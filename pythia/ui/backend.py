@@ -20,7 +20,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
-from pythia import datadir, downloads, onboarding, scanning
+from pythia import datadir, downloads, onboarding, reconciliation, scanning
 
 
 def _normalize_path(path_str: str) -> str:
@@ -50,6 +50,8 @@ class Backend(QObject):
     scanComplete = Signal(object)
     gamesChanged = Signal()
     downloadDetected = Signal(str)  # a new file's path, from a watched Downloads folder
+    mergeCandidatesReady = Signal(object)
+    mergeComplete = Signal(object)
 
     def __init__(self):
         super().__init__()
@@ -180,3 +182,21 @@ class Backend(QObject):
     def stop_watch(self):
         if self._watch_stop_event is not None:
             self._watch_stop_event.set()
+
+    # ---- reconciliation ---------------------------------------------------------
+    @Slot()
+    def refresh_merge_candidates(self):
+        threading.Thread(target=self._merge_candidates_worker, daemon=True).start()
+
+    def _merge_candidates_worker(self):
+        candidates = reconciliation.find_merge_candidates()
+        self.mergeCandidatesReady.emit(_jsonable(candidates))
+
+    @Slot(int, int)
+    def merge_games(self, surviving_id: int, retired_id: int):
+        threading.Thread(target=self._merge_worker, args=(surviving_id, retired_id), daemon=True).start()
+
+    def _merge_worker(self, surviving_id, retired_id):
+        result = reconciliation.merge(surviving_id, retired_id)
+        self.refresh_games()
+        self.mergeComplete.emit(_jsonable(result))

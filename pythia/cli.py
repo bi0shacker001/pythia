@@ -9,6 +9,8 @@ Commands:
   status <path>    show engine platform support and detected patchers for one install
   enable <path>    run whatever engine plugin remediation is fixable for one install
   open <game_id>   hand this game off to a manager plugin (e.g. the Steam client)
+  duplicates       list this system's tracked games that look like the same game
+  merge <a> <b>    fold game_id b into game_id a (b is deleted)
   renpy-patch ...  the Ren'Py ARM/x86_64 lib patcher (see renpy_patch.patch.run_cli)
 """
 
@@ -16,7 +18,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from pythia import datadir, onboarding, scanning
+from pythia import datadir, onboarding, reconciliation, scanning
 
 
 def _print_result(result: dict):
@@ -251,6 +253,33 @@ def cmd_open(args):
     return 0 if ok else 1
 
 
+def cmd_duplicates(args):
+    """List this system's own tracked games that look like the same game -- a
+    suggestion queue, never auto-applied (see reconciliation.find_merge_candidates)."""
+    candidates = reconciliation.find_merge_candidates()
+    if not candidates:
+        print("No likely duplicates found.")
+        return 0
+    for c in candidates:
+        a, b = c["a"], c["b"]
+        print(f"  {c['score']:.2f}  [{a['game_id']}] {a['name']!r} ({a['engine_kind']}, {a['version_count']} version(s))")
+        print(f"          <-> [{b['game_id']}] {b['name']!r} ({b['engine_kind']}, {b['version_count']} version(s))")
+        print(f"          a: {a['path']}")
+        print(f"          b: {b['path']}")
+    print(f"\n{len(candidates)} candidate pair(s). Use `pythia merge <a> <b>` to fold b into a.")
+    return 0
+
+
+def cmd_merge(args):
+    """Fold game_id `retired` into game_id `surviving` (see reconciliation.merge)."""
+    result = reconciliation.merge(args.surviving, args.retired)
+    if result["status"] != "ok":
+        print(f"error: {result['message']}", file=sys.stderr)
+        return 1
+    print(f"  -> game_id {result['retired_game_id']} merged into {result['game_id']}")
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="pythia")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -282,6 +311,14 @@ def build_parser():
     p_open.add_argument("game_id", type=int)
     p_open.add_argument("--yes", action="store_true", help="Don't prompt for confirmation before handing off.")
     p_open.set_defaults(func=cmd_open)
+
+    p_duplicates = sub.add_parser("duplicates", help="List tracked games that look like the same game.")
+    p_duplicates.set_defaults(func=cmd_duplicates)
+
+    p_merge = sub.add_parser("merge", help="Fold game_id b into game_id a (b is deleted).")
+    p_merge.add_argument("surviving", type=int)
+    p_merge.add_argument("retired", type=int)
+    p_merge.set_defaults(func=cmd_merge)
 
     # renpy-patch is *not* registered as a normal subparser: it owns its own
     # argparse setup (patch.run_cli) with flags like --library/--game that clash

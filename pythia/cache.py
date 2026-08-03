@@ -82,6 +82,18 @@ def upsert_entry(entry: dict, filename: str):
         conn.close()
 
 
+def remove_entry(system_uuid: str, game_id: int):
+    """Drop one cache row -- used by reconciliation.merge() when a retired game_id's
+    datadir file is deleted, so the index doesn't keep pointing at a file that no
+    longer exists."""
+    conn = _connect()
+    try:
+        conn.execute("DELETE FROM games WHERE game_id = ? AND system_uuid = ?", (game_id, system_uuid))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def rebuild(datadir_dir: Path):
     """Drop and repopulate the whole cache by rescanning every datadir/*.json file."""
     import json

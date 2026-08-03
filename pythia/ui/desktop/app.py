@@ -8,6 +8,7 @@ if basic, window today rather than nothing.
 
 from PySide6.QtWidgets import (
     QFileDialog,
+    QHBoxLayout,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -17,6 +18,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from pythia.ui.desktop.reconciliation import ReconciliationDialog
 
 
 class MainWindow(QMainWindow):
@@ -30,9 +33,19 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
 
+        toolbar = QWidget()
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(toolbar)
+
         scan_btn = QPushButton("Scan Folder...")
         scan_btn.clicked.connect(self._scan_folder)
-        layout.addWidget(scan_btn)
+        toolbar_layout.addWidget(scan_btn)
+
+        duplicates_btn = QPushButton("Review Duplicates...")
+        duplicates_btn.clicked.connect(self._review_duplicates)
+        toolbar_layout.addWidget(duplicates_btn)
+        toolbar_layout.addStretch()
 
         splitter = QSplitter()
         layout.addWidget(splitter)
@@ -54,6 +67,10 @@ class MainWindow(QMainWindow):
         if path:
             self.log.appendPlainText(f"Scanning '{path}' ...")
             self.backend.start_scan(path)
+
+    def _review_duplicates(self):
+        dialog = ReconciliationDialog(self.backend, self)
+        dialog.exec()
 
     def _refresh_list(self):
         self.game_list.clear()

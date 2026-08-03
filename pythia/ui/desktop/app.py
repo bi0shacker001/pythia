@@ -386,6 +386,7 @@ class MainWindow(QMainWindow):
         "version_added": "New version detected",
         "ownership_recorded": "Ownership recorded",
         "merged": "Merged with another entry",
+        "linked_cross_system": "Linked to another system's record",
     }
 
     def _build_history_row(self, event: dict) -> QWidget:

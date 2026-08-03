@@ -125,13 +125,34 @@ def _own_entries():
 
 def find_candidates(detection: dict, name_hint: str, path: Path):
     """Return {"certain": entry_or_None, "suggested": [entries]} -- plausible matches
-    for `detection` among this system's own already-tracked games."""
+    for `detection`.
+
+    **Cross-system aware since 2026-08-03** (a real, previously-flagged foundational
+    gap: this used to search only `_own_entries()`, so if System B already tracked a
+    game, System A onboarding the same install independently would mint a duplicate
+    game_id instead of recognizing System B's existing one -- defeating the whole
+    point of a shared `datadir/`). External-ID and fuzzy-name matching now search
+    every known system's entries (`datadir.list_all_entries()`), not just this
+    system's own. Path matching stays own-only on purpose: an on-disk path is
+    inherently system-local (different machines, different drive letters/mount
+    points), so a path match from another system's file would be coincidence, not a
+    real signal.
+
+    **A `certain`/`suggested` entry may belong to a different system than this one.**
+    Callers must never treat it as directly mutable/saveable -- see `onboard()`'s
+    `_own_or_none()`/`_seed_from()` helpers, which turn a foreign match into a seed
+    for a brand-new entry in *this* system's own file (same game_id, carried-over
+    name/platform_ids/ownership) rather than ever writing to another system's file,
+    which would violate the single-writer-per-file rule everything else in datadir/
+    depends on."""
     own = _own_entries()
+    all_entries = datadir.list_all_entries()
     path_str = str(Path(path).resolve())
 
     # Strongest possible signal: this exact on-disk path is already tracked under some
-    # game. Without this check, re-onboarding the same path (e.g. re-running `scan`)
-    # would mint a brand new game every time instead of updating the existing one.
+    # game *by this system*. Without this check, re-onboarding the same path (e.g.
+    # re-running `scan`) would mint a brand new game every time instead of updating
+    # the existing one.
     certain = None
     for entry in own:
         if any(
@@ -145,24 +166,33 @@ def find_candidates(detection: dict, name_hint: str, path: Path):
     external_id = detection.get("external_id")
     if certain is None and external_id is not None:
         expected_source = f"{detection['kind']}_id"
-        for entry in own:
-            # Both the ID *and* its source kind must match -- otherwise a small
-            # locally-minted counter value could coincidentally collide with an
-            # unrelated external ID (e.g. a low-numbered Steam AppID) and produce a
-            # false "certain" link between two different games.
-            if entry.get("game_id") == external_id and entry_id_source(entry) == expected_source:
-                certain = entry
-                break
+        # Cross-system: prefer this system's own record if it has one, otherwise
+        # take the first match from any system -- if ANY system in the sync group
+        # already claimed this external ID under some game_id, every system should
+        # recognize and converge on it, not each independently mint its own.
+        matches = [
+            e for e in all_entries if e.get("game_id") == external_id and entry_id_source(e) == expected_source
+        ]
+        this_uuid = get_system_uuid()
+        certain = next((e for e in matches if e.get("system_uuid") == this_uuid), None) or (
+            matches[0] if matches else None
+        )
 
     suggested = []
     if certain is None:
         target = name_hint.lower()
-        for entry in own:
+        seen_game_ids = set()
+        scored = []
+        for entry in all_entries:
+            gid = entry.get("game_id")
+            if gid in seen_game_ids:
+                continue  # one suggestion per game_id, not one per system's copy of it
             ratio = difflib.SequenceMatcher(None, target, entry.get("canonical_name", "").lower()).ratio()
             if ratio >= NAME_SIMILARITY_THRESHOLD:
-                suggested.append((ratio, entry))
-        suggested.sort(key=lambda t: t[0], reverse=True)
-        suggested = [e for _, e in suggested]
+                scored.append((ratio, entry))
+                seen_game_ids.add(gid)
+        scored.sort(key=lambda t: t[0], reverse=True)
+        suggested = [e for _, e in scored]
 
     return {"certain": certain, "suggested": suggested}
 
@@ -266,6 +296,15 @@ def onboard(path: Path, decision: dict | None = None):
 
     action = (decision or {}).get("action")
     import_to_location = (decision or {}).get("import_to_location", False)
+    this_uuid = get_system_uuid()
+    # A match `find_candidates()`/a `link` decision points at may belong to a
+    # *different* system (2026-08-03 cross-system fix -- see find_candidates()'s
+    # docstring). `existing_entry` below is only ever set when it's genuinely this
+    # system's own record, safe to mutate and save directly; a foreign match instead
+    # populates `foreign_seed`, used further down to seed a brand-new entry in this
+    # system's own file under the *same* game_id -- never writing to another
+    # system's file, which would violate the single-writer-per-file rule.
+    foreign_seed = None
 
     if action == "new":
         game_id, id_source, existing_entry = _mint_new(detection)
@@ -274,14 +313,21 @@ def onboard(path: Path, decision: dict | None = None):
         id_source = "linked"
         existing_entry = _find_own_entry_by_game_id(game_id)
         if existing_entry is None:
-            return {"status": "error", "message": f"No existing tracked game with id {game_id} on this system."}
+            foreign_seed = _find_any_entry_by_game_id(game_id)
+            if foreign_seed is None:
+                return {"status": "error", "message": f"No existing tracked game with id {game_id} on any known system."}
     else:
         # Automatic: certain match -> link, otherwise new. Used by scan_library() and
         # any caller that doesn't want to prompt.
-        if candidates["certain"] is not None:
-            existing_entry = candidates["certain"]
-            game_id = existing_entry["game_id"]
-            id_source = entry_id_source(existing_entry)
+        certain = candidates["certain"]
+        if certain is not None:
+            game_id = certain["game_id"]
+            id_source = entry_id_source(certain)
+            if certain.get("system_uuid") == this_uuid:
+                existing_entry = certain
+            else:
+                existing_entry = None
+                foreign_seed = certain
         else:
             game_id, id_source, existing_entry = _mint_new(detection)
 
@@ -302,12 +348,16 @@ def onboard(path: Path, decision: dict | None = None):
 
     is_new_entry = existing_entry is None
     entry = existing_entry or {
-        "system_uuid": get_system_uuid(),
+        "system_uuid": this_uuid,
         "game_id": game_id,
         "game_id_source": id_source,
-        "canonical_name": name,
-        "platform_ids": [],
-        "ownership": [],
+        "canonical_name": (foreign_seed or {}).get("canonical_name") or name,
+        # Cross-system seed carries over additively (2026-08-03) -- if another
+        # system already knows this game's platform_ids/ownership, this system's
+        # brand-new file starts with that context instead of losing it; still just
+        # a starting point, not a live link back to the foreign entry.
+        "platform_ids": list((foreign_seed or {}).get("platform_ids", [])),
+        "ownership": list((foreign_seed or {}).get("ownership", [])),
         "managed_externally": False,
         "version_management_enabled": True,
         "notes": "",
@@ -325,7 +375,11 @@ def onboard(path: Path, decision: dict | None = None):
     )
     _merge_version(entry, path, version_label, mods, language, detection.get("platforms", []), source)
 
-    if is_new_entry:
+    if is_new_entry and foreign_seed is not None:
+        datadir.add_timeline_event(
+            entry, "linked_cross_system", f"{version_label or '?'} ({source['kind']}), matched another system's record"
+        )
+    elif is_new_entry:
         datadir.add_timeline_event(entry, "game_added", f"{version_label or '?'} ({source['kind']})")
     elif is_new_variant_path:
         datadir.add_timeline_event(entry, "version_added", f"{version_label or '?'} ({source['kind']})")
@@ -355,6 +409,17 @@ def _mint_new(detection: dict):
 
 def _find_own_entry_by_game_id(game_id: int):
     for entry in _own_entries():
+        if entry.get("game_id") == game_id:
+            return entry
+    return None
+
+
+def _find_any_entry_by_game_id(game_id: int):
+    """Cross-system lookup (2026-08-03, part of the same find_candidates() fix) --
+    used when a `link` decision names a game_id this system doesn't have its own
+    file for yet, but another system does. The caller must treat the result as a
+    read-only seed, never mutate/save it directly (see onboard()'s own handling)."""
+    for entry in datadir.list_all_entries():
         if entry.get("game_id") == game_id:
             return entry
     return None

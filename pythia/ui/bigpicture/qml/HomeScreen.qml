@@ -89,7 +89,22 @@ Item {
                     }
 
                     Label {
-                        text: (entry.source && entry.source.kind) ? entry.source.kind : "unknown"
+                        // schema v3 (2026-08-03): source moved off the top-level entry
+                        // to each variant, since a game can have installs from more than
+                        // one place (a Steam copy and an Epic copy of the same game_id).
+                        // This card just shows the first variant found's kind as a
+                        // representative label -- the real per-install detail lives in
+                        // entry.versions[*].variants[*].source.
+                        text: {
+                            for (var i = 0; i < (entry.versions ? entry.versions.length : 0); i++) {
+                                var variants = entry.versions[i].variants || []
+                                for (var j = 0; j < variants.length; j++) {
+                                    var source = variants[j].source
+                                    if (source && source.kind) return source.kind
+                                }
+                            }
+                            return "unknown"
+                        }
                         color: "#7fb3ff"
                         font.pixelSize: 14
                     }

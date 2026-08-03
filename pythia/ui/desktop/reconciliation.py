@@ -84,11 +84,11 @@ class ReconciliationDialog(QDialog):
         actions_layout = QHBoxLayout(actions)
         actions_layout.setContentsMargins(2, 2, 2, 2)
 
-        keep_a_btn = QPushButton(f"Keep A, merge B in")
+        keep_a_btn = QPushButton("Keep A, merge B in")
         keep_a_btn.clicked.connect(lambda: self._merge(a["game_id"], b["game_id"]))
         actions_layout.addWidget(keep_a_btn)
 
-        keep_b_btn = QPushButton(f"Keep B, merge A in")
+        keep_b_btn = QPushButton("Keep B, merge A in")
         keep_b_btn.clicked.connect(lambda: self._merge(b["game_id"], a["game_id"]))
         actions_layout.addWidget(keep_b_btn)
 

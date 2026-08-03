@@ -419,7 +419,7 @@ def run_cli(argv):
 
 # ---------------------------------------------------------------------------
 # GUI (stdlib tkinter only). Standalone Ren'Py-patcher GUI, separate from the
-# unified Pythia GUI in pythia/gui.py.
+# unified Pythia Qt UI in pythia/ui/.
 # ---------------------------------------------------------------------------
 def run_gui():
     import queue

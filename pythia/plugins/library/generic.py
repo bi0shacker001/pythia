@@ -13,8 +13,6 @@ Moved verbatim from detectors/generic.py, adapted to the LibraryPlugin interface
 
 from pathlib import Path
 
-from pathlib import Path
-
 from pythia.plugins import LibraryPlugin
 from pythia.plugins.registry import register_builtin
 

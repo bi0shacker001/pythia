@@ -2,8 +2,8 @@
 onboard(path) -- identify a single game root and start (or continue) tracking it.
 
 Split into pure detection/matching (find_candidates) and an explicit commit step
-(onboard) driven by a `decision` -- interactive prompting belongs in cli.py/gui.py,
-not here. See the Milestone 1 plan for the full rationale.
+(onboard) driven by a `decision` -- interactive prompting belongs in cli.py or the
+Qt UI's backend.py, not here. See the Milestone 1 plan for the full rationale.
 """
 
 import difflib
@@ -167,9 +167,9 @@ def entry_id_source(entry: dict) -> str:
 
 def preview(path: Path):
     """Identify `path` and find candidate existing games, without writing anything.
-    This is what cli.py/gui.py call before asking the user for a decision. Returns
-    {"status": "ok", "path", "detection", "name", "version_label", "candidates"} or
-    {"status": "error", "message": ...}.
+    This is what cli.py/the Qt UI's backend.py call before asking the user for a
+    decision. Returns {"status": "ok", "path", "detection", "name", "version_label",
+    "candidates"} or {"status": "error", "message": ...}.
     """
     path = Path(path).resolve()
     if not path.is_dir():

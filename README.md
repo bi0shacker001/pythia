@@ -20,6 +20,22 @@ pip install pyside6
 Nothing else does. If PySide6 isn't installed, the CLI still works fine; only the
 no-args UI launch prints a short message pointing back here instead of a traceback.
 
+**`epic-connect`/`epic-sync` need `legendary`** (a real, actively-maintained,
+third-party Epic Games Store CLI -- preferred over reimplementing Epic's OAuth
+client ourselves). Nothing to install by hand: the first time it's needed, Pythia
+downloads the real, official, architecture-matched standalone binary from
+legendary's own GitHub releases into `app_data_dir()/tools/legendary/` and runs it
+as a subprocess (same model as Lutris's own runners system -- a downloaded external
+tool binary, not a Python import). This is why it's a *downloaded* dependency rather
+than a `pip install`: the standalone `pythia.exe` build has no pip/Python
+environment to install into at runtime. Only x86_64 Windows/Linux builds exist
+today (no arm64 build is published upstream) -- `epic-connect`/`epic-sync` report a
+clear "not available on this architecture" rather than downloading a mismatched
+binary. Its own login session is stored locally (`app_data_dir()/legendary`, not
+the synced `datadir/`) -- you only need to run `epic-connect` on one system, ever;
+the resulting owned-games data syncs normally like everything else once that system
+does.
+
 Nothing under `pythia/renpy_patch/` will ever gain a dependency -- that module is
 stdlib-only, no exceptions.
 

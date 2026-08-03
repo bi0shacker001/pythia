@@ -63,6 +63,8 @@ resources, embedded strings, archive headers -- is also fair game for detection
 
 from pathlib import Path
 
+from pythia import credentials
+
 
 class PluginMeta:
     """Metadata every plugin declares about itself, independent of what it does --
@@ -73,13 +75,43 @@ class PluginMeta:
     plan's Research findings): a list of {"key", "label", "type", "default"} dicts
     that simultaneously define what a plugin's settings persist *and* let a host UI
     (Milestone 5) auto-generate a settings form with zero per-plugin UI code. Empty
-    by default -- most built-ins today need no configuration."""
+    by default -- most built-ins today need no configuration.
+
+    `credential_fields` is the same declarative-schema idea, specialized for secrets
+    (2026-08-03, added after ItchLibraryPlugin and SteamLibraryPlugin both grew an
+    account-connect flow and the desktop Settings UI ended up hardcoding "itch.io"
+    directly into a section title -- a real "we want pluggable modules" bug: any
+    plugin with account-level ownership should get a real Settings row for free, not
+    require bespoke UI code per plugin). A list of {"key", "label", "secret": bool}
+    dicts; `get_credential`/`set_credential` below persist them generically via
+    `pythia.credentials` -- **synced** through datadir/credentials/ (2026-08-03,
+    changed from an earlier local.db-only design specifically because a login flow
+    with real friction, GOG's OAuth dance in particular, would otherwise have to be
+    repeated independently on every synced system, defeating the point of Pythia's
+    whole cross-system model. See pythia/credentials.py's own docstring for the real,
+    accepted tradeoff this involves -- synced secrets, no encryption at rest)."""
 
     id: str = "base"
     display_name: str = "Unnamed plugin"
     version: str = "0.0.0"
     author: str = "unknown"
     config_schema: list = []
+    credential_fields: list = []
+
+    def get_credential(self, key: str) -> str | None:
+        return credentials.get_credential(self.id, key)
+
+    def set_credential(self, key: str, value: str):
+        credentials.set_credential(self.id, key, value)
+
+    def is_connected(self) -> bool:
+        """True once every declared credential field has a value. A plugin with no
+        credential_fields at all is never "connected" in this sense (nothing to
+        connect) -- distinct from list_owned() returning None, which specifically
+        means "not connected yet" for a plugin that DOES have fields."""
+        if not self.credential_fields:
+            return False
+        return all(self.get_credential(f["key"]) for f in self.credential_fields)
 
 
 class LibraryPlugin(PluginMeta):
@@ -298,6 +330,14 @@ class MetadataPlugin(PluginMeta):
         without any way to tell whether the user owns each piece, same limitation as
         platform_support(). Returns a list of {"id", "name"} dicts, or None if not
         known."""
+        return None
+
+    def resolve_name(self, platform_id: dict) -> str | None:
+        """This platform's real display name for the game, purely from a known ID --
+        added 2026-08-03 to close a real, stated fidelity gap: GogLibraryPlugin's
+        list_owned() only ever returns bare product IDs (its account-ownership
+        endpoint doesn't include names), unlike Steam's/Epic's, which do. None means
+        "not known," same contract as the other methods here."""
         return None
 
 

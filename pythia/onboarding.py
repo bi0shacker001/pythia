@@ -95,7 +95,13 @@ def _derive_name_version_mods_language(path: Path):
     When the leaf folder name itself is just a version/part marker with no real title
     (see _is_generic_part_leaf), looks to a meaningful ancestor folder for the name
     instead of minting a bogus separate "game" per part/chapter/version subfolder."""
-    folder_name = path.name
+    # path.name can be "" for a path a real directory listing would never produce
+    # (e.g. a leading "//" parses as a UNC-style anchor with no separate name
+    # component on Windows) -- not reachable through scanning.py's Path.iterdir()
+    # walk, but reachable if a user hand-types a path to `pythia onboard`. Fall back
+    # to the fully-resolved path string so the caller never receives an empty name
+    # (2026-08-03, caught by the fuzz harness in tests/test_naming_fuzz.py).
+    folder_name = path.name or str(path)
 
     if _is_generic_part_leaf(folder_name):
         ancestor_name = _find_meaningful_ancestor_name(path)
@@ -375,6 +381,129 @@ def add_ownership(game_id: int, platform: str, note: str | None = None):
     cache.upsert_entry(entry, saved_path.name)
 
     return {"status": "ok", "game_id": game_id, "ownership": entry["ownership"]}
+
+
+def _resolve_name_via_metadata(kind: str, detection: dict):
+    """A real name-resolution fallback for services whose ownership listing has no
+    name field at all (GOG's bare product IDs, see plugins/library/gog.py) -- tries
+    every enabled MetadataPlugin willing to serve this platform (2026-08-03, closes
+    a real, previously-stated fidelity gap). Best-effort: returns None (falls
+    through to the existing "Unknown (...)" placeholder) if no metadata plugin has
+    an answer, never raises."""
+    id_key = datadir.PLATFORM_ID_KINDS.get(kind)
+    platform_id_value = detection.get("extra", {}).get(id_key) if id_key else None
+    if platform_id_value is None:
+        return None
+
+    from pythia.plugins import metadata as metadata_plugins
+
+    for plugin in metadata_plugins.find_for_platform(kind):
+        try:
+            name = plugin.resolve_name({"platform": kind, "id": platform_id_value})
+        except Exception:
+            continue
+        if name:
+            return name
+    return None
+
+
+def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[dict, bool]:
+    """Fold one ownership detection dict (the shape `list_owned()` produces) into
+    this system's tracked games -- the single-item primitive `sync_owned()` loops
+    over, factored out (2026-08-03) so a single-thread add (F95's browser-extension
+    RPC `/games/add` handler, real logic ported from F95Checker's own
+    `callbacks.add_games()`) can reuse the exact same matching/creation logic as a
+    bulk account sync, instead of duplicating it. `own` lets a caller doing several
+    adds in a row pass the same already-loaded list through repeatedly rather than
+    re-reading every datadir file per call; omit it for a one-off call.
+
+    Returns (entry, created) -- `created` is False when this detection matched an
+    already-tracked game (additive update only), True when a new entry was minted."""
+    own = _own_entries() if own is None else own
+    kind = detection["kind"]
+    external_id = detection.get("external_id")
+    expected_source = f"{kind}_id"
+    # The real identifying value isn't always the numeric external_id -- a service
+    # like Epic Games Store identifies a game by a string AppName, kept in
+    # extra[PLATFORM_ID_KINDS[kind]], with external_id always None (2026-08-03,
+    # caught before it could duplicate every EGS game on every re-sync: the
+    # platform_ids fallback below used to be gated on `external_id is not None`,
+    # which a string-identified service can never satisfy).
+    id_key = datadir.PLATFORM_ID_KINDS.get(kind)
+    string_id = detection.get("extra", {}).get(id_key) if id_key else None
+
+    entry = None
+    if external_id is not None:
+        entry = next(
+            (e for e in own if e.get("game_id") == external_id and entry_id_source(e) == expected_source),
+            None,
+        )
+    if entry is None and id_key is not None:
+        # Not tracked by numeric ID (or has none) yet -- also check platform_ids in
+        # case this game is already tracked under a different (e.g. locally-minted)
+        # game_id via a different source, so a re-run doesn't mint a duplicate.
+        # Matches on whichever of external_id/string_id this service actually
+        # identifies games by.
+        match_value = external_id if external_id is not None else string_id
+        if match_value is not None:
+            entry = next(
+                (
+                    e
+                    for e in own
+                    if any(p.get("platform") == kind and p.get("id") == match_value for p in e.get("platform_ids", []))
+                ),
+                None,
+            )
+
+    created = entry is None
+    if entry is None:
+        game_id = external_id if external_id is not None else next_game_id()
+        name = detection.get("name") or _resolve_name_via_metadata(kind, detection)
+        entry = {
+            "system_uuid": get_system_uuid(),
+            "game_id": game_id,
+            "game_id_source": expected_source if external_id is not None else "local",
+            "canonical_name": name or f"Unknown ({kind} {external_id})",
+            "platform_ids": [],
+            "ownership": [],
+            "managed_externally": False,
+            "version_management_enabled": True,
+            "notes": "",
+            "versions": [],
+            "available_updates": [],
+        }
+        own.append(entry)
+
+    _update_platform_ids_and_ownership(entry, detection)
+    saved_path = datadir.save_entry(entry)
+
+    from pythia import cache
+
+    cache.upsert_entry(entry, saved_path.name)
+    return entry, created
+
+
+def sync_owned(plugin) -> dict:
+    """Pull `plugin.list_owned()` (an account-level ownership listing, independent of
+    any local install -- e.g. ItchLibraryPlugin's real API-key-based itch.io pull,
+    2026-08-03) and fold it into this system's tracked games via record_ownership().
+    Returns {"status": "ok", "linked": N, "created": N} or an error if the plugin has
+    no real list_owned() implementation."""
+    owned = plugin.list_owned()
+    if owned is None:
+        return {"status": "error", "message": f"'{plugin.id}' has no account connected (or doesn't support list_owned())."}
+
+    own = _own_entries()
+    linked = 0
+    created = 0
+    for detection in owned:
+        _entry, was_created = record_ownership(detection, own)
+        if was_created:
+            created += 1
+        else:
+            linked += 1
+
+    return {"status": "ok", "linked": linked, "created": created}
 
 
 def _update_platform_ids_and_ownership(entry: dict, detection: dict):

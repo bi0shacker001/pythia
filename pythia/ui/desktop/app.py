@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QTabWidget,
@@ -34,6 +35,7 @@ from PySide6.QtWidgets import (
 
 from pythia.ui import theme
 from pythia.ui.desktop.reconciliation import ReconciliationDialog
+from pythia.ui.desktop.settings import SettingsDialog
 
 
 def _first_variant(entry: dict):
@@ -91,6 +93,7 @@ class MainWindow(QMainWindow):
         self._models = []
         self._visible_models = []
         self._selected_model = None
+        self._manager_candidates = []
 
         self._build_menu_bar()
         self._build_central()
@@ -148,9 +151,12 @@ class MainWindow(QMainWindow):
         self._nav_list = QListWidget()
         self._nav_list.setObjectName("navList")
         self._nav_list.addItem("Library")
+        self._nav_list.addItem("Duplicates")
+        self._nav_list.addItem("Settings")
         self._nav_list.setCurrentRow(0)
-        self._nav_list.setFixedHeight(36)
+        self._nav_list.setFixedHeight(112)
         self._nav_list.setFrameShape(QListWidget.Shape.NoFrame)
+        self._nav_list.itemClicked.connect(self._on_nav_clicked)
         layout.addWidget(self._nav_list)
         layout.addStretch()
 
@@ -209,6 +215,12 @@ class MainWindow(QMainWindow):
         title_col.addWidget(self._detail_sub)
         head_layout.addLayout(title_col)
         head_layout.addStretch()
+
+        self._open_button = QPushButton("Open")
+        self._open_button.setObjectName("primary")
+        self._open_button.setVisible(False)
+        self._open_button.clicked.connect(self._open_in_manager)
+        head_layout.addWidget(self._open_button)
         layout.addWidget(head)
 
         self._tabs = QTabWidget()
@@ -315,7 +327,13 @@ class MainWindow(QMainWindow):
             self._versions_list.clear()
             self._notes_edit.clear()
             self._history_list.clear()
+            self._open_button.setVisible(False)
             return
+
+        self._manager_candidates = self.backend.find_manager_for_game(model.game_id)
+        self._open_button.setVisible(bool(self._manager_candidates))
+        if self._manager_candidates:
+            self._open_button.setText(f"Open in {self._manager_candidates[0]['manager_name']}")
 
         self._detail_badge.setText(model.name[:1].upper())
         start, end = theme.badge_gradient(model.kind)
@@ -409,11 +427,46 @@ class MainWindow(QMainWindow):
         dialog = ReconciliationDialog(self.backend, self)
         dialog.exec()
 
+    def _open_settings(self):
+        dialog = SettingsDialog(self.backend, self)
+        dialog.exec()
+
+    def _on_nav_clicked(self, item):
+        # "Library" is the persistent main view; "Duplicates"/"Settings" are modal
+        # actions -- clicking them opens the relevant dialog and then snaps
+        # selection back to Library rather than leaving the rail on a "page" that
+        # doesn't actually exist in this pane.
+        text = item.text()
+        if text == "Duplicates":
+            self._review_duplicates()
+        elif text == "Settings":
+            self._open_settings()
+        self._nav_list.setCurrentRow(0)
+
     def _save_notes(self):
         if self._selected_model is None:
             return
         self.backend.save_notes(self._selected_model.game_id, self._notes_edit.toPlainText())
         self._status_label.setText("Notes saved.")
+
+    def _open_in_manager(self):
+        # Pythia never launches a game's own executable -- this hands off to a
+        # third-party tool (Steam client, etc.) that runs it, same boundary as
+        # cli.py's `open` command. Real side effect (launches an external
+        # application), so it's confirmed first, same as the CLI does.
+        if self._selected_model is None or not self._manager_candidates:
+            return
+        candidate = self._manager_candidates[0]
+        answer = QMessageBox.question(
+            self,
+            "Open game",
+            f"This will hand off to {candidate['manager_name']} to launch "
+            f"“{self._selected_model.name}”. Proceed?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.backend.open_in_manager(self._selected_model.game_id, candidate["manager_id"])
+        self._status_label.setText(f"Handing off to {candidate['manager_name']}...")
 
     def _on_log_line(self, line: str):
         self._status_label.setText(line)

@@ -14,15 +14,22 @@ engine identification, with no library-side duplicate.
 
 from pathlib import Path
 
+from pythia.plugins.library.egs import plugin as egs_plugin
+from pythia.plugins.library.f95 import plugin as f95_plugin
 from pythia.plugins.library.generic import plugin as generic_plugin
+from pythia.plugins.library.gog import plugin as gog_plugin
 from pythia.plugins.library.itch import plugin as itch_plugin
 from pythia.plugins.library.steam import plugin as steam_plugin
 from pythia.plugins.registry import filter_enabled, for_category
 
 # Built-in priority order, used only to pick a single winner in identify() when more
 # than one plugin matches the same path. Generic is the unconditional catch-all, so
-# it must always rank last.
-_DEFAULT_PRIORITY = [steam_plugin.id, itch_plugin.id, generic_plugin.id]
+# it must always rank last. f95 has no match()/is_root() at all (account/watchlist-
+# only, see its own docstring) so its priority position is moot -- listed for
+# completeness.
+_DEFAULT_PRIORITY = [
+    steam_plugin.id, gog_plugin.id, egs_plugin.id, itch_plugin.id, f95_plugin.id, generic_plugin.id,
+]
 
 
 def all_plugins() -> list:

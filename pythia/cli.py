@@ -220,23 +220,9 @@ def cmd_open(args):
         print(f"error: no tracked game with id {args.game_id}.", file=sys.stderr)
         return 1
 
-    detections_by_kind = {}
-    for entry in entries:
-        for group in entry.get("versions", []):
-            for variant in group.get("variants", []):
-                source = variant.get("source") or {}
-                kind = source.get("kind")
-                if kind:
-                    detections_by_kind[kind] = {"kind": kind, "extra": source.get("extra", {})}
-
-    candidates = [
-        (plugin, detections_by_kind[kind])
-        for kind in detections_by_kind
-        for plugin in manager_plugins.find_for_source(kind)
-    ]
+    candidates = manager_plugins.find_for_game(entries)
     if not candidates:
-        seen = sorted(detections_by_kind) or ["none"]
-        print(f"No manager plugin knows how to launch this game (sources seen: {', '.join(seen)}).")
+        print("No manager plugin knows how to launch this game.")
         return 1
 
     manager_plugin, detection = candidates[0]
@@ -280,6 +266,180 @@ def cmd_merge(args):
     return 0
 
 
+def cmd_itch_connect(args):
+    """Store an itch.io API key locally (never synced) for real account-level
+    ownership pulls -- see pythia/plugins/library/itch.py's module docstring for
+    where this flow came from (ported from Lutris's actual itchio.py service)."""
+    from pythia.plugins.library import itch as itch_plugin_module
+
+    itch_plugin_module.set_api_key(args.api_key)
+    print("itch.io API key saved. Run `pythia itch-sync` to pull your owned library.")
+    return 0
+
+
+def cmd_itch_sync(args):
+    """Pull the user's real itch.io ownership (via the API key set with
+    `itch-connect`) and fold it into this system's tracked games."""
+    from pythia.plugins.library.itch import plugin as itch_plugin
+
+    result = onboarding.sync_owned(itch_plugin)
+    if result["status"] != "ok":
+        print(f"error: {result['message']}", file=sys.stderr)
+        return 1
+    print(f"  -> {result['linked']} game(s) linked, {result['created']} new game(s) recorded (ownership only).")
+    return 0
+
+
+def cmd_steam_connect(args):
+    """Store a Steam Web API key locally (never synced, never Lutris's default key)
+    for real account-level ownership pulls -- get one at
+    https://steamcommunity.com/dev/apikey."""
+    from pythia.plugins.library import steam as steam_plugin_module
+
+    steam_plugin_module.set_api_key(args.api_key)
+    if args.steamid64:
+        steam_plugin_module.set_steamid64(args.steamid64)
+    print("Steam API key saved. Run `pythia steam-sync` to pull your owned library.")
+    return 0
+
+
+def cmd_steam_sync(args):
+    """Pull the user's real Steam ownership (via the API key set with
+    `steam-connect`, and the most-recently-used local Steam account unless overridden)
+    and fold it into this system's tracked games."""
+    from pythia.plugins.library.steam import plugin as steam_plugin
+
+    result = onboarding.sync_owned(steam_plugin)
+    if result["status"] != "ok":
+        print(f"error: {result['message']}", file=sys.stderr)
+        return 1
+    print(f"  -> {result['linked']} game(s) linked, {result['created']} new game(s) recorded (ownership only).")
+    return 0
+
+
+def cmd_gog_connect(args):
+    """Step 1 of GOG's OAuth login: print the URL to open in a real browser (GOG has
+    no self-serve API-key page like Steam/itch.io -- see plugins/library/gog.py)."""
+    from pythia.plugins.library.gog import login_url
+
+    print("Open this URL in your browser, log in, then copy the final redirected URL")
+    print("(it may show a blank/error page -- the address bar is what matters):\n")
+    print(f"  {login_url()}\n")
+    print("Then run: pythia gog-token \"<pasted url>\"")
+    return 0
+
+
+def cmd_gog_token(args):
+    """Step 2: exchange the pasted redirect URL's authorization code for a token,
+    storing the (synced) refresh token."""
+    from pythia.plugins.library.gog import connect_from_redirect_url
+
+    if not connect_from_redirect_url(args.redirected_url):
+        print("error: no authorization code found in that URL.", file=sys.stderr)
+        return 1
+    print("GOG connected. Run `pythia gog-sync` to pull your owned library.")
+    return 0
+
+
+def cmd_gog_sync(args):
+    """Pull the user's real GOG ownership (product IDs only -- see
+    plugins/library/gog.py for why names aren't resolved here) and fold it into this
+    system's tracked games."""
+    from pythia.plugins.library.gog import plugin as gog_plugin
+
+    result = onboarding.sync_owned(gog_plugin)
+    if result["status"] != "ok":
+        print(f"error: {result['message']}", file=sys.stderr)
+        return 1
+    print(f"  -> {result['linked']} game(s) linked, {result['created']} new game(s) recorded (ownership only).")
+    return 0
+
+
+def cmd_epic_connect(args):
+    """Step 1 of Epic's OAuth login: print the URL to open in a real browser."""
+    from pythia.plugins.library.egs import login_url
+
+    print("Open this URL in your browser and log in. Epic's redirect page shows raw")
+    print("JSON text (not a normal page) -- copy that JSON text, then run:\n")
+    print(f"  {login_url()}\n")
+    print('  pythia epic-token \'<pasted JSON>\'')
+    return 0
+
+
+def cmd_epic_token(args):
+    """Step 2: exchange the pasted JSON page content's authorizationCode for a
+    token, storing the (synced) refresh token."""
+    from pythia.plugins.library.egs import connect_from_redirect_json
+
+    if not connect_from_redirect_json(args.pasted_json):
+        print("error: no authorizationCode found in that JSON.", file=sys.stderr)
+        return 1
+    print("Epic Games Store connected. Run `pythia epic-sync` to pull your owned library.")
+    return 0
+
+
+def cmd_epic_sync(args):
+    """Pull the user's real Epic Games Store ownership and fold it into this
+    system's tracked games."""
+    from pythia.plugins.library.egs import plugin as egs_plugin
+
+    result = onboarding.sync_owned(egs_plugin)
+    if result["status"] != "ok":
+        print(f"error: {result['message']}", file=sys.stderr)
+        return 1
+    print(f"  -> {result['linked']} game(s) linked, {result['created']} new game(s) recorded (ownership only).")
+    return 0
+
+
+def cmd_f95_import(args):
+    """One-shot import from a real F95Checker db.sqlite3 -- NOT an ongoing account
+    sync (see plugins/library/f95.py's module docstring for why): datadir is
+    canonical after this, safe to re-run (only ever links/adds, never overwrites),
+    but there's no persistent "connection" the way Steam/GOG/Epic have."""
+    from pythia.plugins.library import f95 as f95_module
+    from pythia.plugins.library.f95 import plugin as f95_plugin
+
+    if args.db_path:
+        f95_module.set_db_path(args.db_path)
+
+    result = onboarding.sync_owned(f95_plugin)
+    if result["status"] != "ok":
+        print(f"error: {result['message']}", file=sys.stderr)
+        return 1
+    print(f"  -> {result['linked']} game(s) linked, {result['created']} new game(s) recorded (watchlist import).")
+    return 0
+
+
+def cmd_f95_export(args):
+    """Write a real, loadable F95Checker db.sqlite3 from Pythia's own tracked f95
+    entries -- deliberately minimal-fidelity, see plugins/library/f95.py."""
+    from pythia.plugins.library.f95 import export_to_sqlite
+
+    count = export_to_sqlite(args.path)
+    print(f"  -> wrote {count} game(s) to '{args.path}'")
+    return 0
+
+
+def cmd_f95_rpc_serve(args):
+    """Run the F95Checker-browser-extension-compatible RPC server in the
+    foreground (Ctrl+C to stop) -- see pythia/f95_rpc.py for the real protocol."""
+    import time
+
+    from pythia import f95_rpc
+
+    f95_rpc.start()
+    print(f"F95 RPC server listening on http://127.0.0.1:{f95_rpc.RPC_PORT} (the official")
+    print("F95Checker browser extension can point at this directly). Ctrl+C to stop.")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        f95_rpc.stop()
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="pythia")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -319,6 +479,56 @@ def build_parser():
     p_merge.add_argument("surviving", type=int)
     p_merge.add_argument("retired", type=int)
     p_merge.set_defaults(func=cmd_merge)
+
+    p_itch_connect = sub.add_parser("itch-connect", help="Save an itch.io API key locally for ownership sync.")
+    p_itch_connect.add_argument("api_key")
+    p_itch_connect.set_defaults(func=cmd_itch_connect)
+
+    p_itch_sync = sub.add_parser("itch-sync", help="Pull real itch.io ownership via the saved API key.")
+    p_itch_sync.set_defaults(func=cmd_itch_sync)
+
+    p_steam_connect = sub.add_parser("steam-connect", help="Save a Steam Web API key locally for ownership sync.")
+    p_steam_connect.add_argument("api_key")
+    p_steam_connect.add_argument("--steamid64", help="Override the local-login-history guess of which account to query.")
+    p_steam_connect.set_defaults(func=cmd_steam_connect)
+
+    p_steam_sync = sub.add_parser("steam-sync", help="Pull real Steam ownership via the saved API key.")
+    p_steam_sync.set_defaults(func=cmd_steam_sync)
+
+    p_gog_connect = sub.add_parser("gog-connect", help="Step 1: print the GOG OAuth login URL.")
+    p_gog_connect.set_defaults(func=cmd_gog_connect)
+
+    p_gog_token = sub.add_parser("gog-token", help="Step 2: exchange the pasted redirect URL for a token.")
+    p_gog_token.add_argument("redirected_url")
+    p_gog_token.set_defaults(func=cmd_gog_token)
+
+    p_gog_sync = sub.add_parser("gog-sync", help="Pull real GOG ownership via the connected account.")
+    p_gog_sync.set_defaults(func=cmd_gog_sync)
+
+    p_epic_connect = sub.add_parser("epic-connect", help="Step 1: print the Epic OAuth login URL.")
+    p_epic_connect.set_defaults(func=cmd_epic_connect)
+
+    p_epic_token = sub.add_parser("epic-token", help="Step 2: exchange the pasted redirect JSON for a token.")
+    p_epic_token.add_argument("pasted_json")
+    p_epic_token.set_defaults(func=cmd_epic_token)
+
+    p_epic_sync = sub.add_parser("epic-sync", help="Pull real Epic Games Store ownership via the connected account.")
+    p_epic_sync.set_defaults(func=cmd_epic_sync)
+
+    p_f95_import = sub.add_parser(
+        "f95-import", help="One-shot import from a real F95Checker db.sqlite3 (not an ongoing sync)."
+    )
+    p_f95_import.add_argument("--db-path", help="Override the default F95Checker db.sqlite3 location.")
+    p_f95_import.set_defaults(func=cmd_f95_import)
+
+    p_f95_export = sub.add_parser("f95-export", help="Write a real F95Checker-compatible db.sqlite3.")
+    p_f95_export.add_argument("path")
+    p_f95_export.set_defaults(func=cmd_f95_export)
+
+    p_f95_rpc = sub.add_parser(
+        "f95-rpc-serve", help="Run the F95Checker browser-extension-compatible RPC server."
+    )
+    p_f95_rpc.set_defaults(func=cmd_f95_rpc_serve)
 
     # renpy-patch is *not* registered as a normal subparser: it owns its own
     # argparse setup (patch.run_cli) with flags like --library/--game that clash

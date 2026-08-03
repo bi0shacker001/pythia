@@ -53,6 +53,7 @@ class Backend(QObject):
     downloadDetected = Signal(str)  # a new file's path, from a watched Downloads folder
     mergeCandidatesReady = Signal(object)
     mergeComplete = Signal(object)
+    accountSyncComplete = Signal(str, object)
 
     def __init__(self):
         super().__init__()
@@ -216,3 +217,154 @@ class Backend(QObject):
                 cache.upsert_entry(entry, saved_path.name)
                 self.refresh_games()
                 return
+
+    # ---- settings -----------------------------------------------------------
+    # Real backing for both front ends' Settings screens (2026-08-03 -- big-picture
+    # had none at all until this point; desktop already talks to these modules
+    # directly since it's plain QtWidgets/Python, but QML's only bridge to Python is
+    # this `backend` context object, so these slots exist specifically for it).
+    @Slot(result="QVariant")
+    def get_system_info(self):
+        from pythia.identity import app_data_dir
+
+        this_uuid = get_system_uuid()
+        others: dict = {}
+        for entry in datadir.list_all_entries():
+            uuid = entry.get("system_uuid")
+            if uuid and uuid != this_uuid:
+                others[uuid] = others.get(uuid, 0) + 1
+        return _jsonable(
+            {
+                "system_uuid": this_uuid,
+                "sync_folder": str(datadir.datadir_path()),
+                "app_data_folder": str(app_data_dir()),
+                "other_systems": [{"uuid": u, "count": c} for u, c in others.items()],
+            }
+        )
+
+    @Slot(result="QVariant")
+    def get_downloader_plugins(self):
+        from pythia.plugins import downloader as downloader_plugins
+        from pythia.plugins.registry import get_enabled_plugin_ids
+
+        allowed = get_enabled_plugin_ids()
+        return _jsonable(
+            [
+                {
+                    "id": p.id,
+                    "display_name": p.display_name,
+                    "enabled": allowed is None or p.id in allowed,
+                }
+                for p in downloader_plugins.all_plugins()
+            ]
+        )
+
+    @Slot(str, bool)
+    def set_plugin_enabled(self, plugin_id: str, enabled: bool):
+        from pythia.plugins.registry import all_plugins, get_enabled_plugin_ids, set_enabled_plugin_ids
+
+        allowed = get_enabled_plugin_ids()
+        current = set(allowed) if allowed is not None else {p.id for p in all_plugins()}
+        if enabled:
+            current.add(plugin_id)
+        else:
+            current.discard(plugin_id)
+        set_enabled_plugin_ids(list(current))
+
+    @Slot(result="QVariant")
+    def get_account_plugins(self):
+        """Every LibraryPlugin declaring credential_fields (PluginMeta's generic
+        secret-storage schema) -- same generic, zero-hardcoding pattern desktop's
+        Settings Accounts section uses."""
+        from pythia.plugins import library as library_plugins
+
+        return _jsonable(
+            [
+                {
+                    "id": p.id,
+                    "display_name": p.display_name,
+                    "connected": p.is_connected(),
+                    "fields": [
+                        {"key": f["key"], "label": f["label"], "secret": bool(f.get("secret"))}
+                        for f in p.credential_fields
+                    ],
+                }
+                for p in library_plugins.all_plugins()
+                if p.credential_fields
+            ]
+        )
+
+    @Slot(str, str, str)
+    def set_account_credential(self, plugin_id: str, key: str, value: str):
+        from pythia.plugins import library as library_plugins
+
+        for p in library_plugins.all_plugins():
+            if p.id == plugin_id:
+                p.set_credential(key, value)
+                return
+
+    @Slot(str)
+    def sync_account(self, plugin_id: str):
+        threading.Thread(target=self._sync_account_worker, args=(plugin_id,), daemon=True).start()
+
+    def _sync_account_worker(self, plugin_id: str):
+        from pythia.plugins import library as library_plugins
+
+        plugin = next((p for p in library_plugins.all_plugins() if p.id == plugin_id), None)
+        if plugin is None:
+            return
+        result = onboarding.sync_owned(plugin)
+        self.refresh_games()
+        self.accountSyncComplete.emit(plugin_id, _jsonable(result))
+
+    @Slot(result=str)
+    def get_ui_mode(self) -> str:
+        from pythia.identity import get_setting
+
+        return get_setting("ui_mode") or ""
+
+    @Slot(str)
+    def set_ui_mode(self, mode: str):
+        from pythia.identity import set_setting
+
+        set_setting("ui_mode", mode)
+
+    # ---- launcher hand-off --------------------------------------------------
+    @Slot(int, result="QVariant")
+    def find_manager_for_game(self, game_id: int):
+        """Every (manager plugin, source kind) this game could be handed off to --
+        lets the UI show/hide an "Open" action and pick which source to use if more
+        than one applies, without launching anything itself (see
+        pythia.plugins.manager.find_for_game())."""
+        from pythia.plugins import manager as manager_plugins
+
+        games = datadir.list_known_games()
+        entries = games.get(game_id, [])
+        candidates = manager_plugins.find_for_game(entries)
+        return _jsonable(
+            [{"manager_id": p.id, "manager_name": p.display_name, "kind": d["kind"]} for p, d in candidates]
+        )
+
+    @Slot(int, str)
+    def open_in_manager(self, game_id: int, manager_id: str):
+        """Real, side-effecting hand-off -- launches an external application (the
+        manager plugin's own tool, e.g. Steam). Never the game's own executable;
+        Pythia's "never launches anything" boundary stays on the game itself. Callers
+        should confirm with the user before calling this, same as cli.py's `open`."""
+        threading.Thread(target=self._open_in_manager_worker, args=(game_id, manager_id), daemon=True).start()
+
+    def _open_in_manager_worker(self, game_id: int, manager_id: str):
+        from pythia.plugins import manager as manager_plugins
+        from pythia.plugins.context import PluginContext
+
+        games = datadir.list_known_games()
+        entries = games.get(game_id, [])
+        candidates = manager_plugins.find_for_game(entries)
+        match = next((c for c in candidates if c[0].id == manager_id), None)
+        if match is None:
+            self.logLine.emit(f"No manager plugin '{manager_id}' available for this game.")
+            return
+        plugin, detection = match
+        ctx = PluginContext(log=self.logLine.emit)
+        ok = plugin.open(detection, ctx)
+        self.logLine.emit("Hand-off attempted." if ok else "Hand-off failed or not supported for this game.")

@@ -27,7 +27,13 @@ SCHEMA_VERSION = 3
 # ownership, but conceptually a different fact -- e.g. Patreon-subscribed but
 # f95-downloaded is ownership without a platform_id, and a game's Steam AppID could
 # be known/recorded for metadata purposes without the user owning it on Steam).
-PLATFORM_ID_KINDS = {"steam": "steam_appid", "itch": "itch_game_id"}
+PLATFORM_ID_KINDS = {
+    "steam": "steam_appid",
+    "itch": "itch_game_id",
+    "gog": "gog_id",
+    "egs": "egs_app_name",
+    "f95": "f95_thread_id",
+}
 
 LANGUAGE_TOKENS = {
     "eng": "en", "en": "en", "english": "en",

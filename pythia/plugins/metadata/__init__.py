@@ -6,6 +6,7 @@ completely separately," extended to detection too -- see MetadataPlugin's
 docstring).
 """
 
+from pythia.plugins.metadata.gog import plugin as gog_metadata  # noqa: F401
 from pythia.plugins.metadata.steam import plugin as steam_metadata  # noqa: F401
 from pythia.plugins.registry import filter_enabled, for_category
 

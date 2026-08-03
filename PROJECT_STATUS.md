@@ -99,18 +99,25 @@ legal/moral possession concept:
   matters is a **watchlist** (which specific titles the user has told Pythia they care
   about), not "ownership" in the gated-platform sense.
 
-### 3.2. Real, confirmed gaps in this model (not yet fixed)
+### 3.2. Real, confirmed gaps in this model
 
 - **`game_id` allocation is not collision-safe.** It's a simple per-system counter,
   with external platform IDs (e.g. a Steam AppID) sometimes reused directly as the
   `game_id`. An external architecture review (independently commissioned by the user)
   flagged this; the fix (random 52-bit IDs + a separate `external_ids[]` list) is
   designed but **not implemented**.
-- **Onboarding only searches this system's own records**, not the merged
-  cross-system view. This means if System B already tracks a game, System A onboarding
-  the same install today can mint a duplicate `game_id` rather than recognizing System
-  B's existing one. This is a real, foundational bug given the whole point of a shared
-  `datadir/`. **Not fixed.**
+- **Onboarding only searching this system's own records — FIXED.** Previously, if
+  System B already tracked a game, System A onboarding the same install would mint a
+  duplicate `game_id` instead of recognizing System B's existing one — a real,
+  foundational bug given the whole point of a shared `datadir/`. `find_candidates()`
+  now searches every known system's records for external-ID and fuzzy-name matches
+  (path matching stays own-only, since a filesystem path is inherently
+  system-local). Fixed carefully to preserve the sync-safety model: a match
+  belonging to another system is never treated as directly mutable — it seeds a
+  brand-new entry in *this* system's own file (same `game_id`, carried-over name/
+  ownership), never writes to another system's file. Verified end-to-end with the
+  real two-system debug simulation: linking produces two separate files converging
+  on the same `game_id`, with the first system's file provably untouched.
 - **No deterministic merge semantics for shared fields.** No per-field revision/origin
   metadata — a later automated rescan could silently clobber a manually-corrected name
   with no way to tell which write should win. **Not fixed.**
@@ -353,10 +360,11 @@ needed to resolve masked download links (see §6).
 1. **The sync-safety model itself** (§3) — is single-writer-per-file actually
    sufficient, or are there sync-conflict edge cases not yet considered (e.g. a file
    deleted on one system while another is mid-write)?
-2. **The three confirmed-but-unfixed data-model gaps** (§3.2) — collision-safe
-   `game_id`, cross-system onboarding search, and merge semantics are all real,
-   acknowledged, load-bearing gaps given the project's whole premise is multi-system
-   sync.
+2. **The remaining data-model gaps** (§3.2) — collision-safe `game_id` allocation
+   and per-field merge semantics are still real, acknowledged, load-bearing gaps
+   given the project's whole premise is multi-system sync (cross-system onboarding
+   search was fixed and verified this round — worth an independent look at the fix
+   itself, not just confirming the gap existed).
 3. **The shared-OAuth-credential decision** (§8) — reasonable given the real
    constraints found, but worth a second, independent opinion given it involves
    platform ToS territory this session couldn't fully resolve.

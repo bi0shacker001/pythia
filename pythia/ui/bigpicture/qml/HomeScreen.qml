@@ -13,6 +13,7 @@ Item {
     property string searchText: ""
     property string filterKind: ""  // "" == All, set from Main.qml's source chips
     signal downloadsRequested()
+    signal gameSelected(int gameId)
     function scanRequested() { folderDialog.open() }
 
     Theme { id: theme }
@@ -112,6 +113,11 @@ Item {
 
                 readonly property var gameEntry: backend.games[entryIndex].entries[0]
                 readonly property string kind: root.representativeKind(gameEntry)
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: root.gameSelected(gameId)
+                }
 
                 RowLayout {
                     anchors.fill: parent

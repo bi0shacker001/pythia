@@ -201,6 +201,16 @@ ApplicationWindow {
             searchText: searchField.text
             filterKind: window.selectedKind
             onDownloadsRequested: stackView.push(downloadsScreenComponent)
+            onGameSelected: function(gameId) {
+                var entry = null
+                for (var i = 0; i < backend.games.length; i++) {
+                    if (backend.games[i].game_id === gameId) {
+                        entry = backend.games[i].entries[0]
+                        break
+                    }
+                }
+                stackView.push(gameDetailScreenComponent, { gameId: gameId, entry: entry })
+            }
         }
     }
 
@@ -223,6 +233,13 @@ ApplicationWindow {
     Component {
         id: settingsScreenComponent
         SettingsScreen {
+            onBack: stackView.pop()
+        }
+    }
+
+    Component {
+        id: gameDetailScreenComponent
+        GameDetailScreen {
             onBack: stackView.pop()
         }
     }

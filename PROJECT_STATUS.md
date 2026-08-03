@@ -229,14 +229,14 @@ This is the same base a future real Wine/Proton runner port would use — see §
   use case), **structured mod profiles**, **collision-safe game_id / cross-system
   onboarding search** (§3.2), **launcher-entry projection** (writing *into*
   Lutris/Playnite/Steam shortcuts, as opposed to just handing off to them).
-- **Big-picture (QML/touch) UI visual polish.** All four screens (Home/Decision/
-  Downloads/Settings — Settings didn't exist at all before this pass) now share real
-  design tokens and a Lutris-informed source-filter-chip pattern, and Settings is
-  backed by real data through new `backend.py` slots (verified against a live
-  `QCoreApplication` test). It launches without error, but the user's own assessment
-  after seeing it is **"ugly"** — needs a real visual pass against the validated
-  desktop-mode mockup, not just a token substitution on the old layout skeleton.
-  Tracked, not done.
+- **Big-picture (QML/touch) UI visual polish.** All five screens (Home/Decision/
+  Downloads/Settings/GameDetail — Settings and GameDetail didn't exist at all before
+  this session) now share real design tokens and a Lutris-informed source-filter-chip
+  pattern, and Settings is backed by real data through new `backend.py` slots
+  (verified against a live `QCoreApplication` test). It launches without error, but
+  the user's own assessment after seeing it is **"ugly"** — needs a real visual pass
+  against the validated desktop-mode mockup, not just a token substitution on the old
+  layout skeleton. Tracked, not done.
 - **Pythia's own packaging metadata** (`pyproject.toml`), a LICENSE file, and a
   third-party-plugin-authoring guide — flagged repeatedly as needed given the
   "meant to be used by others" posture, never started.

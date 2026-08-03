@@ -20,7 +20,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
-from pythia import datadir, downloads, onboarding, reconciliation, scanning
+from pythia import cache, datadir, downloads, onboarding, reconciliation, scanning
+from pythia.identity import get_system_uuid
 
 
 def _normalize_path(path_str: str) -> str:
@@ -200,3 +201,18 @@ class Backend(QObject):
         result = reconciliation.merge(surviving_id, retired_id)
         self.refresh_games()
         self.mergeComplete.emit(_jsonable(result))
+
+    # ---- notes ------------------------------------------------------------------
+    @Slot(int, str)
+    def save_notes(self, game_id: int, text: str):
+        """Update this system's own entry for `game_id`'s free-text notes field
+        (part of the schema since Milestone 3). No-op if this system doesn't own
+        that game_id -- notes are per-system-written, same as everything else."""
+        uuid = get_system_uuid()
+        for entry in datadir.list_all_entries():
+            if entry.get("system_uuid") == uuid and entry.get("game_id") == game_id:
+                entry["notes"] = text
+                saved_path = datadir.save_entry(entry)
+                cache.upsert_entry(entry, saved_path.name)
+                self.refresh_games()
+                return

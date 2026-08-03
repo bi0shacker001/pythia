@@ -8,6 +8,8 @@ detection only, since where these patches come from and how they update hasn't b
 researched yet.
 """
 
+from pathlib import Path
+
 from pythia.plugins.patcher.bundled import plugin as bundled_patcher_plugin  # noqa: F401
 from pythia.plugins.registry import filter_enabled, for_category
 
@@ -18,3 +20,19 @@ def all_plugins() -> list:
 
 def enabled_plugins() -> list:
     return filter_enabled(all_plugins())
+
+
+def identify_all(game_root: Path):
+    """Every enabled patcher plugin whose detect() actually matches -- same
+    per-plugin try/except isolation as library/engine's identify_all() (2026-08-03,
+    defensive hardening after a real crash was found in the identical unguarded
+    pattern -- see plugins/library/__init__.py's identify_all())."""
+    results = []
+    for plugin in enabled_plugins():
+        try:
+            result = plugin.detect(game_root)
+        except Exception:
+            continue
+        if result is not None:
+            results.append((plugin, result))
+    return results

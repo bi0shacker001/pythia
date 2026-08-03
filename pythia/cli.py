@@ -144,30 +144,22 @@ def cmd_status(args):
     ctx = PluginContext(log=print)
 
     print(f"Engine status for '{path}':")
-    found_engine = False
-    for plugin in engine_plugins.enabled_plugins():
-        detection = plugin.detect(path)
-        if detection is None:
-            continue
-        found_engine = True
+    engine_matches = engine_plugins.identify_all(path)
+    for plugin, detection in engine_matches:
         print(f"  [{plugin.display_name}] detected: {detection}")
         print(f"    capabilities: {plugin.capabilities(ctx)}")
         for plat, info in plugin.platform_status(path, ctx).items():
             state = "ok" if info["supported"] else ("fixable" if info["fixable"] else "unsupported")
             requires = ", ".join(info.get("requires", [])) or "-"
             print(f"    {plat:14s} [{state:11s}] requires: {requires}")
-    if not found_engine:
+    if not engine_matches:
         print("  No engine plugin recognized this install.")
 
     print(f"\nPatchers for '{path}':")
-    found_patch = False
-    for plugin in patcher_plugins.enabled_plugins():
-        detected = plugin.detect(path)
-        if detected is None:
-            continue
-        found_patch = True
+    patcher_matches = patcher_plugins.identify_all(path)
+    for plugin, detected in patcher_matches:
         print(f"  [{plugin.display_name}] detected: {detected}")
-    if not found_patch:
+    if not patcher_matches:
         print("  None detected.")
 
     return 0
@@ -186,10 +178,11 @@ def cmd_enable(args):
         return 1
 
     ctx = PluginContext(log=print)
-    matched = next((p for p in engine_plugins.enabled_plugins() if p.detect(path) is not None), None)
-    if matched is None:
+    matches = engine_plugins.identify_all(path)
+    if not matches:
         print(f"error: no engine plugin recognizes '{path}'.", file=sys.stderr)
         return 1
+    matched, _detection = matches[0]
 
     status = matched.platform_status(path, ctx)
     target_platforms = [plat for plat, info in status.items() if info.get("fixable")]

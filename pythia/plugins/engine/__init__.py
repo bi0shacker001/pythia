@@ -36,12 +36,21 @@ def enabled_plugins() -> list:
 def identify_all(game_root: Path, current_kind: str | None = None):
     """Every enabled plugin willing to try against `current_kind` whose detect()
     actually matches -- multiple matches are normal, not an error. A plugin with
-    refines_kinds=None (the default) is always willing."""
+    refines_kinds=None (the default) is always willing. Each plugin's detect() is
+    isolated in its own try/except (2026-08-03, defensive hardening after finding
+    the identical unguarded-loop pattern actually crashed every onboard/scan call
+    once one library plugin didn't override match() -- see
+    plugins/library/__init__.py's identify_all() for the real incident this
+    mirrors): a broken third-party engine plugin must never take every other
+    plugin's identification down with it."""
     results = []
     for plugin in enabled_plugins():
         if plugin.refines_kinds is not None and current_kind not in plugin.refines_kinds:
             continue
-        result = plugin.detect(game_root)
+        try:
+            result = plugin.detect(game_root)
+        except Exception:
+            continue
         if result is not None:
             results.append((plugin, result))
     return results

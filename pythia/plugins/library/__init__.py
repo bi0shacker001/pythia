@@ -44,10 +44,18 @@ def enabled_plugins() -> list:
 
 def identify_all(path: Path):
     """Every enabled plugin that matches `path` -- multiple matches are normal, not
-    an error (e.g. two Steam library plugins both recognizing the same install)."""
+    an error (e.g. two Steam library plugins both recognizing the same install).
+    Each plugin's match() is isolated in its own try/except (2026-08-03, added
+    after a real bug -- see PluginMeta.match()'s docstring -- where one plugin's
+    exception took down every single onboard/scan call): a broken third-party
+    plugin degrades the same way a broken plugin at discovery time already does
+    elsewhere in the registry, it never crashes the whole app."""
     results = []
     for plugin in enabled_plugins():
-        result = plugin.match(path)
+        try:
+            result = plugin.match(path)
+        except Exception:
+            continue
         if result is not None:
             results.append((plugin, result))
     return results

@@ -117,6 +117,7 @@ def merge(surviving_game_id: int, retired_game_id: int) -> dict:
             survivor_ownership.append(o)
             known_owned.add(o.get("platform"))
 
+    datadir.add_timeline_event(survivor, "merged", f"folded in game_id {retired_game_id} ({retired.get('canonical_name', '?')})")
     saved_path = datadir.save_entry(survivor)
     cache.upsert_entry(survivor, saved_path.name)
 

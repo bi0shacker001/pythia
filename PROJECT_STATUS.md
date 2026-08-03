@@ -313,6 +313,21 @@ needed to resolve masked download links (see §6).
   a string-identified service (Epic's `AppName`) could never populate — every Epic
   game would have duplicated on every re-sync. Caught and fixed before shipping, with
   a real two-sync verification test.
+- **A third, critical bug — found and fixed, worth flagging to a reviewer
+  specifically**: `identify_all()` called every enabled `LibraryPlugin`'s `match()`
+  with no exception handling, and `match()`'s base-class default was
+  `raise NotImplementedError`. `F95LibraryPlugin` (account/watchlist-only, no
+  path-based matching by design) never overrode it. **Net effect: every single
+  `onboard`/`scan` call — CLI or UI — had been crashing since F95's library plugin
+  was registered.** It slipped through because every regression check in this
+  session had re-run `list` (reads already-tracked data) rather than exercising
+  fresh onboarding end-to-end — a real gap in the verification discipline itself,
+  worth a reviewer's attention: **testing what already works isn't the same as
+  testing the actual failure mode.** Fixed at the root (the base-class default
+  changed to `None`, matching every other "no answer" convention already in the
+  codebase; `identify_all()` gained the same per-plugin isolation every other
+  discovery path already had) and re-verified against a real scan of the user's
+  actual library (4 real titles, 0 errors), not just the one crashing case.
 
 ---
 

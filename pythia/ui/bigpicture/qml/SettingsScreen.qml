@@ -195,7 +195,7 @@ Item {
                                             echoMode: modelData.secret ? TextInput.Password : TextInput.Normal
                                             font.pixelSize: 14
                                             color: theme.text
-                                            background: Rectangle { color: theme.surfaceSunken; radius: 6; border.color: theme.border }
+                                            background: Rectangle { color: theme.surfaceSunken; radius: 8; border.color: theme.border }
                                             onEditingFinished: backend.set_account_credential(accountDelegate.modelData.id, modelData.key, text)
                                         }
                                     }
@@ -207,7 +207,7 @@ Item {
                                         text: "Sync Now"
                                         font.pixelSize: 14
                                         contentItem: Label { text: parent.text; color: theme.accentText; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                        background: Rectangle { color: theme.accent; radius: 6 }
+                                        background: Rectangle { color: theme.accent; radius: 8 }
                                         onClicked: backend.sync_account(modelData.id)
                                     }
                                     Label {

@@ -80,6 +80,7 @@ class GameViewModel:
         self.status = "critical" if self.kind in (None, "unknown") else "ok"
         self.status_text = "Configuration invalid" if self.status == "critical" else ""
         self.notes = self.primary_entry.get("notes", "")
+        self.timeline_events = self.primary_entry.get("timeline_events", [])
 
 
 class MainWindow(QMainWindow):
@@ -365,7 +366,52 @@ class MainWindow(QMainWindow):
         self._notes_edit.setPlainText(model.notes)
 
         self._history_list.clear()
-        self._history_list.addItem("No history tracked yet -- Pythia doesn't keep a per-game event log yet.")
+        if not model.timeline_events:
+            self._history_list.addItem("No history recorded yet for this system's copy of this entry.")
+        else:
+            # Newest first -- real events (game_added/version_added/ownership_recorded/
+            # merged, see datadir.add_timeline_event()), not a placeholder. Only this
+            # system's own entry's events are shown, same "primary_entry only, not
+            # merged across systems" convention model.versions/model.notes already use.
+            for event in reversed(model.timeline_events):
+                item = QListWidgetItem()
+                row = self._build_history_row(event)
+                self._history_list.addItem(item)
+                self._history_list.setItemWidget(item, row)
+                row.adjustSize()
+                item.setSizeHint(row.sizeHint())
+
+    _EVENT_LABELS = {
+        "game_added": "Game added",
+        "version_added": "New version detected",
+        "ownership_recorded": "Ownership recorded",
+        "merged": "Merged with another entry",
+    }
+
+    def _build_history_row(self, event: dict) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(10)
+
+        timestamp = (event.get("timestamp") or "")[:19].replace("T", " ")
+        time_label = QLabel(timestamp)
+        time_label.setStyleSheet(f"font-family: {theme.MONO_FONT}; font-size: 10.5px; color: {theme.COLORS['text_faint']};")
+        time_label.setFixedWidth(140)
+        layout.addWidget(time_label)
+
+        event_type = event.get("type", "")
+        text_label = QLabel(self._EVENT_LABELS.get(event_type, event_type))
+        text_label.setStyleSheet(f"font-size: 12.5px; color: {theme.COLORS['text']};")
+        layout.addWidget(text_label)
+
+        detail = event.get("detail") or ""
+        if detail:
+            detail_label = QLabel(detail)
+            detail_label.setStyleSheet(f"font-family: {theme.MONO_FONT}; font-size: 11px; color: {theme.COLORS['text_muted']};")
+            layout.addWidget(detail_label)
+        layout.addStretch()
+        return row
 
     def _build_version_header(self, group: dict) -> QWidget:
         row = QWidget()

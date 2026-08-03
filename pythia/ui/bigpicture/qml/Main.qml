@@ -75,14 +75,42 @@ ApplicationWindow {
 
                 Button {
                     text: "Scan"
-                    font.pixelSize: 18
+                    implicitHeight: 44
+                    implicitWidth: 96
+                    contentItem: Label {
+                        text: parent.text
+                        font.pixelSize: 16
+                        font.weight: Font.DemiBold
+                        color: theme.accentText
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    // Same treatment as QPushButton#primary in the desktop QSS
+                    // (theme.py's build_stylesheet()) -- solid accent fill, not a
+                    // generic native button, matching the "previous UI... was
+                    // shaping up nicely" reference.
+                    background: Rectangle { color: theme.accent; radius: 8 }
                     onClicked: homeScreen && homeScreen.scanRequested()
                 }
 
-                ToolButton {
+                Button {
                     text: "⚙"
-                    font.pixelSize: 22
+                    implicitHeight: 44
+                    implicitWidth: 44
                     visible: stackView.depth === 1
+                    contentItem: Label {
+                        text: parent.text
+                        font.pixelSize: 20
+                        color: theme.text
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: theme.surfaceRaised
+                        radius: 8
+                        border.color: parent.hovered ? theme.accent : theme.border
+                        border.width: 1
+                    }
                     onClicked: stackView.push(settingsScreenComponent)
                 }
             }

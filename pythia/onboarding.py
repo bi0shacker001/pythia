@@ -300,6 +300,7 @@ def onboard(path: Path, decision: dict | None = None):
             shutil.move(str(path), str(new_path))
             path = new_path
 
+    is_new_entry = existing_entry is None
     entry = existing_entry or {
         "system_uuid": get_system_uuid(),
         "game_id": game_id,
@@ -319,7 +320,15 @@ def onboard(path: Path, decision: dict | None = None):
         _update_platform_ids_and_ownership(entry, other)
 
     source = {"kind": detection["kind"], "extra": detection.get("extra", {})}
+    is_new_variant_path = not any(
+        variant.get("path") == str(path) for group in entry.get("versions", []) for variant in group.get("variants", [])
+    )
     _merge_version(entry, path, version_label, mods, language, detection.get("platforms", []), source)
+
+    if is_new_entry:
+        datadir.add_timeline_event(entry, "game_added", f"{version_label or '?'} ({source['kind']})")
+    elif is_new_variant_path:
+        datadir.add_timeline_event(entry, "version_added", f"{version_label or '?'} ({source['kind']})")
 
     saved_path = datadir.save_entry(entry)
 
@@ -473,6 +482,7 @@ def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[di
             "available_updates": [],
         }
         own.append(entry)
+        datadir.add_timeline_event(entry, "ownership_recorded", f"via {kind}")
 
     _update_platform_ids_and_ownership(entry, detection)
     saved_path = datadir.save_entry(entry)

@@ -76,7 +76,7 @@ Item {
             delegate: Rectangle {
                 width: ListView.view.width
                 height: 80
-                radius: 10
+                radius: 8
                 color: theme.surface
                 border.color: theme.border
 
@@ -104,7 +104,7 @@ Item {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
-                        background: Rectangle { color: theme.accent; radius: 6 }
+                        background: Rectangle { color: theme.accent; radius: 8 }
                         onClicked: {
                             backend.start_onboard(modelData)
                             var updated = root.pendingFiles.slice()

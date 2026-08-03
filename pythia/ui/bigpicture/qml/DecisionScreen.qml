@@ -64,7 +64,7 @@ Item {
             delegate: Rectangle {
                 width: ListView.view.width
                 height: 88
-                radius: 10
+                radius: 8
                 color: theme.surface
                 border.color: theme.border
 
@@ -126,7 +126,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
-            background: Rectangle { color: theme.surfaceRaised; radius: 10; border.color: theme.border; border.width: 1 }
+            background: Rectangle { color: theme.surfaceRaised; radius: 8; border.color: theme.border; border.width: 1 }
             onClicked: {
                 backend.resolveDecision(root.preview.path, { action: "new" })
                 root.done()

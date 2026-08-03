@@ -163,6 +163,26 @@ def load_entry(path: Path) -> dict:
     return entry
 
 
+def add_timeline_event(entry: dict, event_type: str, detail: str = ""):
+    """Append a real, timestamped event to this entry's own history log
+    (2026-08-03) -- closes a real gap the desktop UI's History tab had been openly
+    showing as "not built yet." Directly inspired by F95Checker's own real
+    `timeline_events` table (confirmed structure -- game_id, timestamp, type,
+    arguments -- inspected against the user's real, copied db.sqlite3 while
+    building the F95 import), not invented from nothing. Additive only: an older
+    entry with no `timeline_events` key gets one created on first use, no schema
+    migration needed. Caller is responsible for calling save_entry() afterward --
+    this only mutates the in-memory dict."""
+    events = entry.setdefault("timeline_events", [])
+    events.append(
+        {
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "type": event_type,
+            "detail": detail,
+        }
+    )
+
+
 def save_entry(entry: dict) -> Path:
     """Write an entry, replacing any prior file for the same (system_uuid, game_id)
     even if its sanitized-name portion changed since the last write."""

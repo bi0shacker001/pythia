@@ -105,7 +105,7 @@ Item {
             delegate: Rectangle {
                 width: 300
                 height: 160
-                radius: 10
+                radius: 8
                 color: theme.surface
                 border.color: theme.border
                 border.width: 1
@@ -122,7 +122,7 @@ Item {
                         Layout.preferredWidth: 44
                         Layout.preferredHeight: 44
                         Layout.alignment: Qt.AlignTop
-                        radius: 10
+                        radius: 8
                         gradient: Gradient {
                             orientation: Gradient.Diagonal
                             GradientStop { position: 0.0; color: theme.badgeGradient(kind)[0] }

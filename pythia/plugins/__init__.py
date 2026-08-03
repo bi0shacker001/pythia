@@ -127,7 +127,18 @@ class LibraryPlugin(PluginMeta):
     unrepresentable."""
 
     def match(self, path: Path) -> dict | None:
-        raise NotImplementedError
+        """Real, structural, path-based identification -- None means "not this
+        plugin's kind of install." Default: None, not NotImplementedError
+        (2026-08-03, a real bug caught by actually running onboarding against a
+        fresh path, not just reviewing code: `identify_all()` calls `match()`
+        unconditionally on every enabled library plugin with no try/except, and
+        F95LibraryPlugin -- account/watchlist-only, no structural signature at all,
+        see its own docstring -- never overrode this, so it inherited the old
+        raise-by-default and crashed every single onboard/scan call once it was
+        registered). A plugin that's genuinely list_owned()-only, like F95's,
+        should never need to override this at all; the default now matches that
+        case correctly instead of requiring every subclass to implement it."""
+        return None
 
     def is_root(self, path: Path) -> bool:
         """Structural 'stop recursing here' rule for scanning.py's tree walk.

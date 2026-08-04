@@ -1,4 +1,4 @@
-"""Tests for lutris.services.gog_cloud
+"""Tests for pythia.services.gog_cloud
 
 Tests the GOG cloud save synchronization implementation including:
 - Data models (CloudSaveLocation, SyncFile, SyncResult)
@@ -23,8 +23,8 @@ import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import lutris.services.gog_cloud as _mod
-from lutris.services.gog_cloud import (
+import pythia.services.gog_cloud as _mod
+from pythia.services.gog_cloud import (
     EMPTY_GZIP_MD5,
     CloudSaveLocation,
     GOGCloudStorageClient,
@@ -40,7 +40,7 @@ from lutris.services.gog_cloud import (
     get_relative_path,
     resolve_save_path,
 )
-from lutris.util.http import HTTPError
+from pythia.util.http import HTTPError
 
 
 class TestSyncAction(unittest.TestCase):

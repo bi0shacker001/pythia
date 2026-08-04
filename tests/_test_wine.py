@@ -1,7 +1,7 @@
 from unittest import TestCase
 
-from lutris.runners import wine
-from lutris.util.test_config import setup_test_environment
+from pythia.runners import wine
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 

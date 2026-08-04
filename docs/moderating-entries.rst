@@ -1,8 +1,8 @@
 ============================
-Moderating Lutris Entries
+Moderating Pythia Entries
 ============================
 
-Every Lutris entry must receive approval from a moderator before being public.
+Every Pythia entry must receive approval from a moderator before being public.
 
 Here are some guidelines on how to accept or reject submissions. Please follow these guidelines.
 

@@ -12,7 +12,7 @@ Tests the ability to:
 import unittest
 from unittest.mock import MagicMock, patch
 
-import lutris.services.gog as GOG
+import pythia.services.gog as GOG
 
 GOGService = GOG.GOGService
 

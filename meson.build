@@ -1,5 +1,5 @@
 project(
-  'lutris',
+  'pythia',
   license: 'GPL-3.0-or-later',
   meson_version: '>=0.46.0',
 )
@@ -14,7 +14,7 @@ pylibdir = python.get_install_dir()
 datadir = get_option('datadir')
 localedir = get_option('localedir')
 mandir = get_option('mandir')
-lutrisdir = join_paths(pylibdir, 'lutris')
+pythiadir = join_paths(pylibdir, 'pythia')
 podir = join_paths(meson.source_root(), 'po')
 
 # Generate configuration files
@@ -25,7 +25,7 @@ configure_file(
   input: 'optional_settings.py.in',
   output: 'optional_settings.py',
   configuration: config,
-  install_dir: lutrisdir,
+  install_dir: pythiadir,
 )
 
 # Translations
@@ -33,13 +33,13 @@ subdir('po')
 
 # Do installation
 install_data(
-  files('bin/lutris'),
+  files('bin/pythia'),
   install_dir: bindir,
   install_mode: 'rwxr-xr-x',
 )
 
 install_subdir(
-  'lutris',
+  'pythia',
   install_dir: pylibdir,
 )
 
@@ -56,19 +56,19 @@ install_subdir(
 )
 
 install_subdir(
-  'share/lutris',
-  install_dir: join_paths(datadir, 'lutris'),
+  'share/pythia',
+  install_dir: join_paths(datadir, 'pythia'),
   strip_directory: true,
 )
 
 install_man(
-  files('share/man/man1/lutris.1'),
+  files('share/man/man1/pythia.1'),
   install_dir: join_paths(mandir, 'man1'),
 )
 
 desktop_file = i18n.merge_file(
-  input: files('share/applications/net.lutris.Lutris.desktop'),
-  output: 'net.lutris.Lutris.desktop',
+  input: files('share/applications/net.pythia.Pythia.desktop'),
+  output: 'net.pythia.Pythia.desktop',
   type: 'desktop',
   po_dir: podir,
   install: true,
@@ -86,8 +86,8 @@ if desktop_file_validate.found()
 endif
 
 desktop_file_association = i18n.merge_file(
-  input: files('share/applications/net.lutris.Lutris1.desktop'),
-  output: 'net.lutris.Lutris1.desktop',
+  input: files('share/applications/net.pythia.Pythia1.desktop'),
+  output: 'net.pythia.Pythia1.desktop',
   type: 'desktop',
   po_dir: podir,
   install: true,
@@ -105,8 +105,8 @@ if desktop_file_association_validate.found()
 endif
 
 metainfo_file = i18n.merge_file(
-  input: files('share/metainfo/net.lutris.Lutris.metainfo.xml'),
-  output: 'net.lutris.Lutris.metainfo.xml',
+  input: files('share/metainfo/net.pythia.Pythia.metainfo.xml'),
+  output: 'net.pythia.Pythia.metainfo.xml',
   type: 'xml',
   po_dir: podir,
   install: true,

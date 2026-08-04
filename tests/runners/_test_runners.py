@@ -1,9 +1,9 @@
 import logging
 from unittest.mock import patch
 
-from lutris import runners
-from lutris.config import LutrisConfig
-from lutris.util.test_config import setup_test_environment
+from pythia import runners
+from pythia.config import PythiaConfig
+from pythia.util.test_config import setup_test_environment
 from tests._test_pga import DatabaseTester
 
 LOGGER = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class ImportRunnerTest(DatabaseTester):
                 return {"system": {"resolution": "640x480"}}
             return {}
 
-        with patch("lutris.config.read_yaml_from_file") as yaml_reader:
+        with patch("pythia.config.read_yaml_from_file") as yaml_reader:
             yaml_reader.side_effect = fake_yaml_reader
             wine_runner = runners.import_runner("wine")
             wine = wine_runner()
@@ -58,7 +58,7 @@ class ImportRunnerTest(DatabaseTester):
                 return {"system": {"resolution": "800x600"}}
             return {}
 
-        with patch("lutris.config.read_yaml_from_file") as yaml_reader:
+        with patch("pythia.config.read_yaml_from_file") as yaml_reader:
             yaml_reader.side_effect = fake_yaml_reader
             wine_runner = runners.import_runner("wine")
             wine = wine_runner()
@@ -76,10 +76,10 @@ class ImportRunnerTest(DatabaseTester):
                 return {"system": {"resolution": "1920x1080"}}
             return {}
 
-        with patch("lutris.config.read_yaml_from_file") as yaml_reader:
+        with patch("pythia.config.read_yaml_from_file") as yaml_reader:
             yaml_reader.side_effect = fake_yaml_reader
             wine_runner = runners.import_runner("wine")
-            game_config = LutrisConfig(game_config_id="rage", runner_slug="wine")
+            game_config = PythiaConfig(game_config_id="rage", runner_slug="wine")
             wine = wine_runner(game_config)
             self.assertEqual(wine.system_config.get("resolution"), "1920x1080")
 
@@ -95,10 +95,10 @@ class ImportRunnerTest(DatabaseTester):
                 return {"system": {"resolution": "1680x1050"}, "runner": "wine"}
             return {}
 
-        with patch("lutris.config.read_yaml_from_file") as yaml_reader:
+        with patch("pythia.config.read_yaml_from_file") as yaml_reader:
             yaml_reader.side_effect = fake_yaml_reader
             wine_runner = runners.import_runner("wine")
-            game_config = LutrisConfig(runner_slug="wine", game_config_id="rage")
+            game_config = PythiaConfig(runner_slug="wine", game_config_id="rage")
             self.assertEqual(game_config.game_config_id, "rage")
             self.assertEqual(game_config.runner_slug, "wine")
             wine = wine_runner(game_config)

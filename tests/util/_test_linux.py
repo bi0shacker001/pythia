@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch
 
-from lutris.util import linux
+from pythia.util import linux
 
 
 class TestLinuxSystem(TestCase):

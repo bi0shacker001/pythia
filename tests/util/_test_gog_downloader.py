@@ -8,9 +8,9 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from lutris.util.download_progress import DownloadProgress
-from lutris.util.downloader import DEFAULT_CHUNK_SIZE, BaseDownloader
-from lutris.util.gog_downloader import GOGDownloader
+from pythia.util.download_progress import DownloadProgress
+from pythia.util.downloader import DEFAULT_CHUNK_SIZE, BaseDownloader
+from pythia.util.gog_downloader import GOGDownloader
 
 
 class TestGOGDownloaderInit(TestCase):
@@ -74,7 +74,7 @@ class TestBuildRequestHeaders(TestCase):
         dl = GOGDownloader("https://example.com/file.bin", "/tmp/test.bin")
         headers = dl._build_request_headers()
         assert "User-Agent" in headers
-        assert "Lutris/" in headers["User-Agent"]
+        assert "Pythia/" in headers["User-Agent"]
 
     def test_referer_header(self):
         dl = GOGDownloader("https://example.com/file.bin", "/tmp/test.bin", referer="https://gog.com")
@@ -494,7 +494,7 @@ class TestInstallerFileIntegration(TestCase):
 
     def test_installer_file_downloader_class(self):
         """InstallerFile should expose downloader_class from file_meta."""
-        from lutris.installer.installer_file import InstallerFile
+        from pythia.installer.installer_file import InstallerFile
 
         file = InstallerFile(
             "test-game",
@@ -509,7 +509,7 @@ class TestInstallerFileIntegration(TestCase):
 
     def test_installer_file_no_downloader_class(self):
         """InstallerFile without downloader_class should return None."""
-        from lutris.installer.installer_file import InstallerFile
+        from pythia.installer.installer_file import InstallerFile
 
         file = InstallerFile(
             "test-game",
@@ -523,7 +523,7 @@ class TestInstallerFileIntegration(TestCase):
 
     def test_installer_file_string_meta_no_class(self):
         """InstallerFile with string meta should return None for downloader_class."""
-        from lutris.installer.installer_file import InstallerFile
+        from pythia.installer.installer_file import InstallerFile
 
         file = InstallerFile(
             "test-game",
@@ -540,7 +540,7 @@ class TestGOGServiceIntegration(TestCase):
         """_format_links should inject GOGDownloader as downloader_class."""
         from unittest.mock import MagicMock
 
-        from lutris.services.gog import GOGService
+        from pythia.services.gog import GOGService
 
         service = GOGService()
         installer = MagicMock()
@@ -937,7 +937,7 @@ class TestResumeStartMethod(TestCase):
         dl = GOGDownloader("https://cdn.gog.com/file.bin", dest, overwrite=True, num_workers=2)
 
         # Patch AsyncCall so start() doesn't actually launch a thread
-        with patch("lutris.util.downloader.jobs.AsyncCall") as mock_async:
+        with patch("pythia.util.downloader.jobs.AsyncCall") as mock_async:
             mock_thread = MagicMock()
             mock_thread.stop_request = threading.Event()
             mock_async.return_value = mock_thread
@@ -956,7 +956,7 @@ class TestResumeStartMethod(TestCase):
 
         dl = GOGDownloader("https://cdn.gog.com/file.bin", dest, overwrite=True, num_workers=2)
 
-        with patch("lutris.util.downloader.jobs.AsyncCall") as mock_async:
+        with patch("pythia.util.downloader.jobs.AsyncCall") as mock_async:
             mock_thread = MagicMock()
             mock_thread.stop_request = threading.Event()
             mock_async.return_value = mock_thread

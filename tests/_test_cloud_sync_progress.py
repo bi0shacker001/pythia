@@ -8,13 +8,13 @@ via the stop button.
 import unittest
 from unittest.mock import MagicMock
 
-from lutris.util.test_config import setup_test_environment
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 
-from lutris.gui.dialogs.cloud_sync_progress import CloudSyncCancelled, CloudSyncProgressAdapter
-from lutris.gui.widgets.progress_box import ProgressInfo  # noqa: F401
-from lutris.services.gog_cloud import SyncResult
+from pythia.gui.dialogs.cloud_sync_progress import CloudSyncCancelled, CloudSyncProgressAdapter
+from pythia.gui.widgets.progress_box import ProgressInfo  # noqa: F401
+from pythia.services.gog_cloud import SyncResult
 
 # ---------------------------------------------------------------------------
 # Helpers

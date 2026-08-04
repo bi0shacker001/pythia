@@ -1,0 +1,267 @@
+import math
+import time
+from collections.abc import Collection, Sequence
+from itertools import chain
+from typing import Any, TypeAlias, cast
+
+from pythia import settings
+from pythia.database import sql
+from pythia.util.log import logger
+from pythia.util.strings import slugify
+
+_SERVICE_CACHE: dict[str, list[str]] = {}
+_SERVICE_CACHE_ACCESSED = False  # Keep time of last access to have a self degrading cache
+
+DbGameDict: TypeAlias = dict[str, Any]
+
+
+def _stringify_game_id(game: DbGameDict) -> DbGameDict:
+    """Convert the 'id' field from int to str.
+
+    SQLite returns ids as int, but game IDs are str throughout Pythia
+    because they share data structures with string-typed service IDs
+    in the UI layer.
+    """
+    if "id" in game:
+        game["id"] = str(game["id"])
+    return game
+
+
+def _stringify_game_ids(games: list[DbGameDict]) -> list[DbGameDict]:
+    """Apply _stringify_game_id to a list of game rows."""
+    return [_stringify_game_id(row) for row in games]
+
+
+def get_games(
+    searches: dict[str, str] | None = None,
+    filters: sql.DBConditionsDict | None = None,
+    excludes: sql.DBConditionsDict | None = None,
+    sorts: Sequence[str] | None = None,
+) -> list[DbGameDict]:
+    return _stringify_game_ids(
+        sql.filtered_query(
+            settings.DB_PATH, "games", searches=searches, filters=filters, excludes=excludes, sorts=sorts
+        )
+    )
+
+
+def get_games_where(**conditions: Any) -> list[DbGameDict]:
+    """
+    Query games table based on conditions
+
+    Args:
+        conditions (dict): named arguments with each field matches its desired value.
+        Special values for field names can be used:
+            <field>__lessthan will return rows where `field` is less than the value
+            <field>__isnull will return rows where `field` is NULL if the value is True
+            <field>__not will invert the condition using `!=` instead of `=`
+            <field>__in will match rows for every value of `value`, which should be an iterable
+
+    Returns:
+        list: Rows matching the query
+
+    """
+    query = "select * from games"
+    condition_fields = []
+    condition_values = []
+    for field, value in conditions.items():
+        field, *extra_conditions = field.split("__")
+        if extra_conditions:
+            extra_condition = extra_conditions[0]
+            if extra_condition == "lessthan":
+                condition_fields.append("{} < ?".format(field))
+                condition_values.append(value)
+            if extra_condition == "isnull":
+                condition_fields.append("{} is {} null".format(field, "" if value else "not"))
+            if extra_condition == "not":
+                condition_fields.append("{} != ?".format(field))
+                condition_values.append(value)
+            if extra_condition == "in":
+                if not hasattr(value, "__iter__"):
+                    raise ValueError("Value should be an iterable (%s given)" % value)
+                if len(value) > 999:
+                    raise ValueError("SQLite limited to a maximum of 999 parameters.")
+                if value:
+                    condition_fields.append("{} in ({})".format(field, ", ".join("?" * len(value)) or ""))
+                    condition_values = list(chain(condition_values, value))
+        else:
+            condition_fields.append("{} = ?".format(field))
+            condition_values.append(value)
+    condition = " AND ".join(condition_fields)
+    if condition:
+        query = " WHERE ".join((query, condition))
+    else:
+        # Inspect and document why we should return
+        # an empty list when no condition is present.
+        return []
+    return _stringify_game_ids(sql.db_query(settings.DB_PATH, query, tuple(condition_values)))
+
+
+def get_games_by_ids(game_ids: Collection[str]) -> list[DbGameDict]:
+    # sqlite limits the number of query parameters to 999, to
+    # bypass that limitation, divide the query in chunks
+    size = 999
+    return list(
+        chain.from_iterable(
+            [
+                get_games_where(id__in=list(game_ids)[page * size : page * size + size])
+                for page in range(math.ceil(len(game_ids) / size))
+            ]
+        )
+    )
+
+
+def get_game_for_service(service: str, appid: str) -> DbGameDict | None:
+    if service == "pythia":
+        return get_game_by_field(appid, field="slug")
+
+    existing_games = get_games(filters={"service_id": appid, "service": service})
+    if existing_games:
+        return existing_games[0]
+
+    return None
+
+
+def get_all_installed_game_for_service(service: str) -> dict[str, DbGameDict]:
+    if service == "pythia":
+        db_games = get_games(filters={"installed": 1})
+        return {g["slug"]: g for g in db_games}
+
+    db_games = get_games(filters={"service": service, "installed": 1})
+    return {g["service_id"]: g for g in db_games}
+
+
+def get_service_games(service: str) -> list[str]:
+    """Return the list of all installed games for a service"""
+    global _SERVICE_CACHE_ACCESSED
+    previous_cache_accessed = _SERVICE_CACHE_ACCESSED or 0
+    _SERVICE_CACHE_ACCESSED = time.time()
+    if service not in _SERVICE_CACHE or _SERVICE_CACHE_ACCESSED - previous_cache_accessed > 1:
+        if service == "pythia":
+            _SERVICE_CACHE[service] = [game["slug"] for game in get_games(filters={"installed": "1"})]
+        else:
+            _SERVICE_CACHE[service] = [
+                game["service_id"] for game in get_games(filters={"service": service, "installed": "1"})
+            ]
+    return _SERVICE_CACHE[service]
+
+
+def get_game_by_field(value: Any, field: str = "slug") -> DbGameDict | None:
+    """Query a game based on a database field, or None if not found."""
+    if field not in ("slug", "installer_slug", "id", "configpath", "name"):
+        raise ValueError("Can't query by field '%s'" % field)
+    game_result = sql.db_select(settings.DB_PATH, "games", condition=(field, value))
+    if game_result:
+        return _stringify_game_id(game_result[0])
+    return None
+
+
+def get_games_by_runner(runner: str) -> list[DbGameDict]:
+    """Return all games using a specific runner"""
+    return _stringify_game_ids(sql.db_select(settings.DB_PATH, "games", condition=("runner", runner)))
+
+
+def get_games_by_slug(slug: str) -> list[DbGameDict]:
+    """Return all games using a specific slug"""
+    return _stringify_game_ids(sql.db_select(settings.DB_PATH, "games", condition=("slug", slug)))
+
+
+def add_game(**game_data: Any) -> str:
+    """Add a game to the database."""
+    game_data["installed_at"] = int(time.time())
+    if "slug" not in game_data:
+        game_data["slug"] = slugify(game_data["name"])
+    return str(sql.db_insert(settings.DB_PATH, "games", game_data))
+
+
+def add_games_bulk(games: list[DbGameDict]) -> list[str]:
+    """
+    Add a list of games to the database.
+    The dicts must have an identical set of keys.
+
+    Args:
+        games (list): list of games in dict format
+    Returns:
+        list: List of inserted game ids
+    """
+    return [str(sql.db_insert(settings.DB_PATH, "games", game)) for game in games]
+
+
+def add_or_update(**params: Any) -> str:
+    """Add a game to the database or update an existing one
+
+    If an 'id' is provided in the parameters then it
+    will try to match it, otherwise it will try matching
+    by slug, creating one when possible.
+    """
+    game_id = update_existing(**params)
+    if game_id:
+        return game_id
+
+    return add_game(**params)
+
+
+def update_existing(**params: Any) -> str | None:
+    """Updates a game, but do not add one. If the game exists, this returns its ID;
+    if not it returns None and makes no changes."""
+    game_id = get_matching_game(params)
+    if game_id:
+        params["id"] = game_id
+        sql.db_update(settings.DB_PATH, "games", params, {"id": game_id})
+        return game_id
+    return None
+
+
+def get_matching_game(params: dict[str, Any]) -> str | None:
+    """Tries to match given parameters with an existing game"""
+    # Always match by ID if provided
+    if params.get("id"):
+        game = get_game_by_field(params["id"], "id")
+        if game:
+            game_id: str = game["id"]
+            return game_id
+        logger.warning("Game ID %s provided but couldn't be matched", params["id"])
+    slug = params.get("slug") or slugify(cast(str, params.get("name")))
+    if not slug:
+        raise ValueError("Can't add or update without an identifier")
+    for game in get_games_by_slug(slug):
+        game_id = game["id"]
+        if game["installed"]:
+            if game["configpath"] == params.get("configpath"):
+                return game_id
+        else:
+            if game["runner"] == params.get("runner") or not all([params.get("runner"), game["runner"]]):
+                return game_id
+    return None
+
+
+def delete_game(game_id: str) -> None:
+    """Delete a game from the PGA."""
+    sql.db_delete(settings.DB_PATH, "games", "id", game_id)
+
+
+def get_used_runners() -> list[str]:
+    """Return a list of the runners in use by installed games."""
+    with sql.db_cursor(settings.DB_PATH) as cursor:
+        query = "select distinct runner from games where runner is not null order by runner"
+        rows = cursor.execute(query)
+        results = rows.fetchall()
+    return [result[0] for result in results if result[0]]
+
+
+def get_used_platforms() -> list[str]:
+    """Return a list of platforms currently in use"""
+    with sql.db_cursor(settings.DB_PATH) as cursor:
+        query = (
+            "select distinct platform from games where platform is not null and platform is not '' order by platform"
+        )
+        rows = cursor.execute(query)
+        results = rows.fetchall()
+    return [result[0] for result in results if result[0]]
+
+
+def get_game_count(param: str, value: Any) -> int | None:
+    res = sql.db_select(settings.DB_PATH, "games", fields=("COUNT(id)",), condition=(param, value))
+    if res:
+        return cast(int, res[0]["COUNT(id)"])
+    return None

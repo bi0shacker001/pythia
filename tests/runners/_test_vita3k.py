@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from lutris.runners.vita3k import MissingVitaTitleIDError, vita3k
-from lutris.util.test_config import setup_test_environment
+from pythia.runners.vita3k import MissingVitaTitleIDError, vita3k
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 
@@ -25,7 +25,7 @@ class TestVita3kRunner(unittest.TestCase):
             self.runner.play()
 
     @patch("os.path.isfile")
-    @patch("lutris.util.system.path_exists")
+    @patch("pythia.util.system.path_exists")
     def test_play_fullscreen(self, mock_path_exists, mock_isfile):
         main_file = "PCSG00042"
         mock_path_exists.return_value = True
@@ -38,7 +38,7 @@ class TestVita3kRunner(unittest.TestCase):
         self.assertEqual(self.runner.play(), expected)
 
     @patch("os.path.isfile")
-    @patch("lutris.util.system.path_exists")
+    @patch("pythia.util.system.path_exists")
     def test_play(self, mock_path_exists, mock_isfile):
         title_id = "PCSG00009"
         mock_path_exists.return_value = True
@@ -51,7 +51,7 @@ class TestVita3kRunner(unittest.TestCase):
         self.assertEqual(self.runner.play(), expected)
 
     @patch("os.path.isfile")
-    @patch("lutris.util.system.path_exists")
+    @patch("pythia.util.system.path_exists")
     def test_legacy_main_file_play(self, mock_path_exists, mock_isfile):
         main_file = "PCSG00009"
         mock_path_exists.return_value = True
@@ -64,7 +64,7 @@ class TestVita3kRunner(unittest.TestCase):
         self.assertEqual(self.runner.play(), expected)
 
     @patch("os.path.isfile")
-    @patch("lutris.util.system.path_exists")
+    @patch("pythia.util.system.path_exists")
     def test_play_with_legacy_main_file(self, mock_path_exists, mock_isfile):
         main_file = "PCSG00009"
         title_id = "PCSG00027"

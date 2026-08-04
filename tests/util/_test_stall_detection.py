@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from lutris.util.downloader import BaseDownloader, DownloadStallError, SimpleDownloader, StallMonitor, get_time
+from pythia.util.downloader import BaseDownloader, DownloadStallError, SimpleDownloader, StallMonitor, get_time
 
 
 class TestDownloadStallError(TestCase):
@@ -183,7 +183,7 @@ class TestDownloaderRetry(TestCase):
         ]
 
         with patch.object(dl, "_prepare_retry"):
-            with patch("lutris.util.downloader.time") as mock_time:
+            with patch("pythia.util.downloader.time") as mock_time:
                 mock_time.monotonic = time.monotonic
                 mock_time.sleep = MagicMock()
                 dl.async_download()
@@ -199,7 +199,7 @@ class TestDownloaderRetry(TestCase):
         mock_do.side_effect = stall_err
 
         with patch.object(dl, "_prepare_retry"):
-            with patch("lutris.util.downloader.time") as mock_time:
+            with patch("pythia.util.downloader.time") as mock_time:
                 mock_time.monotonic = time.monotonic
                 mock_time.sleep = MagicMock()
                 dl.async_download()
@@ -233,7 +233,7 @@ class TestDownloaderRetry(TestCase):
         mock_do.side_effect = [http_err, None]
 
         with patch.object(dl, "_prepare_retry"):
-            with patch("lutris.util.downloader.time") as mock_time:
+            with patch("pythia.util.downloader.time") as mock_time:
                 mock_time.monotonic = time.monotonic
                 mock_time.sleep = MagicMock()
                 dl.async_download()
@@ -252,7 +252,7 @@ class TestDownloaderRetry(TestCase):
         mock_do.side_effect = [http_err, None]
 
         with patch.object(dl, "_prepare_retry"):
-            with patch("lutris.util.downloader.time") as mock_time:
+            with patch("pythia.util.downloader.time") as mock_time:
                 mock_time.monotonic = time.monotonic
                 mock_time.sleep = MagicMock()
                 dl.async_download()

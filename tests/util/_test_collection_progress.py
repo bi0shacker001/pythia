@@ -4,14 +4,14 @@ These tests verify the prefetch-one concurrent download model, aggregate
 progress, per-file error handling, cancel-all, and edge cases — all
 without a running GTK display (GTK widgets are mocked).
 
-The module is loaded via importlib to avoid the normal lutris.gui package
+The module is loaded via importlib to avoid the normal pythia.gui package
 chain that requires a real GTK installation / display.
 """
 
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from lutris.gui.widgets.download_collection_progress_box import (
+from pythia.gui.widgets.download_collection_progress_box import (
     MAX_CONCURRENT_FILES,
     DownloadCollectionProgressBox,
     _ActiveDownload,
@@ -119,9 +119,9 @@ class TestInit(TestCase):
 
 
 class TestCreateDownloader(TestCase):
-    @patch("lutris.gui.widgets.download_collection_progress_box.create_cache_lock")
-    @patch("lutris.gui.widgets.download_collection_progress_box.SimpleDownloader")
-    @patch("lutris.gui.widgets.download_collection_progress_box.os.path.exists", return_value=False)
+    @patch("pythia.gui.widgets.download_collection_progress_box.create_cache_lock")
+    @patch("pythia.gui.widgets.download_collection_progress_box.SimpleDownloader")
+    @patch("pythia.gui.widgets.download_collection_progress_box.os.path.exists", return_value=False)
     def test_creates_downloader_with_correct_args(self, mock_exists, MockDL, mock_lock):
         box = DownloadCollectionProgressBox.__new__(DownloadCollectionProgressBox)
         f = _make_file(url="https://cdn.example.com/f.bin", dest="/tmp/dl/f.bin")
@@ -136,10 +136,10 @@ class TestCreateDownloader(TestCase):
         )
         assert f.tmp_file == "/tmp/dl/f.bin.tmp"
 
-    @patch("lutris.gui.widgets.download_collection_progress_box.create_cache_lock")
-    @patch("lutris.gui.widgets.download_collection_progress_box.SimpleDownloader")
-    @patch("lutris.gui.widgets.download_collection_progress_box.os.path.exists", return_value=True)
-    @patch("lutris.gui.widgets.download_collection_progress_box.os.remove")
+    @patch("pythia.gui.widgets.download_collection_progress_box.create_cache_lock")
+    @patch("pythia.gui.widgets.download_collection_progress_box.SimpleDownloader")
+    @patch("pythia.gui.widgets.download_collection_progress_box.os.path.exists", return_value=True)
+    @patch("pythia.gui.widgets.download_collection_progress_box.os.remove")
     def test_removes_existing_tmp_file(self, mock_remove, mock_exists, MockDL, mock_lock):
         box = DownloadCollectionProgressBox.__new__(DownloadCollectionProgressBox)
         f = _make_file(dest="/tmp/dl/f.bin")
@@ -147,8 +147,8 @@ class TestCreateDownloader(TestCase):
         box._create_downloader(f)
         mock_remove.assert_called_once_with("/tmp/dl/f.bin.tmp")
 
-    @patch("lutris.gui.widgets.download_collection_progress_box.create_cache_lock")
-    @patch("lutris.gui.widgets.download_collection_progress_box.os.path.exists", return_value=False)
+    @patch("pythia.gui.widgets.download_collection_progress_box.create_cache_lock")
+    @patch("pythia.gui.widgets.download_collection_progress_box.os.path.exists", return_value=False)
     def test_uses_custom_downloader_class(self, mock_exists, mock_lock):
         box = DownloadCollectionProgressBox.__new__(DownloadCollectionProgressBox)
         custom_dl_cls = MagicMock()
@@ -158,15 +158,15 @@ class TestCreateDownloader(TestCase):
         box._create_downloader(f)
         custom_dl_cls.assert_called_once()
 
-    @patch("lutris.gui.widgets.download_collection_progress_box.display_error")
-    @patch("lutris.gui.widgets.download_collection_progress_box.os.path.exists", return_value=False)
+    @patch("pythia.gui.widgets.download_collection_progress_box.display_error")
+    @patch("pythia.gui.widgets.download_collection_progress_box.os.path.exists", return_value=False)
     def test_returns_none_on_runtime_error(self, mock_exists, mock_display):
         box = DownloadCollectionProgressBox.__new__(DownloadCollectionProgressBox)
         box.get_toplevel = MagicMock(return_value=None)
         f = _make_file(dest="/tmp/dl/f.bin")
         # Simulate no downloader_class → use default Downloader which will fail
         with patch(
-            "lutris.gui.widgets.download_collection_progress_box.SimpleDownloader",
+            "pythia.gui.widgets.download_collection_progress_box.SimpleDownloader",
             side_effect=RuntimeError("oops"),
         ):
             result = box._create_downloader(f)
@@ -185,7 +185,7 @@ class TestPopNextDownloadableFile(TestCase):
         box.num_files_downloaded = 0
         box._completed_sizes = {}
 
-        with patch("lutris.gui.widgets.download_collection_progress_box.os.path.exists", return_value=False):
+        with patch("pythia.gui.widgets.download_collection_progress_box.os.path.exists", return_value=False):
             result = box._pop_next_downloadable_file()
         assert result is f
 
@@ -200,8 +200,8 @@ class TestPopNextDownloadableFile(TestCase):
         def exists_side(path):
             return path == "/tmp/dl/cached.bin"
 
-        with patch("lutris.gui.widgets.download_collection_progress_box.os.path.exists", side_effect=exists_side):
-            with patch("lutris.gui.widgets.download_collection_progress_box.os.path.getsize", return_value=500):
+        with patch("pythia.gui.widgets.download_collection_progress_box.os.path.exists", side_effect=exists_side):
+            with patch("pythia.gui.widgets.download_collection_progress_box.os.path.getsize", return_value=500):
                 result = box._pop_next_downloadable_file()
 
         assert result is fresh
@@ -298,7 +298,7 @@ class TestStartPrefetch(TestCase):
 
         mock_dl = _make_downloader()
         with patch.object(box, "_create_downloader", return_value=mock_dl):
-            with patch("lutris.gui.widgets.download_collection_progress_box.schedule_repeating_at_idle"):
+            with patch("pythia.gui.widgets.download_collection_progress_box.schedule_repeating_at_idle"):
                 box.start()
 
         assert len(box._active_downloads) == 2
@@ -349,7 +349,7 @@ class TestStartPrefetch(TestCase):
         mock_dl = _make_downloader()
         with patch.object(box, "_create_downloader", return_value=mock_dl):
             with patch(
-                "lutris.gui.widgets.download_collection_progress_box.os.path.exists",
+                "pythia.gui.widgets.download_collection_progress_box.os.path.exists",
                 return_value=False,
             ):
                 box._start_prefetch()
@@ -405,8 +405,8 @@ class TestProgress(TestCase):
         ad = _ActiveDownload(f, dl)
         box._active_downloads = [ad]
 
-        with patch("lutris.gui.widgets.download_collection_progress_box.os.rename") as mock_rename:
-            with patch("lutris.gui.widgets.download_collection_progress_box.update_cache_lock"):
+        with patch("pythia.gui.widgets.download_collection_progress_box.os.rename") as mock_rename:
+            with patch("pythia.gui.widgets.download_collection_progress_box.update_cache_lock"):
                 box._progress()
 
         assert box._completed_sizes["/tmp/dl/done.bin"] == 1000
@@ -422,8 +422,8 @@ class TestProgress(TestCase):
         box._active_downloads = [ad]
         box._file_queue = [_make_file()]  # one more in queue
 
-        with patch("lutris.gui.widgets.download_collection_progress_box.os.rename"):
-            with patch("lutris.gui.widgets.download_collection_progress_box.update_cache_lock"):
+        with patch("pythia.gui.widgets.download_collection_progress_box.os.rename"):
+            with patch("pythia.gui.widgets.download_collection_progress_box.update_cache_lock"):
                 with patch.object(box, "_start_prefetch") as mock_prefetch:
                     box._progress()
 
@@ -438,8 +438,8 @@ class TestProgress(TestCase):
         box._active_downloads = [ad]
         box._file_queue = []  # nothing left
 
-        with patch("lutris.gui.widgets.download_collection_progress_box.os.rename"):
-            with patch("lutris.gui.widgets.download_collection_progress_box.update_cache_lock"):
+        with patch("pythia.gui.widgets.download_collection_progress_box.os.rename"):
+            with patch("pythia.gui.widgets.download_collection_progress_box.update_cache_lock"):
                 result = box._progress()
 
         assert result is False
@@ -551,10 +551,10 @@ class TestEdgeCases(TestCase):
         mock_dl = _make_downloader()
         with patch.object(box, "_create_downloader", return_value=mock_dl):
             with patch(
-                "lutris.gui.widgets.download_collection_progress_box.os.path.exists",
+                "pythia.gui.widgets.download_collection_progress_box.os.path.exists",
                 return_value=False,
             ):
-                with patch("lutris.gui.widgets.download_collection_progress_box.schedule_repeating_at_idle"):
+                with patch("pythia.gui.widgets.download_collection_progress_box.schedule_repeating_at_idle"):
                     box.start()
 
         # Only 1 active (no prefetch since queue is empty)
@@ -577,11 +577,11 @@ class TestEdgeCases(TestCase):
         box._file_queue = [f1, f2]
 
         with patch(
-            "lutris.gui.widgets.download_collection_progress_box.os.path.exists",
+            "pythia.gui.widgets.download_collection_progress_box.os.path.exists",
             return_value=True,
         ):
             with patch(
-                "lutris.gui.widgets.download_collection_progress_box.os.path.getsize",
+                "pythia.gui.widgets.download_collection_progress_box.os.path.getsize",
                 return_value=500,
             ):
                 box.start()
@@ -612,10 +612,10 @@ class TestEdgeCases(TestCase):
 
         with patch.object(box, "_create_downloader", return_value=mock_dl):
             with patch(
-                "lutris.gui.widgets.download_collection_progress_box.os.path.exists",
+                "pythia.gui.widgets.download_collection_progress_box.os.path.exists",
                 return_value=False,
             ):
-                with patch("lutris.gui.widgets.download_collection_progress_box.schedule_repeating_at_idle"):
+                with patch("pythia.gui.widgets.download_collection_progress_box.schedule_repeating_at_idle"):
                     box.on_retry_clicked(button)
 
         # Active downloads should have been cleared before restart

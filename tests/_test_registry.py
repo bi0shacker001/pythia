@@ -1,7 +1,7 @@
 import os
 from unittest import TestCase
 
-from lutris.util.wine.registry import WineRegistry, WineRegistryKey
+from pythia.util.wine.registry import WineRegistry, WineRegistryKey
 
 FIXTURES_PATH = os.path.join(os.path.dirname(__file__), "fixtures")
 

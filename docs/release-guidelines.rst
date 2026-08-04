@@ -8,7 +8,7 @@ Preparation
 
 GitHub Release
 --------------
-- Draft new release: https://github.com/lutris/lutris/releases/new
+- Draft new release: https://github.com/pythia/pythia/releases/new
 - Copy changelog to release notes
 
 Launchpad PPA
@@ -17,13 +17,13 @@ Launchpad PPA
 
 Website
 -------
-- Bump version in lutris website
+- Bump version in pythia website
 - Deploy website to production
 
 OpenSUSE Build Service
 ----------------------
-Upload to OBS (https://build.opensuse.org/package/show/home:strycore/lutris):
+Upload to OBS (https://build.opensuse.org/package/show/home:strycore/pythia):
 
-- ``lutris.spec``
-- ``build/lutris*.dsc``
-- ``build/lutris*.tar.xz``
+- ``pythia.spec``
+- ``build/pythia*.dsc``
+- ``build/pythia*.tar.xz``

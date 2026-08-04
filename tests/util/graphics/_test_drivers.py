@@ -3,7 +3,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from lutris.util.graphics import drivers, glxinfo
+from pythia.util.graphics import drivers, glxinfo
 
 PROPRIETARY_MODULE_VERSION_FILE = """\
 NVRM version: NVIDIA UNIX x86_64 Kernel Module  525.105.17  Tue Mar 28 18:02:59 UTC 2023

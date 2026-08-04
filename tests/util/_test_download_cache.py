@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from lutris.util.download_cache import (
+from pythia.util.download_cache import (
     CacheState,
     create_cache_lock,
     get_cache_state,
@@ -281,14 +281,14 @@ class TestDownloaderChunkSize(TestCase):
     """Test that the Downloader uses the new chunk size."""
 
     def test_default_chunk_size(self):
-        from lutris.util.downloader import DEFAULT_CHUNK_SIZE, SimpleDownloader
+        from pythia.util.downloader import DEFAULT_CHUNK_SIZE, SimpleDownloader
 
         d = SimpleDownloader("http://example.com/test", "/tmp/test")
         assert d.chunk_size == DEFAULT_CHUNK_SIZE
         assert d.chunk_size == 524288  # 512KB
 
     def test_custom_chunk_size(self):
-        from lutris.util.downloader import SimpleDownloader
+        from pythia.util.downloader import SimpleDownloader
 
         d = SimpleDownloader("http://example.com/test", "/tmp/test", chunk_size=1024)
         assert d.chunk_size == 1024
@@ -296,14 +296,14 @@ class TestDownloaderChunkSize(TestCase):
     def test_session_parameter(self):
         import requests
 
-        from lutris.util.downloader import SimpleDownloader
+        from pythia.util.downloader import SimpleDownloader
 
         session = requests.Session()
         d = SimpleDownloader("http://example.com/test", "/tmp/test", session=session)
         assert d.session is session
 
     def test_no_session_by_default(self):
-        from lutris.util.downloader import SimpleDownloader
+        from pythia.util.downloader import SimpleDownloader
 
         d = SimpleDownloader("http://example.com/test", "/tmp/test")
         assert d.session is None

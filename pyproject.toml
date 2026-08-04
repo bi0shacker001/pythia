@@ -1,11 +1,11 @@
 [project]
-name = "lutris"
+name = "pythia"
 version = "0.5.23"
 authors = [
     {name = "Mathieu Comandon", email = "strider@strycore.com"}
 ]
 description = """
-Lutris is a video game preservation platform that helps you install and play video games from all eras and from most gaming systems.
+Pythia is a video game preservation platform that helps you install and play video games from all eras and from most gaming systems.
 By leveraging and combining existing emulators, engine re-implementations and compatibility layers, it gives you a central interface to launch all your games.
 """
 readme = "README.md"
@@ -32,9 +32,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://lutris.net/"
-Repository = "https://github.com/lutris/lutris"
-Issues = "https://github.com/lutris/lutris/issues"
+Homepage = "https://pythia.net/"
+Repository = "https://github.com/pythia/pythia"
+Issues = "https://github.com/pythia/pythia/issues"
 
 [dependency-groups]
 dev = [
@@ -49,7 +49,7 @@ dev = [
 [tool.mypy]
 python_version = "3.10"
 packages = [
-    "lutris",
+    "pythia",
     "tests",
 ]
 exclude = [
@@ -62,7 +62,7 @@ disable_error_code = [
     "has-type",  # Ignore when variable types cannot be determined.
     "dict-item",  # Dictionaries are always fully dynamic
     "var-annotated",  # Never require type annotations
-    "assignment",  # Allow incompatible types in assignment (used heavily in lutris class structure).
+    "assignment",  # Allow incompatible types in assignment (used heavily in pythia class structure).
 ]
 allow_redefinition = true
 follow_imports = "silent"
@@ -86,41 +86,41 @@ ignore = []
 
 [[tool.mypy.overrides]]
 module = [
-    "lutris.api",
-    "lutris.cache",
-    "lutris.config",
-    "lutris.database.*",
-    "lutris.exception_backstops",
-    "lutris.exceptions",
-    "lutris.gui.dialogs",
-    "lutris.monitored_command",
-    "lutris.runners",
-    "lutris.scanners.default_installers",
-    "lutris.services.mame",
-    "lutris.settings",
-    "lutris.sysoptions",
-    "lutris.util",
-    "lutris.util.busy",
-    "lutris.util.datapath",
-    "lutris.util.discord.base",
-    "lutris.util.graphics.*",
-    "lutris.util.http",
-    "lutris.util.jobs",
-    "lutris.util.log",
-    "lutris.util.flatpak",
-    "lutris.util.retroarch.core_config",
-    "lutris.util.settings",
-    "lutris.util.standalone_scripts",
-    "lutris.util.steam.*",
-    "lutris.util.shell",
-    "lutris.util.system",
-    "lutris.util.timer",
-    "lutris.util.ubisoft.consts",
-    "lutris.util.urlhandler",
-    "lutris.util.wine.d3d_extras",
-    "lutris.util.wine.dgvoodoo2",
-    "lutris.util.xdgshortcuts",
-    "lutris.util.yaml",
+    "pythia.api",
+    "pythia.cache",
+    "pythia.config",
+    "pythia.database.*",
+    "pythia.exception_backstops",
+    "pythia.exceptions",
+    "pythia.gui.dialogs",
+    "pythia.monitored_command",
+    "pythia.runners",
+    "pythia.scanners.default_installers",
+    "pythia.services.mame",
+    "pythia.settings",
+    "pythia.sysoptions",
+    "pythia.util",
+    "pythia.util.busy",
+    "pythia.util.datapath",
+    "pythia.util.discord.base",
+    "pythia.util.graphics.*",
+    "pythia.util.http",
+    "pythia.util.jobs",
+    "pythia.util.log",
+    "pythia.util.flatpak",
+    "pythia.util.retroarch.core_config",
+    "pythia.util.settings",
+    "pythia.util.standalone_scripts",
+    "pythia.util.steam.*",
+    "pythia.util.shell",
+    "pythia.util.system",
+    "pythia.util.timer",
+    "pythia.util.ubisoft.consts",
+    "pythia.util.urlhandler",
+    "pythia.util.wine.d3d_extras",
+    "pythia.util.wine.dgvoodoo2",
+    "pythia.util.xdgshortcuts",
+    "pythia.util.yaml",
     "setup",
     "utils.bios_format",
     "utils.meson_post_install",

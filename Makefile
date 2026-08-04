@@ -1,4 +1,4 @@
-VERSION=`grep "__version__" lutris/__init__.py | cut -d" " -f 3 | sed 's|"\(.*\)"|\1|'`
+VERSION=`grep "__version__" pythia/__init__.py | cut -d" " -f 3 | sed 's|"\(.*\)"|\1|'`
 GITBRANCH ?= master
 # Default GPG key ID to use for package signing.
 PPA_GPG_KEY_ID ?= 82D96E430A1F1C0F0502747E37B90EDD4E3EFAE4
@@ -26,7 +26,7 @@ unsigned:
 #
 # When running from a GitHub workflow.  The above environment variables
 # are passed in from .github/scripts/build-ubuntu.sh and that script
-# receives those variables from the .github/workflows/publish-lutris-ppa.yml
+# receives those variables from the .github/workflows/publish-pythia-ppa.yml
 # which receives them from the repository secrets.
 github-ppa:
 	export GITBRANCH=master
@@ -51,7 +51,7 @@ clean:
 build-source: clean
 	gbp buildpackage -S --git-debian-branch=${GITBRANCH}
 	mkdir build
-	mv ../lutris_${VERSION}* build
+	mv ../pythia_${VERSION}* build
 
 release: build-source upload upload-ppa
 
@@ -63,7 +63,7 @@ test:
 cover:
 	rm tests/fixtures/pga.db -f
 	rm tests/coverage/ -rf
-	nose2 --with-coverage --cover-package=lutris --cover-html --cover-html-dir=tests/coverage
+	nose2 --with-coverage --cover-package=pythia --cover-html --cover-html-dir=tests/coverage
 
 
 pgp-renew:
@@ -77,16 +77,16 @@ changelog-edit:
 	EDITOR=vim dch -e
 
 upload:
-	scp build/lutris_${VERSION}.tar.xz anaheim:~/volumes/releases/
+	scp build/pythia_${VERSION}.tar.xz anaheim:~/volumes/releases/
 
 upload-ppa:
-	dput ppa:lutris-team/lutris build/lutris_${VERSION}*_source.changes
+	dput ppa:pythia-team/pythia build/pythia_${VERSION}*_source.changes
 
 upload-staging:
-	dput --force ppa:lutris-team/lutris-staging build/lutris_${VERSION}*_source.changes
+	dput --force ppa:pythia-team/pythia-staging build/pythia_${VERSION}*_source.changes
 
 snap:
-	snapcraft clean lutris -s pull
+	snapcraft clean pythia -s pull
 	snapcraft
 
 appimage:
@@ -124,7 +124,7 @@ ruff_lint:
 	ruff check .
 
 syntax-compat:
-	python3 -m compileall -q lutris/
+	python3 -m compileall -q pythia/
 
 annotation-compat:
 	python3 utils/check_annotations.py

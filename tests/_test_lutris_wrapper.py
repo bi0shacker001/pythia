@@ -4,22 +4,22 @@ import subprocess
 import sys
 import unittest
 
-if os.path.isfile("share/lutris/bin/lutris-wrapper"):
-    lutris_wrapper_bin = "share/lutris/bin/lutris-wrapper"
+if os.path.isfile("share/pythia/bin/pythia-wrapper"):
+    pythia_wrapper_bin = "share/pythia/bin/pythia-wrapper"
 else:
-    lutris_wrapper_bin = "lutris-wrapper"
+    pythia_wrapper_bin = "pythia-wrapper"
 
 
-class LutrisWrapperTestCase(unittest.TestCase):
+class PythiaWrapperTestCase(unittest.TestCase):
     def test_excluded_initial_process(self):
         "Test that an excluded process that starts a monitored process works"
         env = os.environ.copy()
         env["PYTHONPATH"] = ":".join(sys.path)
-        # run the lutris-wrapper with a bash subshell. bash is "excluded"
+        # run the pythia-wrapper with a bash subshell. bash is "excluded"
         wrapper_proc = subprocess.Popen(
             [
                 sys.executable,
-                lutris_wrapper_bin,
+                pythia_wrapper_bin,
                 "title",
                 "0",
                 "1",
@@ -42,7 +42,7 @@ class LutrisWrapperTestCase(unittest.TestCase):
             else:
                 self.fail("stdout EOF unexpectedly")
 
-            # Wait a short while to see if lutris-wrapper will exit (it shouldn't)
+            # Wait a short while to see if pythia-wrapper will exit (it shouldn't)
             try:
                 wrapper_proc.wait(0.5)
             except subprocess.TimeoutExpired:
@@ -61,13 +61,13 @@ class LutrisWrapperTestCase(unittest.TestCase):
         "Test that nonresponsive child processes can be killed with 2x sigterm"
         env = os.environ.copy()
         env["PYTHONPATH"] = ":".join(sys.path)
-        # First, we run the lutris-wrapper with a bash subshell which ignores
+        # First, we run the pythia-wrapper with a bash subshell which ignores
         # SIGTERMs, emits a message to indicate readiness, and then closes
         # stdout.
         wrapper_proc = subprocess.Popen(
             [
                 sys.executable,
-                lutris_wrapper_bin,
+                pythia_wrapper_bin,
                 "title",
                 "0",
                 "0",
@@ -92,7 +92,7 @@ class LutrisWrapperTestCase(unittest.TestCase):
             # Send first SIGTERM
             wrapper_proc.terminate()
 
-            # Wait for confirmation that lutris-wrapper got our signal.
+            # Wait for confirmation that pythia-wrapper got our signal.
             for line in wrapper_proc.stdout:
                 if line.strip() == b"--terminated processes--":
                     break
@@ -101,7 +101,7 @@ class LutrisWrapperTestCase(unittest.TestCase):
 
             wrapper_proc.stdout.close()  # don't need this anymore.
 
-            # Wait a short while to see if lutris-wrapper will exit (it shouldn't)
+            # Wait a short while to see if pythia-wrapper will exit (it shouldn't)
             try:
                 wrapper_proc.wait(0.5)
             except subprocess.TimeoutExpired:
@@ -114,7 +114,7 @@ class LutrisWrapperTestCase(unittest.TestCase):
             # Send second SIGTERM
             wrapper_proc.terminate()
 
-            # verify that lutris-wrapper closes.
+            # verify that pythia-wrapper closes.
             wrapper_proc.wait(30)
         finally:
             if wrapper_proc.returncode is None:

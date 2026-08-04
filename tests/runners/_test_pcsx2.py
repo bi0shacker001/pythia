@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from lutris.exceptions import MissingGameExecutableError
-from lutris.runners.pcsx2 import pcsx2
-from lutris.util.test_config import setup_test_environment
+from pythia.exceptions import MissingGameExecutableError
+from pythia.runners.pcsx2 import pcsx2
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 
@@ -26,7 +26,7 @@ class TestPCSX2Runner(unittest.TestCase):
             self.runner.play()
         self.assertEqual(cm.exception.filename, main_file)
 
-    @patch("lutris.util.system.path_exists")
+    @patch("pythia.util.system.path_exists")
     @patch("os.path.isfile")
     def test_play_fullscreen(self, mock_path_exists, mock_isfile):
         main_file = "/valid/path/to/iso"
@@ -39,7 +39,7 @@ class TestPCSX2Runner(unittest.TestCase):
         expected = {"command": [self.runner.get_executable(), "-fullscreen", main_file]}
         self.assertEqual(self.runner.play(), expected)
 
-    @patch("lutris.util.system.path_exists")
+    @patch("pythia.util.system.path_exists")
     @patch("os.path.isfile")
     def test_play_full_boot(self, mock_path_exists, mock_isfile):
         main_file = "/valid/path/to/iso"
@@ -52,7 +52,7 @@ class TestPCSX2Runner(unittest.TestCase):
         expected = {"command": [self.runner.get_executable(), "-slowboot", main_file]}
         self.assertEqual(self.runner.play(), expected)
 
-    @patch("lutris.util.system.path_exists")
+    @patch("pythia.util.system.path_exists")
     @patch("os.path.isfile")
     def test_play_nogui(self, mock_path_exists, mock_isfile):
         main_file = "/valid/path/to/iso"
@@ -65,7 +65,7 @@ class TestPCSX2Runner(unittest.TestCase):
         expected = {"command": self.runner.get_command() + ["-nogui", main_file]}
         self.assertEqual(self.runner.play(), expected)
 
-    @patch("lutris.util.system.path_exists")
+    @patch("pythia.util.system.path_exists")
     @patch("os.path.isfile")
     def test_play(self, mock_path_exists, mock_isfile):
         main_file = "/valid/path/to/iso"

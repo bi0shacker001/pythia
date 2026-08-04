@@ -21,15 +21,15 @@ Table of contents
 Basics
 ======
 
-Games in Lutris are written in the YAML format in a declarative way.
+Games in Pythia are written in the YAML format in a declarative way.
 The same document provides information on how to acquire game files, setup the
 game and store a base configuration.
 
 Make sure you have some level of understanding of the YAML format before
-getting into Lutris scripting. The Ansible documentation provides a short
+getting into Pythia scripting. The Ansible documentation provides a short
 guide on the syntax: https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
 
-At the very least, a Lutris installer should have a ``game`` section. If the
+At the very least, a Pythia installer should have a ``game`` section. If the
 installer needs to download or ask the user for some files, those can be added
 in the `files` section.
 
@@ -40,20 +40,20 @@ installer has finished.
 The configuration for a game is constructed from its installer. The `files` and
 `installer` sections are removed from the script, some variables such as
 $GAMEDIR are substituted and the results is saved in:
-~/.local/share/lutris/games/<game>-<timestamp>.yml.
+~/.local/share/pythia/games/<game>-<timestamp>.yml.
 
-Published installers can be accessed from a command line by using the ``lutris:``
+Published installers can be accessed from a command line by using the ``pythia:``
 URL prefix followed by the installer slug.
-For example, calling ``lutris lutris:quake-darkplaces`` will launch the
+For example, calling ``pythia pythia:quake-darkplaces`` will launch the
 Darkplaces installer for Quake.
 
 **Important note:** Installer scripts downloaded to the client are embedded in
-another document. What is editable on the Lutris section is the ``script``
-section of a bigger document. In addition to the script it self, Lutris needs
+another document. What is editable on the Pythia section is the ``script``
+section of a bigger document. In addition to the script it self, Pythia needs
 to know the following information:
 
 * ``name``: Name of the game, should be surrounded in quotes if containing special characters.
-* ``game_slug``: Game identifier on the Lutris website
+* ``game_slug``: Game identifier on the Pythia website
 * ``version``: Name of the installer
 * ``slug``: Installer identifier
 * ``runner``: Runner used for the game.
@@ -61,7 +61,7 @@ to know the following information:
 If you intend to write installers locally and not use the website, you should
 have those keys provided at the root level and everything else indented under a
 ``script`` section.
-Local installers can be launched from the CLI with ``lutris -i /path/to/file.yaml``.
+Local installers can be launched from the CLI with ``pythia -i /path/to/file.yaml``.
 
 Variable substitution
 =====================
@@ -79,7 +79,7 @@ Available variables are:
 * ``$RESOLUTION``: Full resolution of the user's main display (eg. ``1920x1080``)
 * ``$RESOLUTION_WIDTH``: Resolution width of the user's main display (eg. ``1920``)
 * ``$RESOLUTION_HEIGHT``: Resolution height of the user's main display (eg. ``1080``)
-* ``$WINEBIN``: Absolute path to the Lutris provided Wine binary used to install the game.
+* ``$WINEBIN``: Absolute path to the Pythia provided Wine binary used to install the game.
 
 Additional variables are referenced in a `variables` section in the script. Example::
 
@@ -138,7 +138,7 @@ You can also add complex requirements following the same syntax as the
 Extensions / patches
 --------------------
 
-You can write installers that will not create a new game entry in Lutris.
+You can write installers that will not create a new game entry in Pythia.
 Instead they will modify the configuration on an exsiting game.
 You can use this feature with the ``extends`` directive. It works the same
 way as the ``requires`` directive and will check for a base game to be available.
@@ -168,7 +168,7 @@ GOG. Some IDs are used to launch the game (Steam, ScummVM) while in other
 cases, the ID is only used to find games files on a 3rd party platform and
 download the installer (Humble Bundle, GOG).
 
-Lutris supports the following game identifiers:
+Pythia supports the following game identifiers:
 
 `appid`: For Steam games. Numerical ID found in the URL of the store page.
 Example: The `appid` for https://store.steampowered.com/app/238960/Path_of_Exile/ is `238960`.
@@ -182,7 +182,7 @@ sure to reference the base game and not one of its package or DLC.
 Example: The `gogid` for Darksiders III is 1246703238
 
 `humbleid`: Humble Bundle ID. There currently isn't a way to lookup game IDs
-other than using the order details from the HB API. Lutris will soon provide
+other than using the order details from the HB API. Pythia will soon provide
 easier ways to find this ID.
 
 `main_file`: For MAME games, the `main_file` can refer to a MAME ID instead of
@@ -236,7 +236,7 @@ the value can be set to ``win32`` to setup the game in a 32-bit prefix.
 DRM free Steam
 ^^^^^^^^^^^^^^
 
-Lutris has the ability to run Steam games without launching the Steam client.
+Pythia has the ability to run Steam games without launching the Steam client.
 This is only possible with certain games lacking the Steam DRM.
 
 ``run_without_steam``: Activate the DRM free mode and no not launch Steam when
@@ -262,10 +262,10 @@ Runner configuration directives
 
 Runners can be customized in a section named after the runner identifier
 (``slug`` field in the API).  A complete list of all runners is available at
-https://lutris.net/api/runners.  Use the runner's slug as the runner
+https://pythia.net/api/runners.  Use the runner's slug as the runner
 identifier. Please keep the amount of runner customization to a minimum, only
 adding what is needed to make the game run correctly. A lot of runner options
-do not have their place in Lutris installers and are reserved for the user's
+do not have their place in Pythia installers and are reserved for the user's
 preferences.
 
 The following sections will describe runner directives commonly used in
@@ -369,7 +369,7 @@ or install it otherwise.
 
 If the game or file is hosted on moddb.com, it is necessary to understand that
 the platform rotates the actual download links every few hours, making it
-impractical to set these links as source url in installers. Lutris has
+impractical to set these links as source url in installers. Pythia has
 routines to overcome this limitation (with blessing from moddb.com). When
 specifying a file hosted on moddb.com, please use the url of the files details
 page (the one with the red "Download now" button).
@@ -391,7 +391,7 @@ Local installation specifying local files with ``$SCRIPTDIR``
 -------------------------------------------------------------
 
 If you keep local copies of your games — for instance your old games — you may
-want to keep a local Lutris script with game files to automate the installation.
+want to keep a local Pythia script with game files to automate the installation.
 In this situation, specifying files using the ``files:`` section
 (see `Fetching required files`_) adds useless steps since the files' location
 is known prior installation. You can now specify files relative the the YAML
@@ -400,27 +400,27 @@ script using the `$SCRIPTDIR` variable (see `Variable substitution`_).
 For instance, with the following layout::
 
     <game-dir>
-    ├── lutris-script.yaml
+    ├── pythia-script.yaml
     ├── setup.exe
     ├── game-assets
     │   └── …
     └── …
 
-You can reference ``setup.exe`` relative to ``lutris-script.yaml`` with
+You can reference ``setup.exe`` relative to ``pythia-script.yaml`` with
 ``$SCRIPTDIR/setup.exe``. If ``setup.exe`` is located in a parent directory, relative
-to ``lutris-script.yaml``, you can use `..` to refer to ``lutris-script.yaml``
+to ``pythia-script.yaml``, you can use `..` to refer to ``pythia-script.yaml``
 parent directory. For instance, given the following layout::
 
     <game-dir>
-    ├── lutris
+    ├── pythia
     │   └── script
-    │       └──lutris-script.yaml
+    │       └──pythia-script.yaml
     ├── setup.exe
     ├── game-assets
     │   └── …
     └── …
 
-You can reference ``setup.exe`` relative to ``lutris-script.yaml`` with
+You can reference ``setup.exe`` relative to ``pythia-script.yaml`` with
 ``$SCRIPTDIR/../../setup.exe``.
 
 See `Example scripts`_ below for a complete example.
@@ -534,9 +534,9 @@ Executing a file
 Execute files with the ``execute`` directive. Use the ``file`` parameter to
 reference a ``file id`` or a path, ``args`` to add command arguments,
 ``working_dir`` to set the directory to execute the command in (defaults to the install path).
-The command is executed within the Lutris Runtime (resolving most shared
+The command is executed within the Pythia Runtime (resolving most shared
 library dependencies). The file is made executable if necessary, no need to run
-chmodx before. You can also use ``env`` (environment variables), ``exclude_processes`` (space-separated list of processes to exclude from being monitored when determining if the execute phase finished), ``include_processes`` (the opposite of ``exclude_processes``, is used to override Lutris' built-in monitoring exclusion list) and ``disable_runtime`` (run a process without the Lutris Runtime, useful for running system binaries).
+chmodx before. You can also use ``env`` (environment variables), ``exclude_processes`` (space-separated list of processes to exclude from being monitored when determining if the execute phase finished), ``include_processes`` (the opposite of ``exclude_processes``, is used to override Pythia' built-in monitoring exclusion list) and ``disable_runtime`` (run a process without the Pythia Runtime, useful for running system binaries).
 
 Example::
 
@@ -672,7 +672,7 @@ Currently, the following tasks are implemented:
     ``description`` (a message be shown to the user during the execution of the task),
     ``working_dir`` (optional working directory),
     ``exclude_processes`` (optional space-separated list of processes to exclude from being monitored when determining if the execute phase finished),
-    ``include_processes`` (the opposite of ``exclude_processes``, is used to override Lutris' built-in monitoring exclusion list),
+    ``include_processes`` (the opposite of ``exclude_processes``, is used to override Pythia' built-in monitoring exclusion list),
     ``env`` (optional environment variables),
     ``overrides`` (optional DLL overrides).
 
@@ -971,7 +971,7 @@ Downloading GOG games from the depot (gogdl)
 The ``gogdl_setup`` directive downloads a GOG game's files directly from GOG's
 CDN using ``gogdl`` (the depot downloader from the Heroic Games Launcher),
 instead of requiring the user to provide an offline installer. This requires
-the user to be connected to GOG in Lutris.
+the user to be connected to GOG in Pythia.
 
 Parameters:
 

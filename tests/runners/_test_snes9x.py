@@ -1,8 +1,8 @@
 import logging
 from unittest import TestCase
 
-from lutris.runners.snes9x import snes9x
-from lutris.util.test_config import setup_test_environment
+from pythia.runners.snes9x import snes9x
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 

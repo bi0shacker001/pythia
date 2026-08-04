@@ -5,11 +5,11 @@ from contextlib import contextmanager
 from unittest import TestCase
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from lutris.util.test_config import setup_test_environment
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 
-from lutris.runners import steam  # noqa: E402  (must follow setup_test_environment)
+from pythia.runners import steam  # noqa: E402  (must follow setup_test_environment)
 
 
 @contextmanager

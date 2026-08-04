@@ -1,6 +1,6 @@
 import unittest
 
-from lutris.util import cache_single
+from pythia.util import cache_single
 
 
 class TestCacheSingle(unittest.TestCase):

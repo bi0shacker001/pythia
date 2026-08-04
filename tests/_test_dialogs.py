@@ -1,11 +1,11 @@
 from unittest import TestCase
 
-from lutris import runners
-from lutris.gui.application import LutrisApplication
-from lutris.gui.config.add_game_dialog import AddGameDialog
-from lutris.gui.config.game_info_box import GameInfoBox
-from lutris.gui.views.store import sort_func
-from lutris.util.test_config import setup_test_environment
+from pythia import runners
+from pythia.gui.application import PythiaApplication
+from pythia.gui.config.add_game_dialog import AddGameDialog
+from pythia.gui.config.game_info_box import GameInfoBox
+from pythia.gui.views.store import sort_func
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 
@@ -19,9 +19,9 @@ class TestGameDialogCommon(TestCase):
 
 class TestGameDialog(TestCase):
     def setUp(self):
-        lutris_application = LutrisApplication()
-        lutris_window = lutris_application.window
-        self.dlg = AddGameDialog(lutris_window)
+        pythia_application = PythiaApplication()
+        pythia_window = pythia_application.window
+        self.dlg = AddGameDialog(pythia_window)
 
     def get_notebook(self):
         return self.dlg.vbox.get_children()[0]

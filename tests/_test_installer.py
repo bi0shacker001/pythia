@@ -3,9 +3,9 @@ from unittest.mock import patch
 
 import requests
 
-from lutris.installer.errors import ScriptingError
-from lutris.installer.interpreter import ScriptInterpreter
-from lutris.util.test_config import setup_test_environment
+from pythia.installer.errors import ScriptingError
+from pythia.installer.interpreter import ScriptInterpreter
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 
@@ -80,7 +80,7 @@ class TestScriptInterpreter(TestCase):
         mirror_url = "https://www.moddb.com/downloads/mirror/test-file"
         interpreter = self.get_moddb_interpreter(moddb_url)
 
-        with patch("lutris.installer.installer.ModDB.transform_url", return_value=mirror_url):
+        with patch("pythia.installer.installer.ModDB.transform_url", return_value=mirror_url):
             interpreter.installer.prepare_game_files([])
 
         installer_file = interpreter.installer.files[0]
@@ -92,7 +92,7 @@ class TestScriptInterpreter(TestCase):
         interpreter = self.get_moddb_interpreter(moddb_url)
 
         with patch(
-            "lutris.installer.installer.ModDB.transform_url",
+            "pythia.installer.installer.ModDB.transform_url",
             side_effect=requests.HTTPError("403 Client Error"),
         ):
             interpreter.installer.prepare_game_files([])
@@ -110,6 +110,6 @@ class TestScriptInterpreter(TestCase):
         moddb_url = "https://www.moddb.com/downloads/test-file"
         interpreter = self.get_moddb_interpreter(moddb_url)
 
-        with patch("lutris.installer.installer.ModDB.transform_url", side_effect=RuntimeError("Invalid ModDB URL")):
+        with patch("pythia.installer.installer.ModDB.transform_url", side_effect=RuntimeError("Invalid ModDB URL")):
             with self.assertRaises(RuntimeError):
                 interpreter.installer.prepare_game_files([])

@@ -1,10 +1,10 @@
 from unittest import TestCase
 from unittest.mock import patch
 
-from lutris.config import LutrisConfig
-from lutris.runners.runner import Runner
-from lutris.runners.scummvm import scummvm
-from lutris.util.test_config import setup_test_environment
+from pythia.config import PythiaConfig
+from pythia.runners.runner import Runner
+from pythia.runners.scummvm import scummvm
+from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
 
@@ -12,7 +12,7 @@ setup_test_environment()
 class TestScummvm(TestCase):
     def test_custom_data_dir(self):
         scummvm_runner = scummvm()
-        scummvm_runner.config = LutrisConfig()
+        scummvm_runner.config = PythiaConfig()
         scummvm_runner.config.runner_config["datadir"] = "~/custom/scummvm"
 
         with patch.object(Runner, "get_command", return_value=["scummvm"]):

@@ -2,7 +2,7 @@
 
 import unittest
 
-from lutris.services.steamfamily import SteamFamilyService
+from pythia.services.steamfamily import SteamFamilyService
 
 
 class TestSteamFamilyAccessToken(unittest.TestCase):

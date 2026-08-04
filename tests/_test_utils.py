@@ -2,9 +2,9 @@ import os
 from collections import OrderedDict
 from unittest import TestCase
 
-from lutris.util import fileio, strings, system
-from lutris.util.steam import vdfutils
-from lutris.util.wine import wine
+from pythia.util import fileio, strings, system
+from pythia.util.steam import vdfutils
+from pythia.util.wine import wine
 
 
 class TestFileUtils(TestCase):
@@ -68,15 +68,15 @@ class TestStringUtils(TestCase):
     def test_gtk_safe_urls(self):
         self.assertEqual(strings.gtk_safe_urls("foo bar"), "foo bar")
         self.assertEqual(
-            strings.gtk_safe_urls("foo http://lutris.net bar"),
-            'foo <a href="http://lutris.net">http://lutris.net</a> bar',
+            strings.gtk_safe_urls("foo http://pythia.net bar"),
+            'foo <a href="http://pythia.net">http://pythia.net</a> bar',
         )
         self.assertEqual(
-            strings.gtk_safe_urls("http://lutris.net"), '<a href="http://lutris.net">http://lutris.net</a>'
+            strings.gtk_safe_urls("http://pythia.net"), '<a href="http://pythia.net">http://pythia.net</a>'
         )
-        text = "foo http://lutris.net bar http://strycore.com"
+        text = "foo http://pythia.net bar http://strycore.com"
         expected = (
-            'foo <a href="http://lutris.net">http://lutris.net</a> '
+            'foo <a href="http://pythia.net">http://pythia.net</a> '
             'bar <a href="http://strycore.com">http://strycore.com</a>'
         )
         self.assertEqual(strings.gtk_safe_urls(text), expected)

@@ -1,6 +1,6 @@
 """nose2 plugin that pins GTK/GDK versions before any test module is imported.
 
-Without this, test modules that stub gi.repository or import lutris GUI code
+Without this, test modules that stub gi.repository or import pythia GUI code
 can cause GTK 4.0 to load before gi.require_version("Gtk", "3.0") runs,
 breaking all subsequent GTK3-dependent test imports.
 """

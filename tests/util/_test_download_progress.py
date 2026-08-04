@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from lutris.util.download_progress import DownloadProgress
+from pythia.util.download_progress import DownloadProgress
 
 
 def tmp_dest(tmp_path):

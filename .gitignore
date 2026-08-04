@@ -1,6 +1,43 @@
-__pycache__/
+nbproject
+build
+.project
+.pydevproject
+.settings
+.ropeproject
+.idea
+tags
 *.pyc
 *.pyo
-build/
-dist/
-*.spec.bak
+*.ui~
+PYSMELLTAGS
+lutris.e4p
+.coverage
+pga.db
+tests/coverage/*
+/dist
+/lutris.egg-info
+/flake.nix
+/flake.lock
+
+# meson builddirs
+builddir
+
+# i18n files
+po/lutris.pot
+po/*.mo
+transl-builddir
+
+# virtual environment folders
+venv
+.venv
+env
+.env
+
+# VS Codium files
+.vscode
+
+# Claude Code
+CLAUDE.md
+
+# glade recovery files
+*.ui~

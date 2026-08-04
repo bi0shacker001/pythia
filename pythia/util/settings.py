@@ -2,7 +2,7 @@ import configparser
 import os
 from typing import Any
 
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 from pythia.util.log import logger
 
 

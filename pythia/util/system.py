@@ -13,12 +13,9 @@ from gettext import gettext as _
 from pathlib import Path
 from typing import IO
 
-from gi.repository import Gio, GLib
-
 from pythia import settings
 from pythia.exceptions import MissingExecutableError
 from pythia.util.log import logger
-from pythia.util.portals import TrashPortal
 
 # Home folders that should never get deleted.
 PROTECTED_HOME_FOLDERS = (
@@ -400,13 +397,19 @@ def merge_folders(source: str, destination: str) -> None:
 
 def remove_folder(
     path: str,
-    completion_function: TrashPortal.CompletionFunction | None = None,
-    error_function: TrashPortal.ErrorFunction | None = None,
+    completion_function: Callable[[], None] | None = None,
+    error_function: Callable[[Exception], None] | None = None,
 ) -> None:
-    """Trashes a folder specified by path. When a GLib main loop is running
-    (GUI mode) this operates asynchronously via the Trash portal. When no
-    main loop is running (CLI mode) this iterates the GLib main context
-    until the trash operation completes, so the folder is gone on return.
+    """Trashes a folder specified by path via the xdg-desktop-portal Trash
+    portal (Linux-desktop-specific; requires GObject-introspection, so the
+    import is deferred to here rather than at module load, same as before
+    GTK removal but now necessary rather than just tidy -- pythia.util.system
+    itself must stay importable without GObject installed at all).
+
+    GTK removal (2026-08-04): the old async-via-running-GLib-main-loop path
+    is gone along with GLib -- this always runs synchronously now (iterates
+    until the trash operation completes), same as the old CLI-mode fallback
+    already did. Revisit once the Qt UI has its own async job-running story.
     """
     if not os.path.exists(path):
         logger.warning("Non existent path: %s", path)
@@ -418,30 +421,27 @@ def remove_folder(
             error_function(RuntimeError("Pythia tried to trash home directory!"))
         return
 
-    if GLib.main_depth() > 0:
-        logger.debug("Trashing folder %s", path)
+    from pythia.util.jobs import run_until_complete
+    from pythia.util.portals import TrashPortal
+
+    logger.debug("Trashing folder %s (sync)", path)
+
+    def _start_trash(
+        completion_function: Callable[[], None] | None = None,
+        error_function: Callable[[Exception], None] | None = None,
+    ) -> None:
         TrashPortal([path], completion_function=completion_function, error_function=error_function)
-    else:
-        from pythia.util.jobs import run_until_complete
 
-        logger.debug("Trashing folder %s (sync)", path)
-
-        def _start_trash(
-            completion_function: TrashPortal.CompletionFunction | None = None,
-            error_function: TrashPortal.ErrorFunction | None = None,
-        ) -> None:
-            TrashPortal([path], completion_function=completion_function, error_function=error_function)
-
-        try:
-            run_until_complete(_start_trash)
-        except Exception as ex:
-            if error_function:
-                error_function(ex)
-            else:
-                raise
+    try:
+        run_until_complete(_start_trash)
+    except Exception as ex:
+        if error_function:
+            error_function(ex)
         else:
-            if completion_function:
-                completion_function()
+            raise
+    else:
+        if completion_function:
+            completion_function()
 
 
 def delete_folder(path: str) -> bool:
@@ -657,7 +657,9 @@ def update_desktop_icons() -> None:
     Other desktop manager icon cache commands must be added here if needed
     """
     if can_find_executable("gtk-update-icon-cache"):
-        execute(["gtk-update-icon-cache", "-tf", os.path.join(GLib.get_user_data_dir(), "icons/hicolor")], quiet=True)
+        from pythia.util.xdg import get_user_data_dir
+
+        execute(["gtk-update-icon-cache", "-tf", os.path.join(get_user_data_dir(), "icons/hicolor")], quiet=True)
         execute(["gtk-update-icon-cache", "-tf", os.path.join(settings.RUNTIME_DIR, "icons/hicolor")], quiet=True)
 
 
@@ -698,10 +700,14 @@ def get_running_pid_list() -> list[int]:
 
 
 def get_mounted_discs() -> list[str | None]:
-    """Return a list of mounted discs and ISOs
+    """Return a list of mounted discs and ISOs (Linux-desktop-specific via
+    Gio.VolumeMonitor; import deferred so this module stays importable
+    without GObject-introspection installed at all).
 
     :rtype: list of Gio.Mount
     """
+    from gi.repository import Gio
+
     volumes = Gio.VolumeMonitor.get()
     drives = []
 

@@ -1,9 +1,18 @@
 """DBus backed display management for Mutter"""
 
+from __future__ import annotations
+
 from collections import namedtuple
 from typing import Any
 
-import dbus
+try:
+    import dbus
+except ImportError:
+    # Linux-desktop-specific (real Mutter DBus display config); not available
+    # at all on Windows. get_display_manager() in util/display.py already
+    # catches the resulting failure and falls back to LegacyDisplayManager,
+    # so this module just needs to not crash at *import* time.
+    dbus = None  # type: ignore[assignment]
 
 from pythia.settings import DEFAULT_RESOLUTION_HEIGHT, DEFAULT_RESOLUTION_WIDTH
 from pythia.util.log import logger

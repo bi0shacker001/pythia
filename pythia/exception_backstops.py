@@ -1,12 +1,26 @@
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable
 from functools import wraps
 from typing import TYPE_CHECKING, Any, cast
 
-from gi.repository import GLib, GObject, Gtk
-
-from pythia.gui.dialogs import display_error
-from pythia.gui.widgets.utils import get_required_main_window
 from pythia.util.log import logger
+
+try:
+    from gi.repository import GLib, GObject, Gtk
+
+    from pythia.gui.dialogs import display_error
+    from pythia.gui.widgets.utils import get_required_main_window
+
+    HAS_GTK = True
+except ImportError:
+    # GTK removal (2026-08-04): watch_game_errors() below has no real GTK
+    # dependency and is what game.py actually needs -- the rest of this
+    # module (_get_error_parent/_create_error_wrapper/init_exception_backstops)
+    # is GObject-signal-swizzling machinery specific to the doomed gui/ tree,
+    # so it's simply unavailable rather than reimplemented here. The Qt UI
+    # will need its own equivalent error-backstop story eventually.
+    HAS_GTK = False
 
 if TYPE_CHECKING:
     from pythia.game import Game

@@ -17,7 +17,7 @@ from typing import Any, TypeAlias, cast
 import requests
 
 from pythia import settings
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 from pythia.util import http, system
 from pythia.util.graphics.gpu import get_gpus_info
 from pythia.util.http import HTTPError, Request

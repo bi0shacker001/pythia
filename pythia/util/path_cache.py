@@ -7,7 +7,7 @@ import time
 from pythia import settings
 from pythia.database.games import get_games
 from pythia.game import GAME_START, GAME_UPDATED, Game
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 from pythia.util import cache_single
 from pythia.util.jobs import AsyncCall
 from pythia.util.log import logger

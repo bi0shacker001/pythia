@@ -4,7 +4,7 @@ from typing import Any
 
 from pythia import settings
 from pythia.database import sql
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 
 SAVED_SEARCHES_UPDATED = NotificationSource()
 

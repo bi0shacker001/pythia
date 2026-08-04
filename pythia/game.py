@@ -11,8 +11,6 @@ import time
 from gettext import gettext as _
 from typing import TYPE_CHECKING, Any, cast
 
-from gi.repository import Gio, GLib, Gtk
-
 from pythia import settings
 from pythia.config import PythiaConfig
 from pythia.database import categories as categories_db
@@ -20,13 +18,14 @@ from pythia.database import games as games_db
 from pythia.database import sql
 from pythia.exception_backstops import watch_game_errors
 from pythia.exceptions import GameConfigError, InvalidGameMoveError, MissingExecutableError
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 from pythia.installer import InstallationKind, get_entry_point_path
 from pythia.monitored_command import MonitoredCommand
 from pythia.runner_interpreter import export_bash_script, get_launch_parameters
 from pythia.runners import import_runner, is_valid_runner_name
 from pythia.runners.runner import Runner, kill_processes
-from pythia.util import busy, discord, extract, jobs, linux, strings, system, xdgshortcuts
+from pythia.util import app_singleton, busy, discord, extract, jobs, linux, strings, system, xdgshortcuts
+from pythia.util.log_buffer import SimpleLogBuffer
 from pythia.util.display import (
     DISPLAY_MANAGER,
     SCREEN_SAVER_INHIBITOR,
@@ -263,12 +262,12 @@ class Game:
                 self.remove_category(".hidden")
 
     @property
-    def log_buffer(self) -> Gtk.TextBuffer:
+    def log_buffer(self) -> SimpleLogBuffer:
         """Access the log buffer object, creating it if necessary"""
         _log_buffer = LOG_BUFFERS.get(self.id)
         if _log_buffer:
             return _log_buffer
-        _log_buffer = Gtk.TextBuffer()
+        _log_buffer = SimpleLogBuffer()
         _log_buffer.create_tag("warning", foreground="red")
         if self.game_thread:
             self.game_thread.set_log_buffer(_log_buffer)
@@ -392,7 +391,7 @@ class Game:
             raise ValueError("Invalid game passed: %s" % self)
 
         if not self.service or self.service == "pythia":
-            application: "PythiaApplication" = Gio.Application.get_default()
+            application: "PythiaApplication" = app_singleton.get_default()
             application.show_pythia_installer_window(game_slug=self.slug)
             return
 
@@ -400,7 +399,7 @@ class Game:
         db_game = service.get_service_db_game(self)
         if not db_game:
             logger.error("Can't find %s for %s, trying to fall back to Pythia installers", self.name, service.name)
-            application: "PythiaApplication" = Gio.Application.get_default()
+            application: "PythiaApplication" = app_singleton.get_default()
             application.show_pythia_installer_window(game_slug=self.slug)
             return
 
@@ -433,7 +432,7 @@ class Game:
             if not installers:
                 raise RuntimeError(_("No updates found"))
 
-            application: "PythiaApplication" = Gio.Application.get_default()
+            application: "PythiaApplication" = app_singleton.get_default()
             application.show_installer_window(
                 installers, service, self.appid, installation_kind=InstallationKind.UPDATE
             )
@@ -455,7 +454,7 @@ class Game:
             if not installers:
                 raise RuntimeError(_("No DLC found"))
 
-            application: "PythiaApplication" = Gio.Application.get_default()
+            application: "PythiaApplication" = app_singleton.get_default()
             application.show_installer_window(installers, service, self.appid, installation_kind=InstallationKind.DLC)
 
         busy.BusyAsyncCall(service.get_dlc_installers_runner, on_installers_ready, db_game, db_game["runner"])
@@ -875,7 +874,7 @@ class Game:
             except AssertionError:
                 pass
 
-        self.heartbeat = GLib.timeout_add(HEARTBEAT_DELAY, self.beat)
+        self.heartbeat = jobs.schedule_repeating_at_idle(self.beat, interval_seconds=HEARTBEAT_DELAY / 1000.0)
         with open(self.now_playing_path, "w", encoding="utf-8") as np_file:
             np_file.write(self.name)
 

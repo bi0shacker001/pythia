@@ -4,18 +4,24 @@ import logging
 import logging.handlers
 import os
 import sys
-from typing import TYPE_CHECKING
 
-from gi.repository import GLib
+# Used to store log buffers for games (formerly typed as Gtk.TextBuffer under
+# GTK; now just whatever the actual UI's log-view widget stores -- see the Qt
+# UI's own log window once it exists).
+LOG_BUFFERS: dict = {}
 
-if TYPE_CHECKING:
-    from gi.repository import Gtk
 
-# Used to store log buffers for games. Quoted so importers (notably the
-# pythia-wrapper subprocess) don't need to load the Gtk typelib just to log.
-LOG_BUFFERS: "dict[str, Gtk.TextBuffer]" = {}
+def _user_cache_dir() -> str:
+    """Cross-platform user cache dir -- replaces GLib.get_user_cache_dir()
+    (2026-08-04 GTK removal). Windows has no XDG convention of its own, so
+    %LOCALAPPDATA% is the closest real analog; everything else (Linux, macOS)
+    follows the real XDG spec."""
+    if os.name == "nt":
+        return os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
 
-CACHE_DIR = os.path.realpath(os.path.join(GLib.get_user_cache_dir(), "pythia"))
+
+CACHE_DIR = os.path.realpath(os.path.join(_user_cache_dir(), "pythia"))
 if not os.path.isdir(CACHE_DIR):
     os.makedirs(CACHE_DIR)
 

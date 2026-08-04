@@ -6,10 +6,10 @@ import shlex
 import time
 import unicodedata
 import uuid
+import xml.etree.ElementTree as ET
+import xml.sax.saxutils
 from dataclasses import dataclass
 from gettext import gettext as _
-
-from gi.repository import GLib
 
 from pythia.util.log import logger
 
@@ -138,12 +138,13 @@ def unpack_dependencies(string: str) -> list[str | tuple[str, ...]]:
 
 
 def gtk_safe(text: str) -> str:
-    """Return a string ready to used in Gtk widgets, with anything that could
-    be Pango markup escaped."""
+    """Return a string with markup-significant characters escaped -- named
+    gtk_safe historically (Pango markup escaping via GLib), kept as plain XML
+    entity escaping now that there's no GTK/Pango involved (2026-08-04)."""
     if not text:
         return ""
 
-    return GLib.markup_escape_text(str(text))
+    return xml.sax.saxutils.escape(str(text), {"'": "&apos;", '"': "&quot;"})
 
 
 def gtk_safe_urls(text: str) -> str:
@@ -165,25 +166,18 @@ def gtk_safe_urls(text: str) -> str:
 
 
 def is_valid_pango_markup(text: str) -> bool:
-    def destroy_func(_user_data: None) -> None:
-        pass  # required by GLib, but we don't need this callback
-
+    """Checks the text is well-formed XML when wrapped in a root tag -- Pango
+    markup is an XML subset, so this used to go through GLib's real Pango
+    markup parser. Replaced with a plain XML well-formedness check (2026-08-04
+    GTK removal): validates markup *structure* (balanced/quoted tags) same as
+    before, just without checking against Pango's specific tag vocabulary."""
     if len(text) == 0:
         return True  # Trivial case - empty strings are always valid
 
     try:
-        parser = GLib.MarkupParser()
-        # DEFAULT_FLAGS == 0, but was not defined before GLib 2.74 so
-        # we'll just hard-code the value.
-        parser_flags: GLib.MarkupParseFlags = 0
-        context = GLib.MarkupParseContext.new(
-            parser=parser, flags=parser_flags, user_data=None, user_data_dnotify=destroy_func
-        )
-
-        markup = f"<markup>{text}</markup>"
-        context.parse(markup, len(markup))
+        ET.fromstring(f"<markup>{text}</markup>")
         return True
-    except GLib.GError:  # type: ignore
+    except ET.ParseError:
         return False
 
 

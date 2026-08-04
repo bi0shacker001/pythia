@@ -7,11 +7,10 @@ from gettext import gettext as _
 from tempfile import TemporaryDirectory
 from typing import cast
 
-from gi.repository import GLib
-
 from pythia import __version__
 from pythia.util.log import logger
 from pythia.util.settings import SettingsIO
+from pythia.util.xdg import get_user_cache_dir, get_user_config_dir, get_user_data_dir
 
 PROJECT = "Pythia"
 VERSION = __version__
@@ -19,8 +18,8 @@ COPYRIGHT = _("(c) 2009 Pythia Team")
 AUTHORS = [_("The Pythia team")]
 
 # Paths
-CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "pythia")
-DATA_DIR = os.path.join(GLib.get_user_data_dir(), "pythia")
+CONFIG_DIR = os.path.join(get_user_config_dir(), "pythia")
+DATA_DIR = os.path.join(get_user_data_dir(), "pythia")
 if not os.path.exists(CONFIG_DIR):
     # Set the config dir to ~/.local/share/pythia as we're deprecating ~/.config/pythia
     CONFIG_DIR = DATA_DIR
@@ -29,7 +28,7 @@ sio = SettingsIO(CONFIG_FILE)
 
 RUNNER_DIR = sio.read_setting("runner_dir") or os.path.join(DATA_DIR, "runners")
 RUNTIME_DIR = sio.read_setting("runtime_dir") or os.path.join(DATA_DIR, "runtime")
-CACHE_DIR = sio.read_setting("cache_dir") or os.path.join(GLib.get_user_cache_dir(), "pythia")
+CACHE_DIR = sio.read_setting("cache_dir") or os.path.join(get_user_cache_dir(), "pythia")
 TMP_DIR = os.path.join(CACHE_DIR, "tmp")
 GAME_CONFIG_DIR = os.path.join(CONFIG_DIR, "games")
 RUNNERS_CONFIG_DIR = os.path.join(CONFIG_DIR, "runners")
@@ -41,7 +40,7 @@ BANNER_PATH = os.path.join(DATA_DIR, "banners")
 COVERART_PATH = os.path.join(DATA_DIR, "coverart")
 
 RUNTIME_VERSIONS_PATH = os.path.join(CACHE_DIR, "versions.json")
-ICON_PATH = os.path.join(GLib.get_user_data_dir(), "icons", "hicolor", "128x128", "apps")
+ICON_PATH = os.path.join(get_user_data_dir(), "icons", "hicolor", "128x128", "apps")
 
 DB_PATH = sio.read_setting("pga_path") or os.path.join(DATA_DIR, "pga.db")
 

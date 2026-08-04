@@ -6,7 +6,7 @@ from typing import Any, TypeAlias
 from pythia import settings
 from pythia.database import games as games_db
 from pythia.database import sql
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 
 CATEGORIES_UPDATED = NotificationSource()
 

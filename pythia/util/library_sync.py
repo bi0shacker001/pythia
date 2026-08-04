@@ -12,7 +12,7 @@ from pythia.database.categories import (
 )
 from pythia.database.games import add_game, get_games, get_games_where
 from pythia.game import Game
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 from pythia.util import http
 from pythia.util.log import logger
 

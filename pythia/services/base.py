@@ -18,7 +18,7 @@ from pythia.game import GAME_UPDATED, Game
 from pythia.gui.dialogs import NoticeDialog
 from pythia.gui.dialogs.webconnect_dialog import WebConnectDialog
 from pythia.gui.views.media_loader import download_media
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 from pythia.gui.widgets.utils import BANNER_SIZE, ICON_SIZE
 from pythia.services.service_media import ServiceMedia
 from pythia.util import system

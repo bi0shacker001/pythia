@@ -4,9 +4,13 @@ import json
 import os
 import platform
 import re
-import resource
 import shutil
 import sys
+
+try:
+    import resource  # POSIX-only; this module is real Linux-specific system code, not yet ported for Windows
+except ImportError:
+    resource = None  # type: ignore[assignment]
 from collections import Counter, defaultdict
 from collections.abc import Iterator
 from gettext import gettext as _
@@ -171,6 +175,8 @@ class LinuxSystem:  # pylint: disable=too-many-public-methods
 
     @staticmethod
     def get_file_limits() -> tuple[int, int]:
+        if resource is None:
+            return (0, 0)  # not meaningful on Windows; no equivalent rlimit concept
         return resource.getrlimit(resource.RLIMIT_NOFILE)
 
     def has_enough_file_descriptors(self) -> bool:

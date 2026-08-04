@@ -5,7 +5,7 @@ import time
 from gettext import gettext as _
 
 from pythia.config import PythiaConfig
-from pythia.gui.widgets import NotificationSource
+from pythia.util.notifier import NotificationSource
 from pythia.installer.errors import ScriptingError
 from pythia.runners import steam
 from pythia.util.jobs import AsyncCall, schedule_repeating_at_idle

@@ -9,14 +9,14 @@ import subprocess
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
-import gi
-
 try:
+    import gi
+
     gi.require_version("GnomeDesktop", "3.0")
     from gi.repository import GnomeDesktop  # type: ignore
 
     LIB_GNOME_DESKTOP_AVAILABLE = True
-except ValueError:
+except (ImportError, ValueError):
     LIB_GNOME_DESKTOP_AVAILABLE = False
     GnomeDesktop = None
 
@@ -27,7 +27,19 @@ try:
 except ImportError:
     DBUS_AVAILABLE = False
 
-from gi.repository import Gdk, GLib, Gio, Gtk
+try:
+    from gi.repository import Gdk, GLib, Gio, Gtk
+
+    HAS_GTK = True
+except ImportError:
+    # GTK removal (2026-08-04): this module's real GNOME/X11 display
+    # management (monitor enumeration, resolution switching, screensaver
+    # inhibition) is genuinely Linux-desktop-specific and stays real for
+    # Linux; on Windows (or anywhere without GObject-introspection) it
+    # degrades to the LegacyDisplayManager/no-op fallbacks below rather than
+    # crashing at import time.
+    Gdk = GLib = Gio = Gtk = None  # type: ignore[assignment]
+    HAS_GTK = False
 
 from pythia.util import cache_single
 from pythia.settings import DEFAULT_RESOLUTION_HEIGHT, DEFAULT_RESOLUTION_WIDTH
@@ -370,9 +382,11 @@ class DBusScreenSaverInhibitor:
         self.proxy = None
         self._used_gtk_fallback = False
 
-    def set_dbus_iface(self, name: str, path: str, interface: str, bus_type: Gio.BusType = Gio.BusType.SESSION) -> None:
+    def set_dbus_iface(self, name: str, path: str, interface: str, bus_type: "Gio.BusType | None" = None) -> None:
         """Sets a dbus proxy to be used instead of Gtk.Application methods, this
         method can raise an exception."""
+        if bus_type is None:
+            bus_type = Gio.BusType.SESSION
         self.proxy = Gio.DBusProxy.new_for_bus_sync(
             bus_type, Gio.DBusProxyFlags.NONE, None, name, path, interface, None
         )

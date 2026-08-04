@@ -30,7 +30,11 @@ def _detect_screen_mode(app) -> str:
 
 
 def resolve_mode(app, hint: str | None) -> str:
-    if hint in ("desktop", "bigpicture"):
+    # "web" (UI-next, see pythia/ui/webview/app.py) is deliberately never
+    # auto-selected by the saved-preference or screen-size paths below -- it's
+    # the fast-iteration testing surface, reached only via an explicit --ui
+    # web hint, never something a user lands in by default.
+    if hint in ("desktop", "bigpicture", "web"):
         return hint
     saved = get_setting("ui_mode")
     if saved in ("desktop", "bigpicture"):
@@ -38,7 +42,7 @@ def resolve_mode(app, hint: str | None) -> str:
     return _detect_screen_mode(app)
 
 
-def launch(hint: str | None = None):
+def launch(hint: str | None = None, relaunch: bool = False):
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError:
@@ -50,11 +54,19 @@ def launch(hint: str | None = None):
         )
         sys.exit(1)
 
+    from pythia.ui import singleton
+
+    if relaunch:
+        singleton.terminate_existing_instance()
+
     # QApplication (a QGuiApplication subclass) works for both the QML big-picture
     # front end and the QtWidgets desktop one -- one Application instance is created
     # here, up front, and handed to whichever front end resolve_mode() picks.
     app = QApplication.instance() or QApplication(sys.argv)
     mode = resolve_mode(app, hint)
+
+    singleton.write_pidfile()
+    app.aboutToQuit.connect(singleton.clear_pidfile)
 
     from pythia.ui.backend import Backend
 
@@ -62,6 +74,8 @@ def launch(hint: str | None = None):
 
     if mode == "bigpicture":
         from pythia.ui.bigpicture.app import run
+    elif mode == "web":
+        from pythia.ui.webview.app import run
     else:
         from pythia.ui.desktop.app import run
 

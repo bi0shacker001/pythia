@@ -413,6 +413,89 @@ def cmd_f95_export(args):
     return 0
 
 
+def cmd_f95_check_updates(args):
+    """Real update check against api.f95checker.dev for every tracked f95 game
+    (see plugins/library/f95_updates.py) -- no F95zone login needed for this,
+    only for account-specific things like watched-thread import."""
+    from pythia.plugins.library import f95_updates
+
+    result = f95_updates.run_update_check(log=print)
+    if result["errors"]:
+        for err in result["errors"]:
+            print(f"error: {err}", file=sys.stderr)
+    print(f"  -> checked {result['checked']}, {result['updated']} update(s) found.")
+    return 1 if result["errors"] and not result["checked"] else 0
+
+
+def cmd_source_add_root(args):
+    from pythia.plugins.source import local_path
+
+    local_path.add_root(args.path)
+    print(f"  -> added source root: {args.path}")
+    return 0
+
+
+def cmd_source_remove_root(args):
+    from pythia.plugins.source import local_path
+
+    local_path.remove_root(args.path)
+    print(f"  -> removed source root: {args.path}")
+    return 0
+
+
+def cmd_source_list_roots(args):
+    from pythia.plugins.source import local_path
+
+    roots = local_path.get_roots()
+    if not roots:
+        print("No source roots registered.")
+        return 0
+    for root in roots:
+        print(root)
+    return 0
+
+
+def cmd_steam_shortcuts_sync(args):
+    """Real, side-effecting write to a real Steam userdata file -- only ever
+    touches Pythia-managed entries (tagged, matched by AppName), preserves
+    everything else, and backs up the original before the first real write.
+    Sourced from this system's own tracked direct-launch variants (real
+    executable path known) -- see pythia/core/steam_shortcuts.py."""
+    from pythia import datadir
+    from pythia.core import steam_shortcuts as ss
+    from pythia.identity import get_system_uuid
+
+    uuid = get_system_uuid()
+    entries = []
+    for entry in datadir.list_all_entries():
+        if entry.get("system_uuid") != uuid:
+            continue
+        for group in entry.get("versions", []):
+            for variant in group.get("variants", []):
+                if variant.get("direct") and variant.get("executable"):
+                    entries.append(
+                        {
+                            "appname": entry.get("canonical_name") or "Unknown",
+                            "exe": variant["executable"],
+                            "start_dir": variant.get("path"),
+                        }
+                    )
+
+    if not entries:
+        print("No direct-launch games tracked on this system -- nothing to sync.")
+        return 0
+
+    if args.dry_run:
+        print(f"Would write {len(entries)} shortcut(s) to {args.shortcuts_vdf_path}:")
+        for e in entries:
+            print(f"  {e['appname']} -> {e['exe']}")
+        return 0
+
+    n = ss.sync_shortcuts(args.shortcuts_vdf_path, entries, log=print)
+    print(f"  -> synced {n} shortcut(s). Restart Steam to see them.")
+    return 0
+
+
 def cmd_f95_rpc_serve(args):
     """Run the F95Checker-browser-extension-compatible RPC server in the
     foreground (Ctrl+C to stop) -- see pythia/f95_rpc.py for the real protocol."""
@@ -461,7 +544,7 @@ def build_parser():
     p_enable.set_defaults(func=cmd_enable)
 
     p_open = sub.add_parser("open", help="Hand a tracked game off to a manager plugin (e.g. the Steam client).")
-    p_open.add_argument("game_id", type=int)
+    p_open.add_argument("game_id")
     p_open.add_argument("--yes", action="store_true", help="Don't prompt for confirmation before handing off.")
     p_open.set_defaults(func=cmd_open)
 
@@ -469,8 +552,8 @@ def build_parser():
     p_duplicates.set_defaults(func=cmd_duplicates)
 
     p_merge = sub.add_parser("merge", help="Fold game_id b into game_id a (b is deleted).")
-    p_merge.add_argument("surviving", type=int)
-    p_merge.add_argument("retired", type=int)
+    p_merge.add_argument("surviving")
+    p_merge.add_argument("retired")
     p_merge.set_defaults(func=cmd_merge)
 
     p_itch_connect = sub.add_parser("itch-connect", help="Save an itch.io API key locally for ownership sync.")
@@ -522,6 +605,36 @@ def build_parser():
         "f95-rpc-serve", help="Run the F95Checker browser-extension-compatible RPC server."
     )
     p_f95_rpc.set_defaults(func=cmd_f95_rpc_serve)
+
+    p_f95_check = sub.add_parser(
+        "f95-check-updates",
+        help="Real update check (api.f95checker.dev) for every tracked f95 game -- populates available_updates[].",
+    )
+    p_f95_check.set_defaults(func=cmd_f95_check_updates)
+
+    p_source_add = sub.add_parser(
+        "source-add-root", help="Register a local/mounted path (UNC share, mount point, ...) as a browsable source."
+    )
+    p_source_add.add_argument("path")
+    p_source_add.set_defaults(func=cmd_source_add_root)
+
+    p_source_remove = sub.add_parser("source-remove-root", help="Un-register a source root.")
+    p_source_remove.add_argument("path")
+    p_source_remove.set_defaults(func=cmd_source_remove_root)
+
+    sub.add_parser("source-list-roots", help="List registered source roots.").set_defaults(
+        func=cmd_source_list_roots
+    )
+
+    p_steam_shortcuts = sub.add_parser(
+        "steam-shortcuts-sync",
+        help="Add/update Steam non-Steam-game shortcuts for direct-launch games (real file write -- see --dry-run).",
+    )
+    p_steam_shortcuts.add_argument("shortcuts_vdf_path", help="Path to Steam's real userdata/<id>/config/shortcuts.vdf")
+    p_steam_shortcuts.add_argument(
+        "--dry-run", action="store_true", help="Print what would be written without touching the real file."
+    )
+    p_steam_shortcuts.set_defaults(func=cmd_steam_shortcuts_sync)
 
     # renpy-patch is *not* registered as a normal subparser: it owns its own
     # argparse setup (patch.run_cli) with flags like --library/--game that clash

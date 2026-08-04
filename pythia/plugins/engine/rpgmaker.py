@@ -50,8 +50,15 @@ class RpgMakerVxAceEnginePlugin(DetectOnlyEnginePlugin):
     kind = "rpgmaker_vxace"
 
     def _signature_present(self, game_root: Path) -> bool:
+        # Real bug fixed (2026-08-03): an exact ".rgss3a" suffix match missed
+        # MGQ Paradox's own real install, where the bundled "One-Click Patcher"
+        # (see plugins/patcher/bundled.py) renames the original archive to
+        # "Game.rgss3a.old" as its own backup -- confirmed directly against
+        # that real folder. Matching ".rgss3a" anywhere in the filename (not
+        # just as the final suffix) catches this real-world renamed-backup
+        # case too, not just a pristine unpatched install.
         try:
-            return any(p.suffix.lower() == ".rgss3a" for p in game_root.iterdir() if p.is_file())
+            return any(".rgss3a" in p.name.lower() for p in game_root.iterdir() if p.is_file())
         except OSError:
             return False
 

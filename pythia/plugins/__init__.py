@@ -45,7 +45,20 @@ extension system) behind these shapes.
 
 **The "never launches anything" boundary is refined, not dropped (2026-08-02).**
 Pythia still never executes a game's own binary directly -- that specific act stays
-absolute. Two things sit on the "allowed" side of that line, both grounded in what
+absolute, with one explicit, narrow exception (2026-08-03): a variant the user has
+flagged **direct** (see `variant["direct"]`/`variant["executable"]` in the datadir
+schema) needs no runner/compatibility layer at all to run -- most relevantly a
+native Windows install that "just runs the executable directly," with nothing else
+to configure. This is not the same as untracked: a direct variant keeps its normal
+source/version/update/patch tracking exactly like any other variant -- "direct"
+describes only how it launches, not whether Pythia manages it. For that specific,
+user-declared case only, `pythia.plugins.manager.direct.DirectLaunchManagerPlugin`
+runs the executable directly. Deliberately minimal: no runner selection, no
+Wine/Proton flags, no process-lifecycle management of any kind -- exactly "run this
+path," never more. Every other install continues to go through the two allowed
+indirect paths below; this exception does not extend to them.
+
+Two more things sit on the "allowed" side of that line, both grounded in what
 Pythia actually is (an update/preparation manager, not a launcher):
 - **Running a patcher/updater/installer tool that prepares a game to be ready to
   run** is enablement, the same category as `renpy_patch/patch.py` copying engine

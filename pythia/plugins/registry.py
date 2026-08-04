@@ -176,10 +176,39 @@ def discover_external(log=print) -> list:
     return found
 
 
+_builtins_imported = False
+
+
+def _ensure_builtins_imported():
+    """Built-in registration is a side effect of importing each category's own
+    package (register_builtin() calls at module import time) -- so a caller
+    that only ever imported, say, pythia.plugins.library and .engine (true of
+    onboarding.py/scanning.py) silently never sees manager/downloader/
+    metadata/patcher plugins at all. Confirmed as a real bug (2026-08-03): the
+    webview UI's plugin inventory showed 17 of 25 real plugins for exactly
+    this reason. Importing every category package here, once, makes
+    all_plugins() correct regardless of which other modules a given front end
+    happened to import first."""
+    global _builtins_imported
+    if _builtins_imported:
+        return
+    import pythia.plugins.downloader  # noqa: F401
+    import pythia.plugins.engine  # noqa: F401
+    import pythia.plugins.library  # noqa: F401
+    import pythia.plugins.manager  # noqa: F401
+    import pythia.plugins.metadata  # noqa: F401
+    import pythia.plugins.mod  # noqa: F401
+    import pythia.plugins.patcher  # noqa: F401
+    import pythia.plugins.source  # noqa: F401
+
+    _builtins_imported = True
+
+
 def all_plugins() -> list:
     """Every discovered plugin instance, built-in + external (pip entry-point) +
     folder (drop-in manifest), instantiated exactly once regardless of how many
     categories it spans."""
+    _ensure_builtins_imported()
     return list(_builtin_instances) + discover_external() + discover_folder_plugins()
 
 

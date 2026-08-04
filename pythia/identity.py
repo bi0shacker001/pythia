@@ -8,6 +8,7 @@ outside datadir/ and is never synced.
 """
 
 import os
+import random
 import sqlite3
 import uuid
 from pathlib import Path
@@ -102,12 +103,29 @@ def set_setting(key: str, value: str):
         conn.close()
 
 
+def new_game_id() -> str:
+    """Mint a fresh, internally-generated game ID -- 16 lowercase hex characters
+    (2026-08-04, superseding the sequential-counter scheme below). Real, explicit
+    user directive: "Obviously every game gets an ID. That should always have
+    been how it goes. Why were we reusing IDs from other services internally?"
+    -- Pythia no longer reuses a platform's own ID (Steam AppID, GOG ID, ...) as
+    the internal game_id for anything, including newly-discovered owned games;
+    those stay purely informational in `platform_ids[]`. A random 16-hex-char
+    UUID slice makes cross-system collisions between two independently-minted
+    IDs astronomically unlikely without needing any coordination between
+    systems (unlike a per-system counter, which needed the random-offset hack
+    below to avoid two fresh installs both starting at the same small number)."""
+    return uuid.uuid4().hex[:16]
+
+
 def next_game_id() -> int:
-    """Mint and persist the next local game ID (for games with no external ID to reuse)."""
+    """Superseded by new_game_id() (2026-08-04) -- kept only for the v3->v4
+    datadir migration, which needs to recognize old sequential/offset-seeded
+    integer IDs on disk. Do not call this for newly-minted games."""
     conn = _connect()
     try:
         current = _get(conn, "next_local_game_id")
-        current = int(current) if current is not None else 1
+        current = int(current) if current is not None else random.randint(100_000, 999_999)
         _set(conn, "next_local_game_id", str(current + 1))
         return current
     finally:

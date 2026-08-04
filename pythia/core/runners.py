@@ -82,6 +82,29 @@ _STATIC_CATALOGS = {
         # emulation, but that's a user/OS-level choice, not this module's to make by
         # silently downloading the "wrong" arch's binary and hoping.
     ],
+    # Valve's own real, stable installer URLs (documented on Valve's SteamCMD wiki
+    # page, not a guessed pattern) -- confirmed live (HTTP 200, real content-length)
+    # 2026-08-04, then actually downloaded and run (`steamcmd +quit`) against a real
+    # copy to confirm the archive layout/entry-point name below is correct, not just
+    # that the URL resolves.
+    "steamcmd": [
+        {
+            "version": "stable",
+            "architecture": "x86_64",
+            "os": "Windows",
+            "url": "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip",
+            "default": True,
+        },
+        {
+            "version": "stable",
+            "architecture": "x86_64",
+            "os": "Linux",
+            "url": "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz",
+            "default": True,
+        },
+        # No arm64 build published by Valve for either OS -- same "don't guess an
+        # unpublished arch" rule as legendary above.
+    ],
 }
 
 

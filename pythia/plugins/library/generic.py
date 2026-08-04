@@ -33,6 +33,19 @@ _STRUCTURE_FOLDER_NAMES = {
     "gamedata", "assets", "installer", "install",
 }
 
+# Extensions that only ever show up as game *assets*, never as the whole content
+# of a real install by themselves -- used to catch a bare asset/backup folder
+# (confirmed real case, 2026-08-03: "Pictures", a picture-asset backup the user
+# keeps alongside MGQ Paradox for merging chapters, not a game at all -- a flat
+# folder of nothing but .png files). Deliberately not used to require a specific
+# platform's executable (an earlier version of this check wrongly required an
+# .exe, which would have rejected every real non-Windows game too) -- this only
+# rejects a folder that is *exclusively* this kind of file, nothing else.
+_ASSET_ONLY_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tga", ".psd",
+    ".txt", ".pdf", ".doc", ".docx", ".md",
+}
+
 
 class GenericLibraryPlugin(LibraryPlugin):
     id = "pythia.library.generic"
@@ -50,6 +63,9 @@ class GenericLibraryPlugin(LibraryPlugin):
         if not has_content:
             return None
 
+        if self._looks_like_asset_only_dump(path):
+            return None
+
         return {
             "kind": "unknown",
             "name": None,
@@ -58,6 +74,22 @@ class GenericLibraryPlugin(LibraryPlugin):
             "external_id": None,
             "extra": {},
         }
+
+    def _looks_like_asset_only_dump(self, path: Path) -> bool:
+        """True only for a flat folder whose files are *exclusively* asset-type
+        extensions (see _ASSET_ONLY_EXTENSIONS) with no subfolders at all --
+        deliberately narrow, so it only catches an actual pure asset dump
+        (confirmed real case: "Pictures") and never a real game that merely
+        lacks a detectable Windows executable (a real non-Windows title should
+        still match here with platforms=[], not be rejected outright)."""
+        try:
+            entries = list(path.iterdir())
+        except OSError:
+            return False
+        if any(e.is_dir() for e in entries):
+            return False
+        files = [e for e in entries if e.is_file()]
+        return bool(files) and all(f.suffix.lower() in _ASSET_ONLY_EXTENSIONS for f in files)
 
     def _os_looks_windows(self, path: Path, max_depth: int = 3) -> bool:
         """Very light heuristic: an .exe somewhere within a few folders of the root

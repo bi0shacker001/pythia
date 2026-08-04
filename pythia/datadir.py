@@ -14,7 +14,7 @@ from pathlib import Path
 
 from pythia.identity import datadir_path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Which library `kind`s carry a real cross-platform ID worth recording in a game's
 # top-level `platform_ids[]`/`ownership[]` (2026-08-03) -- an engine kind like
@@ -136,11 +136,11 @@ def sanitize_name(name: str) -> str:
     return name or "unnamed"
 
 
-def _filename(system_uuid: str, game_id: int, canonical_name: str) -> str:
+def _filename(system_uuid: str, game_id: str, canonical_name: str) -> str:
     return f"{system_uuid}-{game_id}-{sanitize_name(canonical_name)}.json"
 
 
-def find_entry_file(system_uuid: str, game_id: int) -> Path | None:
+def find_entry_file(system_uuid: str, game_id: str) -> Path | None:
     """Locate this identity's existing datadir file, if any, regardless of what its
     sanitized-name portion currently says (the name can drift between onboard runs
     as detection improves; identity is (system_uuid, game_id), not the filename)."""

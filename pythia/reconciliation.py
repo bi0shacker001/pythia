@@ -73,7 +73,7 @@ def find_merge_candidates():
     return candidates
 
 
-def merge(surviving_game_id: int, retired_game_id: int) -> dict:
+def merge(surviving_game_id: str, retired_game_id: str) -> dict:
     """Fold `retired_game_id`'s versions/platform_ids/ownership into
     `surviving_game_id`, on this system's own records only, then delete the retired
     entry's file. Returns {"status": "ok", "game_id", "retired_game_id"} or an error

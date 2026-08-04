@@ -43,11 +43,13 @@ Epic Games Store library plugin.
 import json
 import os
 import subprocess
+import sys
+import urllib.parse
 from pathlib import Path
 
 from pythia.core import runners
 from pythia.identity import app_data_dir
-from pythia.plugins import LibraryPlugin
+from pythia.plugins import LibraryPlugin, ManagerPlugin
 from pythia.plugins.registry import register_builtin
 
 _MANIFESTS_DIR = Path(r"C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests")
@@ -101,11 +103,12 @@ def connect_from_redirect_json(pasted_json: str) -> bool:
     return result is not None and result.returncode == 0
 
 
-class EgsLibraryPlugin(LibraryPlugin):
+class EgsPlugin(LibraryPlugin, ManagerPlugin):
     id = "pythia.library.egs"
     display_name = "Epic Games Store"
     version = "1.0.0"
     author = "pythia"
+    compatible_sources = ["egs"]
 
     def is_connected(self) -> bool:
         # legendary's own session file existing is a cheap, real signal -- avoids
@@ -175,5 +178,36 @@ class EgsLibraryPlugin(LibraryPlugin):
             )
         return results
 
+    # ---- Manager: hand-off to Epic's own client (merged 2026-08-03, see
+    # steam.py's module docstring for why) -- real, documented URI protocol
+    # (`com.epicgames.launcher://apps/<AppName>?action=launch&silent=true`,
+    # confirmed against Epic's own developer docs, dev.epicgames.com/docs/
+    # epic-games-store/protocol-activation -- not guessed). `AppName` is the
+    # same identifier match()/list_owned() above already put in
+    # extra["egs_app_name"] -- no separate lookup needed.
+    def is_available(self, ctx) -> bool:
+        """Same honest "unknown" as Steam's manager capability -- no reliable
+        cross-platform "is the Epic client installed" check built yet."""
+        return False
 
-plugin = register_builtin(EgsLibraryPlugin())
+    def open(self, detection: dict, ctx) -> bool:
+        """No-op (returns False) if `detection` has no Epic AppName to hand off to."""
+        app_name = (detection.get("extra") or {}).get("egs_app_name")
+        if not app_name:
+            return False
+
+        query = urllib.parse.urlencode({"action": "launch", "silent": "true"})
+        uri = f"com.epicgames.launcher://apps/{app_name}?{query}"
+        try:
+            if sys.platform == "win32":
+                os.startfile(uri)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", uri])
+            else:
+                subprocess.Popen(["xdg-open", uri])
+        except OSError:
+            return False
+        return True
+
+
+plugin = register_builtin(EgsPlugin())

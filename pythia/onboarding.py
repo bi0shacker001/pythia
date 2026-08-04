@@ -9,11 +9,13 @@ Qt UI's backend.py, not here. See the Milestone 1 plan for the full rationale.
 import difflib
 import re
 import shutil
+import uuid
 from pathlib import Path
 
 from pythia import datadir
+from pythia.core import instance_marker
 from pythia.datadir import classify_variant_tokens
-from pythia.identity import get_system_uuid, next_game_id
+from pythia.identity import get_system_uuid, new_game_id
 from pythia.plugins import engine as engine_plugins
 from pythia.plugins.library import identify, identify_all
 
@@ -163,15 +165,35 @@ def find_candidates(detection: dict, name_hint: str, path: Path):
             certain = entry
             break
 
+    # Marker-file match (Milestone 9, 2026-08-04): real physical evidence this
+    # exact folder was already onboarded by *another* system and synced here
+    # by something outside Pythia (OneDrive, rsync, a NAS mount, ...) -- not a
+    # guess from name similarity. Stronger than the external-ID check below,
+    # since it's proof of the same synced bytes, not an inference from a
+    # platform's own ID scheme. Absence of a marker is not negative evidence
+    # (an install onboarded before this milestone, or hand-copied without
+    # Pythia's involvement, simply has none yet) -- falls through to the
+    # weaker tiers below exactly as before.
+    if certain is None:
+        marker = instance_marker.read_marker(path)
+        if marker and marker.get("game_uuid"):
+            certain = next((e for e in all_entries if e.get("game_uuid") == marker["game_uuid"]), None)
+
     external_id = detection.get("external_id")
     if certain is None and external_id is not None:
-        expected_source = f"{detection['kind']}_id"
-        # Cross-system: prefer this system's own record if it has one, otherwise
-        # take the first match from any system -- if ANY system in the sync group
-        # already claimed this external ID under some game_id, every system should
-        # recognize and converge on it, not each independently mint its own.
+        kind = detection["kind"]
+        # Cross-system, via platform_ids[] (2026-08-04 redesign -- game_id is now
+        # always an internally-minted opaque ID, never a reused platform ID, so a
+        # platform match has to look at platform_ids[] instead of comparing
+        # game_id directly). Prefer this system's own record if it has one,
+        # otherwise take the first match from any system -- if ANY system in the
+        # sync group already claimed this external ID under some game_id, every
+        # system should recognize and converge on it, not each independently mint
+        # its own.
         matches = [
-            e for e in all_entries if e.get("game_id") == external_id and entry_id_source(e) == expected_source
+            e
+            for e in all_entries
+            if any(p.get("platform") == kind and str(p.get("id")) == str(external_id) for p in e.get("platform_ids", []))
         ]
         this_uuid = get_system_uuid()
         certain = next((e for e in matches if e.get("system_uuid") == this_uuid), None) or (
@@ -351,6 +373,13 @@ def onboard(path: Path, decision: dict | None = None):
         "system_uuid": this_uuid,
         "game_id": game_id,
         "game_id_source": id_source,
+        # Milestone 9 (2026-08-04, game_uuid-only slice): a real UUID, distinct
+        # from the collision-prone numeric game_id, that a marker-file match
+        # (see pythia.core.instance_marker) can converge across systems even
+        # when no external platform ID exists to converge on. Carried over
+        # from a foreign_seed when linking to another system's already-known
+        # game, never re-minted for an existing entry.
+        "game_uuid": (foreign_seed or {}).get("game_uuid") or str(uuid.uuid4()),
         "canonical_name": (foreign_seed or {}).get("canonical_name") or name,
         # Cross-system seed carries over additively (2026-08-03) -- if another
         # system already knows this game's platform_ids/ownership, this system's
@@ -365,6 +394,7 @@ def onboard(path: Path, decision: dict | None = None):
         "available_updates": [],
     }
     entry["canonical_name"] = entry.get("canonical_name") or name
+    entry["game_uuid"] = entry.get("game_uuid") or str(uuid.uuid4())  # lazy backfill for pre-Milestone-9 entries
     _update_platform_ids_and_ownership(entry, detection)
     for other in additional_sources:
         _update_platform_ids_and_ownership(entry, other)
@@ -374,6 +404,7 @@ def onboard(path: Path, decision: dict | None = None):
         variant.get("path") == str(path) for group in entry.get("versions", []) for variant in group.get("variants", [])
     )
     _merge_version(entry, path, version_label, mods, language, detection.get("platforms", []), source)
+    instance_marker.write_marker(path, entry["game_uuid"], version_label, mods, language, this_uuid)
 
     if is_new_entry and foreign_seed is not None:
         datadir.add_timeline_event(
@@ -401,20 +432,22 @@ def onboard(path: Path, decision: dict | None = None):
 
 
 def _mint_new(detection: dict):
-    external_id = detection.get("external_id")
-    if external_id is not None:
-        return external_id, f"{detection['kind']}_id", None
-    return next_game_id(), "local", None
+    # 2026-08-04: every game gets a fresh, internally-minted ID -- no exceptions
+    # for external-ID-sourced detections. A platform's own ID (Steam AppID, GOG
+    # ID, ...) never becomes the internal game_id; it's recorded purely as
+    # informational data in platform_ids[] via _update_platform_ids_and_ownership,
+    # independently of this.
+    return new_game_id(), "local", None
 
 
-def _find_own_entry_by_game_id(game_id: int):
+def _find_own_entry_by_game_id(game_id: str):
     for entry in _own_entries():
         if entry.get("game_id") == game_id:
             return entry
     return None
 
 
-def _find_any_entry_by_game_id(game_id: int):
+def _find_any_entry_by_game_id(game_id: str):
     """Cross-system lookup (2026-08-03, part of the same find_candidates() fix) --
     used when a `link` decision names a game_id this system doesn't have its own
     file for yet, but another system does. The caller must treat the result as a
@@ -425,7 +458,7 @@ def _find_any_entry_by_game_id(game_id: int):
     return None
 
 
-def add_ownership(game_id: int, platform: str, note: str | None = None):
+def add_ownership(game_id: str, platform: str, note: str | None = None):
     """Record ownership of an already-tracked game on `platform` without any local
     install to detect it from (2026-08-03) -- real cases from the user's own library:
     a Patreon subscription with no local Patreon-branded files at all, or owning a
@@ -496,7 +529,6 @@ def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[di
     own = _own_entries() if own is None else own
     kind = detection["kind"]
     external_id = detection.get("external_id")
-    expected_source = f"{kind}_id"
     # The real identifying value isn't always the numeric external_id -- a service
     # like Epic Games Store identifies a game by a string AppName, kept in
     # extra[PLATFORM_ID_KINDS[kind]], with external_id always None (2026-08-03,
@@ -506,37 +538,29 @@ def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[di
     id_key = datadir.PLATFORM_ID_KINDS.get(kind)
     string_id = detection.get("extra", {}).get(id_key) if id_key else None
 
+    # 2026-08-04: game_id is never a reused platform ID anymore, so matching an
+    # already-tracked game for this detection is *only* ever done via
+    # platform_ids[] membership, regardless of whether the platform identifies by
+    # a numeric external_id or a string_id.
+    match_value = external_id if external_id is not None else string_id
     entry = None
-    if external_id is not None:
+    if match_value is not None:
         entry = next(
-            (e for e in own if e.get("game_id") == external_id and entry_id_source(e) == expected_source),
+            (
+                e
+                for e in own
+                if any(p.get("platform") == kind and str(p.get("id")) == str(match_value) for p in e.get("platform_ids", []))
+            ),
             None,
         )
-    if entry is None and id_key is not None:
-        # Not tracked by numeric ID (or has none) yet -- also check platform_ids in
-        # case this game is already tracked under a different (e.g. locally-minted)
-        # game_id via a different source, so a re-run doesn't mint a duplicate.
-        # Matches on whichever of external_id/string_id this service actually
-        # identifies games by.
-        match_value = external_id if external_id is not None else string_id
-        if match_value is not None:
-            entry = next(
-                (
-                    e
-                    for e in own
-                    if any(p.get("platform") == kind and p.get("id") == match_value for p in e.get("platform_ids", []))
-                ),
-                None,
-            )
 
     created = entry is None
     if entry is None:
-        game_id = external_id if external_id is not None else next_game_id()
         name = detection.get("name") or _resolve_name_via_metadata(kind, detection)
         entry = {
             "system_uuid": get_system_uuid(),
-            "game_id": game_id,
-            "game_id_source": expected_source if external_id is not None else "local",
+            "game_id": new_game_id(),
+            "game_id_source": "local",
             "canonical_name": name or f"Unknown ({kind} {external_id})",
             "platform_ids": [],
             "ownership": [],

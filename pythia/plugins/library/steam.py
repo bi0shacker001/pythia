@@ -1,40 +1,63 @@
 """
-Steam library plugin -- identifies games living under a steamapps/common/ folder and
+Steam plugin -- one built-in integration spanning three capabilities (2026-08-03,
+merged from three previously-separate classes after a real architecture bug was
+confirmed: the Plugins page showed "Steam" three times, once per category, because
+library/manager/metadata each instantiated their own independent class instead of
+one plugin implementing all three interfaces). A single real product -- the Steam
+client plus the user's own Steam account -- should be one toggleable thing in the
+Plugins page; per-capability enable/disable still lives on the Sources/Managers/
+Metadata pages exactly as before (isinstance-based category views are unaffected
+by merging the underlying classes).
+
+This does not remove the general architectural point that identification (Library)
+and launch capability (Manager) are independently pluggable concepts (see
+pythia/plugins/__init__.py's ManagerPlugin docstring -- a third-party plugin could
+still add an alternative launcher for kind="steam" games, e.g. Heroic-for-Steam-ish).
+It only means Pythia's own built-in Steam integration -- which will always offer its
+own client as the natural default launcher for Steam-kind games -- doesn't need to
+be split into three separately-toggleable pieces to preserve that extensibility.
+
+**Local detection** -- identifies games living under a steamapps/common/ folder and
 enriches them with metadata from the sibling appmanifest_<appid>.acf file Steam
-itself already maintains there. Local detection only -- pulling metadata from
-Steam's public web API (platform support, DLC) is a separate, independently
-enable-able plugin: see plugins/metadata/steam.py (2026-08-03: "metadata and
-downloads are handled completely separately," and that separation extends to local
-detection too -- a user should be able to disable Steam metadata lookups without
-losing local Steam install detection, or vice versa).
+itself already maintains there. ACF files are a simple nested key-value text format
+(VDF); a regex scan over the whole file for "key" "value" pairs is enough -- no need
+for a full recursive VDF parser here.
 
-ACF files are a simple nested key-value text format (VDF). We only need a few
-flat fields (appid, name, installdir, buildid), so a regex scan over the whole
-file for "key" "value" pairs is enough -- no need for a full recursive VDF parser
-for match()/is_root() (unchanged from the original detectors/steam.py port).
-
-`list_owned()` (added 2026-08-03) is new, real account-level ownership: the Steam Web
+**Account sync** (`list_owned()`) -- real account-level ownership via the Steam Web
 API's GetOwnedGames, using the user's own API key (never Lutris's -- see
 pythia/core/settings.py's docstring for why) and, by default, the most-recently-used
 local Steam account on this machine (pythia.core.steam.windows.get_active_steamid64,
 ported from Lutris's lutris/util/steam/config.py, itself adapted for Windows since
-Lutris's own version only knows Linux Steam data-dir layouts). This closes the
-"authenticated Steam library import" gap flagged in the plan's roadmap -- it surfaces
-owned titles that aren't installed locally at all, which no appmanifest scan could
-ever find.
+Lutris's own version only knows Linux Steam data-dir layouts). Surfaces owned titles
+that aren't installed locally at all, which no appmanifest scan could ever find.
+
+**Launch hand-off** (`open()`) -- hands off to Steam's own client via its
+"steam://rungameid/<appid>" URI; Steam's own client is what actually launches the
+game, the same "open a door, don't walk through it ourselves" shape as launching an
+external downloader in downloads.py.
+
+**Metadata** (`platform_support()`/`list_dlc()`) -- pulls platform support and DLC
+listings from Steam's public appdetails API, unauthenticated, no API key needed,
+works for a game the user doesn't own. Verified 2026-08-03 against real appids from
+the user's library (Sunrider Academy/340730 for platform_support; Love and Sex:
+Second Base/1264710 for list_dlc, which found 5 real DLC IDs with real names).
 """
 
 import json
+import os
 import re
+import subprocess
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from pythia.plugins import LibraryPlugin
+from pythia.plugins import LibraryPlugin, ManagerPlugin, MetadataPlugin
 from pythia.plugins.registry import register_builtin
 
 _KV_RE = re.compile(r'"([^"]+)"\s+"([^"]*)"')
+_APPDETAILS_URL = "https://store.steampowered.com/api/appdetails?appids={appid}"
 
 
 def set_api_key(api_key: str):
@@ -65,7 +88,7 @@ def get_steamid64() -> str | None:
     return get_active_steamid64()
 
 
-class SteamLibraryPlugin(LibraryPlugin):
+class SteamPlugin(LibraryPlugin, ManagerPlugin, MetadataPlugin):
     id = "pythia.library.steam"
     display_name = "Steam"
     version = "1.0.0"
@@ -74,7 +97,9 @@ class SteamLibraryPlugin(LibraryPlugin):
         {"key": "api_key", "label": "Steam Web API key", "secret": True},
         {"key": "steamid64", "label": "SteamID64 override (optional -- auto-detected otherwise)", "secret": False},
     ]
+    compatible_sources = ["steam"]
 
+    # ---- Library: local detection + account sync -----------------------------
     def is_connected(self) -> bool:
         """Override PluginMeta's default (which requires every declared field) --
         steamid64 is an optional override with a real auto-detected fallback
@@ -186,5 +211,76 @@ class SteamLibraryPlugin(LibraryPlugin):
             "extra": {"steam_appid": appid, "buildid": fields.get("buildid")},
         }
 
+    # ---- Manager: hand-off to Steam's own client ------------------------------
+    def is_available(self, ctx) -> bool:
+        """No reliable cross-platform "is Steam installed" check without touching
+        the registry/specific install paths, which hasn't been built yet -- reports
+        unknown-as-unavailable (False) rather than guessing. open() still works
+        regardless (the OS URI handler either resolves or the hand-off silently
+        does nothing), this only affects whether a future UI shows Steam as a ready
+        option."""
+        return False
 
-plugin = register_builtin(SteamLibraryPlugin())
+    def open(self, detection: dict, ctx) -> bool:
+        """No-op (returns False) if `detection` has no Steam AppID to hand off to."""
+        appid = (detection.get("extra") or {}).get("steam_appid")
+        if not appid:
+            return False
+
+        uri = f"steam://rungameid/{appid}"
+        try:
+            if sys.platform == "win32":
+                os.startfile(uri)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", uri])
+            else:
+                subprocess.Popen(["xdg-open", uri])
+        except OSError:
+            return False
+        return True
+
+    # ---- Metadata: public appdetails API ---------------------------------------
+    def _appdetails(self, appid) -> dict | None:
+        """Shared fetch for platform_support()/list_dlc(). Returns the "data"
+        object for `appid`, or None on any failure (network, unexpected shape, or a
+        genuinely unknown appid)."""
+        url = _APPDETAILS_URL.format(appid=appid)
+        try:
+            with urllib.request.urlopen(url, timeout=10) as resp:
+                data = json.loads(resp.read())
+        except (urllib.error.URLError, OSError, ValueError):
+            return None
+
+        app_entry = data.get(str(appid))
+        if not app_entry or not app_entry.get("success"):
+            return None
+        return app_entry.get("data") or {}
+
+    def platform_support(self, platform_id: dict) -> list | None:
+        appid = platform_id.get("id")
+        if not appid:
+            return None
+        data = self._appdetails(appid)
+        if data is None:
+            return None
+        platforms = data.get("platforms") or {}
+        return [p for p, supported in platforms.items() if supported]
+
+    def list_dlc(self, platform_id: dict) -> list | None:
+        appid = platform_id.get("id")
+        if not appid:
+            return None
+        data = self._appdetails(appid)
+        if data is None:
+            return None
+
+        dlc_ids = data.get("dlc") or []
+        result = []
+        for dlc_id in dlc_ids:
+            dlc_data = self._appdetails(dlc_id)
+            name = dlc_data.get("name") if dlc_data else None
+            result.append({"id": str(dlc_id), "name": name})
+        return result
+
+
+plugin = register_builtin(SteamPlugin())

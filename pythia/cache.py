@@ -23,7 +23,7 @@ def _connect() -> sqlite3.Connection:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS games (
-            game_id INTEGER NOT NULL,
+            game_id TEXT NOT NULL,
             system_uuid TEXT NOT NULL,
             canonical_name TEXT,
             source_kind TEXT,
@@ -82,7 +82,7 @@ def upsert_entry(entry: dict, filename: str):
         conn.close()
 
 
-def remove_entry(system_uuid: str, game_id: int):
+def remove_entry(system_uuid: str, game_id: str):
     """Drop one cache row -- used by reconciliation.merge() when a retired game_id's
     datadir file is deleted, so the index doesn't keep pointing at a file that no
     longer exists."""

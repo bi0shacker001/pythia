@@ -6,9 +6,12 @@ completely separately," extended to detection too -- see MetadataPlugin's
 docstring).
 """
 
-from pythia.plugins.metadata.gog import plugin as gog_metadata  # noqa: F401
-from pythia.plugins.metadata.steam import plugin as steam_metadata  # noqa: F401
 from pythia.plugins.registry import filter_enabled, for_category
+
+# GOG and Steam's metadata capability live on their single merged plugin classes
+# (pythia/plugins/library/gog.py, pythia/plugins/library/steam.py -- 2026-08-03,
+# see steam.py's module docstring for why) -- for_category("metadata") picks them
+# up automatically via isinstance, same as every other multi-category plugin.
 
 
 def all_plugins() -> list:

@@ -194,8 +194,8 @@ class Backend(QObject):
         candidates = reconciliation.find_merge_candidates()
         self.mergeCandidatesReady.emit(_jsonable(candidates))
 
-    @Slot(int, int)
-    def merge_games(self, surviving_id: int, retired_id: int):
+    @Slot(str, str)
+    def merge_games(self, surviving_id: str, retired_id: str):
         threading.Thread(target=self._merge_worker, args=(surviving_id, retired_id), daemon=True).start()
 
     def _merge_worker(self, surviving_id, retired_id):
@@ -204,8 +204,8 @@ class Backend(QObject):
         self.mergeComplete.emit(_jsonable(result))
 
     # ---- notes ------------------------------------------------------------------
-    @Slot(int, str)
-    def save_notes(self, game_id: int, text: str):
+    @Slot(str, str)
+    def save_notes(self, game_id: str, text: str):
         """Update this system's own entry for `game_id`'s free-text notes field
         (part of the schema since Milestone 3). No-op if this system doesn't own
         that game_id -- notes are per-system-written, same as everything else."""
@@ -217,6 +217,37 @@ class Backend(QObject):
                 cache.upsert_entry(entry, saved_path.name)
                 self.refresh_games()
                 return
+
+    # ---- direct-launch variants ----------------------------------------------
+    @Slot(str, str, str)
+    def set_variant_direct(self, game_id: str, variant_path: str, executable: str):
+        """Flag (or clear, if `executable` is empty) a specific variant as
+        direct-launch -- Pythia's one deliberate exception to never launching a
+        game's own executable (see pythia.plugins.manager.direct). Doesn't affect
+        source/version/update tracking, only how it launches. This system's own
+        entry only, same as save_notes -- a variant's path is inherently
+        system-local."""
+        threading.Thread(
+            target=self._set_variant_direct_worker, args=(game_id, variant_path, executable), daemon=True
+        ).start()
+
+    def _set_variant_direct_worker(self, game_id: str, variant_path: str, executable: str):
+        uuid = get_system_uuid()
+        for entry in datadir.list_all_entries():
+            if entry.get("system_uuid") != uuid or entry.get("game_id") != game_id:
+                continue
+            changed = False
+            for group in entry.get("versions", []):
+                for variant in group.get("variants", []):
+                    if variant.get("path") == variant_path:
+                        variant["direct"] = bool(executable)
+                        variant["executable"] = executable or None
+                        changed = True
+            if changed:
+                saved_path = datadir.save_entry(entry)
+                cache.upsert_entry(entry, saved_path.name)
+                self.refresh_games()
+            return
 
     # ---- settings -----------------------------------------------------------
     # Real backing for both front ends' Settings screens (2026-08-03 -- big-picture
@@ -256,6 +287,46 @@ class Backend(QObject):
                     "enabled": allowed is None or p.id in allowed,
                 }
                 for p in downloader_plugins.all_plugins()
+            ]
+        )
+
+    @Slot(result="QVariant")
+    def get_all_plugins(self):
+        """Every registered plugin, every category -- real inventory (2026-08-03),
+        for the "Plugins" page in any front end. `origin` distinguishes built-in
+        from third-party (pip entry-point or drop-in folder), matching the
+        registry's own three discovery paths rather than guessing."""
+        from pythia.plugins.registry import (
+            all_plugins,
+            categories_of,
+            discover_external,
+            discover_folder_plugins,
+            get_enabled_plugin_ids,
+        )
+
+        allowed = get_enabled_plugin_ids()
+        external_ids = {p.id for p in discover_external()}
+        folder_ids = {p.id for p in discover_folder_plugins()}
+
+        def origin(pid: str) -> str:
+            if pid in folder_ids:
+                return "Drop-in folder"
+            if pid in external_ids:
+                return "Python package"
+            return "Built-in"
+
+        return _jsonable(
+            [
+                {
+                    "id": p.id,
+                    "display_name": p.display_name,
+                    "categories": categories_of(p),
+                    "version": p.version,
+                    "author": p.author,
+                    "enabled": allowed is None or p.id in allowed,
+                    "origin": origin(p.id),
+                }
+                for p in sorted(all_plugins(), key=lambda p: p.display_name)
             ]
         )
 
@@ -317,6 +388,29 @@ class Backend(QObject):
         self.refresh_games()
         self.accountSyncComplete.emit(plugin_id, _jsonable(result))
 
+    @Slot(str)
+    def import_f95(self, db_path: str):
+        """One-shot F95Checker db.sqlite3 import (see plugins/library/f95.py) --
+        previously CLI-only (`pythia f95-import`), never reachable from the
+        desktop UI at all until now. Reuses accountSyncComplete since the
+        result shape (linked/created/status) is identical to a real account
+        sync's, even though F95's import isn't an ongoing sync."""
+        threading.Thread(target=self._import_f95_worker, args=(db_path,), daemon=True).start()
+
+    def _import_f95_worker(self, db_path: str):
+        from pythia.plugins.library import f95 as f95_module
+        from pythia.plugins.library.f95 import plugin as f95_plugin
+
+        if db_path:
+            f95_module.set_db_path(db_path)
+        result = onboarding.sync_owned(f95_plugin)
+        self.refresh_games()
+        self.accountSyncComplete.emit(f95_plugin.id, _jsonable(result))
+
+    @Slot(result=str)
+    def get_system_uuid(self) -> str:
+        return get_system_uuid()
+
     @Slot(result=str)
     def get_ui_mode(self) -> str:
         from pythia.identity import get_setting
@@ -330,8 +424,8 @@ class Backend(QObject):
         set_setting("ui_mode", mode)
 
     # ---- launcher hand-off --------------------------------------------------
-    @Slot(int, result="QVariant")
-    def find_manager_for_game(self, game_id: int):
+    @Slot(str, result="QVariant")
+    def find_manager_for_game(self, game_id: str):
         """Every (manager plugin, source kind) this game could be handed off to --
         lets the UI show/hide an "Open" action and pick which source to use if more
         than one applies, without launching anything itself (see
@@ -345,15 +439,15 @@ class Backend(QObject):
             [{"manager_id": p.id, "manager_name": p.display_name, "kind": d["kind"]} for p, d in candidates]
         )
 
-    @Slot(int, str)
-    def open_in_manager(self, game_id: int, manager_id: str):
+    @Slot(str, str)
+    def open_in_manager(self, game_id: str, manager_id: str):
         """Real, side-effecting hand-off -- launches an external application (the
         manager plugin's own tool, e.g. Steam). Never the game's own executable;
         Pythia's "never launches anything" boundary stays on the game itself. Callers
         should confirm with the user before calling this, same as cli.py's `open`."""
         threading.Thread(target=self._open_in_manager_worker, args=(game_id, manager_id), daemon=True).start()
 
-    def _open_in_manager_worker(self, game_id: int, manager_id: str):
+    def _open_in_manager_worker(self, game_id: str, manager_id: str):
         from pythia.plugins import manager as manager_plugins
         from pythia.plugins.context import PluginContext
 

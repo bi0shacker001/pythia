@@ -62,6 +62,56 @@ _TYPE_TO_ENGINE_HINT = {
 }
 
 
+# Real F95zone session support (2026-08-03) -- login itself lives in the desktop
+# UI (pythia/ui/desktop/f95_login.py, a real embedded QtWebEngine flow; F95zone's
+# login page isn't headlessly POST-able, confirmed by F95Checker itself needing a
+# webview for this). What lives here is the session-cookie storage and the actual
+# "are we logged in" check against F95zone's own endpoint -- both ported directly
+# from the reference clone's modules/api.py (f95_check_login_fast URL and the
+# exact "logged in" response-body check, confirmed against real source).
+F95_DOMAIN = "f95zone.to"
+F95_CHECK_LOGIN_FAST = f"https://{F95_DOMAIN}/sam/latest_alpha/"
+_LOGIN_REQUIRED_MARKER = b'<pre>Sorry, you have to be <a href="/login">logged in</a> to access this page</a></pre>'
+
+
+def get_session_cookies() -> dict:
+    from pythia import credentials
+
+    raw = credentials.get_credential("pythia.library.f95", "session_cookies")
+    return _decode_json_field(raw, {})
+
+
+def set_session_cookies(cookies: dict):
+    from pythia import credentials
+
+    credentials.set_credential("pythia.library.f95", "session_cookies", json.dumps(cookies))
+
+
+def is_logged_in() -> bool:
+    """Real check against F95zone's own fast-login-check endpoint, using whatever
+    session cookies are currently stored. A network failure or no stored cookies
+    both mean "not usable right now" -- there's nothing useful to distinguish them
+    on from the caller's side, so both return False rather than raising."""
+    cookies = get_session_cookies()
+    if not cookies:
+        return False
+
+    import urllib.error
+    import urllib.request
+
+    cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
+    req = urllib.request.Request(
+        F95_CHECK_LOGIN_FAST,
+        headers={"Cookie": cookie_header, "User-Agent": "Pythia/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = resp.read()
+    except (urllib.error.URLError, OSError):
+        return False
+    return _LOGIN_REQUIRED_MARKER not in body
+
+
 def set_db_path(path: str):
     from pythia import identity
 

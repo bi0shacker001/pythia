@@ -26,7 +26,7 @@ from pythia.gui.widgets.utils import open_uri
 from pythia.monitored_command import MonitoredCommand
 from pythia.services import SERVICES
 from pythia.services.base import BaseService
-from pythia.services.pythia import download_pythia_media
+from pythia.services.lutris import download_lutris_media
 from pythia.util import xdgshortcuts
 from pythia.util.jobs import AsyncCall
 from pythia.util.log import logger
@@ -149,9 +149,9 @@ class GameActions:
             AddGameDialog(self.window, game=game, runner=game.runner_name)
 
     def on_view_game(self, _widget: Gtk.Widget) -> None:
-        """Callback to open a game on pythia.net"""
+        """Callback to open a game on lutris.net"""
         for game in self.get_games():
-            open_uri("https://pythia.net/games/%s" % game.slug.replace("_", "-"))
+            open_uri("https://lutris.net/games/%s" % game.slug.replace("_", "-"))
 
     def on_view_store(self, _widget: Gtk.Widget) -> None:
         """Callback to open a game's store page on the service"""
@@ -487,7 +487,7 @@ class SingleGameActions(GameActions):
 
         # Download in the background; we'll update the PythiaWindow when this
         # completes, no need to wait for it.
-        AsyncCall(download_pythia_media, None, db_game["slug"])
+        AsyncCall(download_lutris_media, None, db_game["slug"])
 
     def _select_game_launch_config_name(self, game: Game) -> str | None:
         if not game.config:

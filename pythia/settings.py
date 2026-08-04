@@ -53,7 +53,7 @@ for test_module in test_modules:
         break
 
 
-SITE_URL = sio.read_setting("website") or "https://pythia.net"
+SITE_URL = sio.read_setting("website") or "https://lutris.net"
 
 INSTALLER_URL = SITE_URL + "/api/installers/%s"
 

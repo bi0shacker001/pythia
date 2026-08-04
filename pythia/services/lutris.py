@@ -15,10 +15,10 @@ from pythia.gui import dialogs
 from pythia.gui.views.media_loader import download_media
 from pythia.services.base import (
     SERVICE_LOGIN,
-    PythiaBanner,
-    PythiaCoverart,
-    PythiaCoverartMedium,
-    PythiaIcon,
+    LutrisBanner,
+    LutrisCoverart,
+    LutrisCoverartMedium,
+    LutrisIcon,
     OnlineService,
 )
 from pythia.services.service_game import ServiceGame
@@ -27,15 +27,15 @@ from pythia.util.busy import BusyAsyncCall
 from pythia.util.log import logger
 
 
-class PythiaGame(ServiceGame):
-    """Service game created from the Pythia API"""
+class LutrisGame(ServiceGame):
+    """Service game created from the Lutris API"""
 
-    service = "pythia"
+    service = "lutris"
 
     @classmethod
     def new_from_api(cls, api_payload):
-        """Create an instance of PythiaGame from the API response"""
-        service_game = PythiaGame()
+        """Create an instance of LutrisGame from the API response"""
+        service_game = LutrisGame()
         service_game.appid = api_payload["slug"]
         service_game.slug = api_payload["slug"]
         service_game.name = api_payload["name"]
@@ -43,24 +43,24 @@ class PythiaGame(ServiceGame):
         return service_game
 
 
-class PythiaService(OnlineService):
-    """Service for Pythia games"""
+class LutrisService(OnlineService):
+    """Service for Lutris games"""
 
-    id = "pythia"
-    name = _("Pythia")
-    icon = "net.pythia.Pythia"
+    id = "lutris"
+    name = _("Lutris")
+    icon = "net.lutris.Lutris"
     online = True
     medias = {
-        "icon": PythiaIcon,
-        "banner": PythiaBanner,
-        "coverart_med": PythiaCoverartMedium,
-        "coverart_big": PythiaCoverart,
+        "icon": LutrisIcon,
+        "banner": LutrisBanner,
+        "coverart_med": LutrisCoverartMedium,
+        "coverart_big": LutrisCoverart,
     }
     default_format = "coverart_med"
 
     api_url = settings.SITE_URL + "/api"
     login_url = settings.SITE_URL + "/api/accounts/token"
-    cache_path = os.path.join(settings.CACHE_DIR, "pythia")
+    cache_path = os.path.join(settings.CACHE_DIR, "lutris")
     token_path = os.path.join(settings.CACHE_DIR, "auth-token")
 
     @property
@@ -69,17 +69,17 @@ class PythiaService(OnlineService):
         return [self.token_path]
 
     def match_games(self):
-        """Matching pythia games is much simpler... No API call needed."""
+        """Matching lutris games is much simpler... No API call needed."""
         service_games = {str(game["appid"]): game for game in ServiceGameCollection.get_for_service(self.id)}
-        for pythia_game in get_games():
-            self.match_game(service_games.get(pythia_game["slug"]), pythia_game)
+        for lutris_game in get_games():
+            self.match_game(service_games.get(lutris_game["slug"]), lutris_game)
 
     def is_connected(self):
         """Is the service connected?"""
         return self.is_authenticated()
 
     def login(self, parent=None):
-        """Connect to Pythia"""
+        """Connect to Lutris"""
         login_dialog = dialogs.ClientLoginDialog(parent=parent)
         login_dialog.connect("connected", self.on_connect_success)
 
@@ -102,20 +102,20 @@ class PythiaService(OnlineService):
         return response.json
 
     def load(self):
-        pythia_games = self.get_library()
-        logger.debug("Loaded %s games from Pythia library", len(pythia_games))
-        for game in pythia_games:
-            pythia_game = PythiaGame.new_from_api(game)
-            pythia_game.save()
+        lutris_games = self.get_library()
+        logger.debug("Loaded %s games from Lutris library", len(lutris_games))
+        for game in lutris_games:
+            lutris_game = LutrisGame.new_from_api(game)
+            lutris_game.save()
         logger.debug("Matching with already installed games")
         self.match_games()
-        logger.debug("Pythia games loaded")
-        return pythia_games
+        logger.debug("Lutris games loaded")
+        return lutris_games
 
     def load_icons(self):
         super().load_icons()
-        # Also load any media for games that use Pythia media,
-        # but are not in the Pythia library.
+        # Also load any media for games that use Lutris media,
+        # but are not in the Lutris library.
         sync_media()
 
     def get_installed_slug(self, db_game):
@@ -130,11 +130,11 @@ class PythiaService(OnlineService):
             if error:
                 raise error  # bounce any error off the backstop
             if not installers:
-                raise RuntimeError(_("Pythia has no installers for %s. Try using a different service instead.") % appid)
+                raise RuntimeError(_("Lutris has no installers for %s. Try using a different service instead.") % appid)
             application = Gio.Application.get_default()
             application.show_installer_window(installers)
 
-        BusyAsyncCall(get_game_installers, on_installers_ready, appid)  # appid is the slug for Pythia games
+        BusyAsyncCall(get_game_installers, on_installers_ready, appid)  # appid is the slug for Lutris games
 
     def get_installed_runner_name(self, db_game):
         platforms = self.get_game_platforms(db_game)
@@ -167,8 +167,8 @@ class PythiaService(OnlineService):
         return None
 
 
-def download_pythia_media(slug):
-    """Download all media types for a single pythia game"""
+def download_lutris_media(slug):
+    """Download all media types for a single lutris game"""
     url = settings.SITE_URL + "/api/games/%s" % slug
     request = http.Request(url)
     try:
@@ -179,19 +179,19 @@ def download_pythia_media(slug):
     response_data = response.json
     icon_url = _get_response_game_icon(response_data)
     if icon_url:
-        download_media({slug: icon_url}, PythiaIcon())
+        download_media({slug: icon_url}, LutrisIcon())
 
     banner_url = _get_response_game_banner(response_data)
     if banner_url:
-        download_media({slug: banner_url}, PythiaBanner())
+        download_media({slug: banner_url}, LutrisBanner())
 
     coverart_url = _get_response_game_coverart(response_data)
     if coverart_url:
-        download_media({slug: coverart_url}, PythiaCoverart())
+        download_media({slug: coverart_url}, LutrisCoverart())
 
 
 def sync_media(slugs: Iterable[str] | None = None) -> dict[str, int]:
-    """Download missing media for Pythia games; if a set of slugs
+    """Download missing media for Lutris games; if a set of slugs
     is not provided, downloads them for all games in the PGA."""
     if slugs is None:
         slugs = {game["slug"] for game in get_games()}
@@ -203,7 +203,7 @@ def sync_media(slugs: Iterable[str] | None = None) -> dict[str, int]:
 
     banners_available = {fn.split(".")[0] for fn in os.listdir(settings.BANNER_PATH)}
     icons_available = {
-        fn.split(".")[0].replace("pythia_", "") for fn in os.listdir(settings.ICON_PATH) if fn.startswith("pythia_")
+        fn.split(".")[0].replace("lutris_", "") for fn in os.listdir(settings.ICON_PATH) if fn.startswith("lutris_")
     }
     covers_available = {fn.split(".")[0] for fn in os.listdir(settings.COVERART_PATH)}
     complete_games = banners_available.intersection(icons_available).intersection(covers_available)
@@ -243,9 +243,9 @@ def sync_media(slugs: Iterable[str] | None = None) -> dict[str, int]:
         if game["slug"] not in covers_available and _get_response_game_coverart(game)
     }
     logger.debug("Syncing %s banners, %s icons and %s covers", len(banner_urls), len(icon_urls), len(coverart_urls))
-    downloaded_banners = download_media(banner_urls, PythiaBanner())
-    downloaded_icons = download_media(icon_urls, PythiaIcon())
-    downloaded_covers = download_media(coverart_urls, PythiaCoverart())
+    downloaded_banners = download_media(banner_urls, LutrisBanner())
+    downloaded_icons = download_media(icon_urls, LutrisIcon())
+    downloaded_covers = download_media(coverart_urls, LutrisCoverart())
     return {
         "banners": len(downloaded_banners),
         "icons": len(downloaded_icons),

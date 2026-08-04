@@ -1,15 +1,24 @@
+"""Background work + idle/timer scheduling -- GTK removal (2026-08-04): this used
+to be built directly on GLib's main loop (GLib.idle_add/timeout_add/MainContext),
+which requires PyGObject and a running GLib loop, neither of which the Qt-based
+Pythia UI has. Reimplemented on plain threading.Timer instead.
+
+Real, honest limitation not glossed over: the old GLib version's "runs on the
+main/UI thread" guarantee doesn't hold here -- a threading.Timer fires on its own
+worker thread, not any particular UI thread. Callers that touch Qt widgets from a
+scheduled callback need to marshal back to the UI thread themselves (e.g. via a Qt
+signal connected with Qt.QueuedConnection) once the Qt UI exists; nothing here
+does that for you. Fine for today's actual callers (NotificationSource and
+AsyncCall), which only touch plain Python data, not GUI widgets, yet.
+"""
+
 import sys
 import threading
 import traceback
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar
-
-from gi.repository import GLib
+from typing import Any, TypeVar
 
 from pythia.util.log import logger
-
-if TYPE_CHECKING:
-    from gi.repository import Gtk
 
 ResultType = TypeVar("ResultType")
 
@@ -20,11 +29,11 @@ class AsyncCall(threading.Thread):
         func: Callable[..., ResultType],
         callback: Callable[[ResultType, Exception], None] | None,
         *args: Any,
-        callback_target: "Gtk.Widget | None" = None,
+        callback_target: Any = None,
         **kwargs: Any,
     ):
         """Execute `function` in a new thread then schedule `callback` for
-        execution in the main loop. If 'callback_target' is a widget and it is destroyed
+        execution at idle time. If 'callback_target' is a widget and it is destroyed
         in the meantime, the callback is cancelled.
         """
         self.callback_task = None
@@ -40,7 +49,7 @@ class AsyncCall(threading.Thread):
         self.start()
 
     def _protect_callback(
-        self, callback: Callable[[Any, Exception], None], callback_target: "Gtk.Widget | None" = None
+        self, callback: Callable[[Any, Exception], None], callback_target: Any = None
     ) -> Callable[[Any, Exception], None]:
         """Wraps and hooks up an on-destroyed handler on the callback_target that
         removes the callback; this prevents an AsyncJob from completing on a
@@ -95,28 +104,28 @@ class IdleTask:
     def __init__(self) -> None:
         """Initializes a task with no connection to a source, but also not completed; this can be
         connected to a source via the connect() method, unless it is completed first."""
-        self.source_id: int | None = None
+        self._timer: threading.Timer | None = None
         self._is_completed = False
 
     def unschedule(self) -> None:
         """Call this to prevent the idle task from running, if it has not already run."""
-        if self.source_id is not None:
-            GLib.source_remove(self.source_id)
+        if self._timer is not None:
+            self._timer.cancel()
             self.disconnect()
 
     def is_completed(self) -> bool:
         """True if the idle task has completed; that is, if mark_completed() was called on it."""
         return self._is_completed
 
-    def connect(self, source_id: int) -> None:
-        """Connects this task to a source to be unscheduled; but if the task is already
+    def connect(self, timer: threading.Timer) -> None:
+        """Connects this task to a timer to be unscheduled; but if the task is already
         completed, this does nothing."""
         if not self._is_completed:
-            self.source_id = source_id
+            self._timer = timer
 
     def disconnect(self) -> None:
         """Break the link to the idle task, so it can't be unscheduled."""
-        self.source_id = None
+        self._timer = None
 
     def mark_completed(self) -> None:
         """Marks the task as completed, and also disconnect it."""
@@ -131,66 +140,50 @@ COMPLETED_IDLE_TASK.mark_completed()
 
 def schedule_at_idle(func: Callable[..., None], *args: Any, delay_seconds: float = 0.0) -> IdleTask:
     """Schedules a function to run at idle time, once. You can specify a delay in seconds
-    before it runs.
+    before it runs (a negative delay runs as soon as possible, same as zero here).
     Returns an object to prevent it running."""
 
     task = IdleTask()
 
-    def wrapper(*a: Any, **kw: Any) -> bool:
+    def wrapper() -> None:
         try:
-            func(*a, **kw)
-            return False
+            func(*args)
         finally:
             task.disconnect()
 
-    handler_object = func.__self__ if hasattr(func, "__self__") else None
-    if handler_object:
-        wrapper.__self__ = handler_object  # type: ignore[attr-defined]
-
-    if delay_seconds >= 0.0:
-        milliseconds = int(delay_seconds * 1000)
-        source_id = GLib.timeout_add(milliseconds, wrapper, *args)
-    else:
-        source_id = GLib.idle_add(wrapper, *args)
-
-    task.connect(source_id)
+    timer = threading.Timer(max(delay_seconds, 0.0), wrapper)
+    timer.daemon = True
+    task.connect(timer)
+    timer.start()
     return task
 
 
 def run_until_complete(
     async_func: Callable[..., None], *args: Any, timeout_seconds: float = 30.0, **kwargs: Any
 ) -> None:
-    """Iterate the GLib main context until an async operation completes.
+    """Blocks the calling thread until an async operation completes.
 
-    This is intended for CLI code paths where no main loop is running, or
-    where nesting a second GLib.MainLoop would interfere with the
-    Gtk.Application lifecycle. The async_func receives two extra keyword
-    arguments — ``completion_function`` and ``error_function`` — which it
-    must call when the operation finishes.
+    Intended for CLI code paths with no GUI event loop running. The async_func
+    receives two extra keyword arguments -- ``completion_function`` and
+    ``error_function`` -- which it must call when the operation finishes.
 
     Raises whatever exception is passed to error_function, or TimeoutError
     if timeout_seconds elapses first.
     """
-    context = GLib.MainContext.default()
-    done = False
+    done_event = threading.Event()
     error_holder: list[Exception | None] = [None]
 
     def on_complete() -> None:
-        nonlocal done
-        done = True
+        done_event.set()
 
     def on_error(ex: Exception) -> None:
-        nonlocal done
         error_holder[0] = ex
-        done = True
+        done_event.set()
 
-    deadline = GLib.get_monotonic_time() + int(timeout_seconds * 1_000_000)
     async_func(*args, completion_function=on_complete, error_function=on_error, **kwargs)
 
-    while not done:
-        if GLib.get_monotonic_time() >= deadline:
-            raise TimeoutError(f"Async operation timed out after {timeout_seconds}s")
-        context.iteration(True)
+    if not done_event.wait(timeout_seconds):
+        raise TimeoutError(f"Async operation timed out after {timeout_seconds}s")
 
     if error_holder[0]:
         raise error_holder[0]
@@ -207,24 +200,21 @@ def schedule_repeating_at_idle(
 
     task = IdleTask()
 
-    def wrapper(*a: Any, **kw: Any) -> bool:
+    def _reschedule() -> None:
+        timer = threading.Timer(max(interval_seconds, 0.0), wrapper)
+        timer.daemon = True
+        task.connect(timer)
+        timer.start()
+
+    def wrapper() -> None:
         repeat = False
         try:
-            repeat = func(*a, **kw)
-            return repeat
+            repeat = func(*args)
         finally:
-            if not repeat:
+            if repeat and not task.is_completed():
+                _reschedule()
+            else:
                 task.disconnect()
 
-    handler_object = func.__self__ if hasattr(func, "__self__") else None
-    if handler_object:
-        wrapper.__self__ = handler_object  # type: ignore[attr-defined]
-
-    if interval_seconds >= 0.0:
-        milliseconds = int(interval_seconds * 1000)
-        source_id = GLib.timeout_add(milliseconds, wrapper, *args)
-    else:
-        source_id = GLib.idle_add(wrapper, *args)
-
-    task.connect(source_id)
+    _reschedule()
     return task

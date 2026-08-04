@@ -16,7 +16,7 @@ from pythia.database.games import add_game, get_game_by_field, update_existing
 from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
 from pythia.services.base import SERVICE_LOGIN, SERVICE_LOGOUT, OnlineService
-from pythia.services.pythia import sync_media
+from pythia.services.lutris import sync_media
 from pythia.services.service_game import ServiceGame
 from pythia.services.service_media import ServiceMedia
 from pythia.util.jobs import AsyncCall

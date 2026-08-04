@@ -13,7 +13,7 @@ from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
 from pythia.installer.installer_file import InstallerFile
 from pythia.services.base import BaseService
-from pythia.services.pythia import sync_media
+from pythia.services.lutris import sync_media
 from pythia.services.service_game import ServiceGame
 from pythia.services.service_media import ServiceMedia
 from pythia.util.log import logger

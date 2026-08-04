@@ -7,7 +7,7 @@ from pythia.api import get_api_games
 from pythia.config import write_game_config
 from pythia.database import sql
 from pythia.database.games import add_or_update, get_game_by_field, get_games
-from pythia.services.pythia import download_pythia_media
+from pythia.services.lutris import download_lutris_media
 from pythia.util.log import logger
 from pythia.util.strings import slugify
 
@@ -393,7 +393,7 @@ def _sync_media_for_games(game_ids: list[str]) -> None:
         if not game or not game.get("service") or not game.get("service_id"):
             # No service info; try slug-based media download as fallback
             if game:
-                download_pythia_media(game["slug"])
+                download_lutris_media(game["slug"])
             continue
         service = game["service"]
         games_by_service.setdefault(service, []).append((game_id, game["slug"], game["service_id"]))
@@ -404,7 +404,7 @@ def _sync_media_for_games(game_ids: list[str]) -> None:
         if not api_games:
             # Fallback to slug-based download
             for _game_id, slug, _ in games:
-                download_pythia_media(slug)
+                download_lutris_media(slug)
             continue
 
         # Build appid -> api_game lookup from the provider_games in the API response
@@ -423,6 +423,6 @@ def _sync_media_for_games(game_ids: list[str]) -> None:
                 # Update the game's slug to the canonical Pythia slug
                 logger.info("Updating slug for game %s: %s -> %s", game_id, local_slug, api_game["slug"])
                 sql.db_update(settings.DB_PATH, "games", {"slug": api_game["slug"]}, {"id": game_id})
-                download_pythia_media(api_game["slug"])
+                download_lutris_media(api_game["slug"])
             else:
-                download_pythia_media(api_game["slug"] if api_game else local_slug)
+                download_lutris_media(api_game["slug"] if api_game else local_slug)

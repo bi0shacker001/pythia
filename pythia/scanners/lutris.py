@@ -4,13 +4,13 @@ from pythia.api import get_api_games, get_game_installers
 from pythia.database.games import get_games
 from pythia.installer.errors import MissingGameDependencyError
 from pythia.installer.interpreter import ScriptInterpreter
-from pythia.services.pythia import download_pythia_media
+from pythia.services.lutris import download_lutris_media
 from pythia.util.log import logger
 from pythia.util.strings import slugify
 
 
 def get_game_slugs_and_folders(dirname):
-    """Scan a directory for games previously installed with pythia"""
+    """Scan a directory for games previously installed with lutris"""
     folders = os.listdir(dirname)
     game_folders = {}
     for folder in folders:
@@ -94,7 +94,7 @@ def scan_directory(dirname):
                 install_game(installer, game_folder)
             except MissingGameDependencyError as ex:
                 logger.error("Skipped %s: %s", api_game["name"], ex)
-            download_pythia_media(installer["game_slug"])
+            download_lutris_media(installer["game_slug"])
             slugs_installed.add(api_game["slug"])
 
     installed_map = {slug: folder for slug, folder in slugs_map.items() if slug in slugs_installed}

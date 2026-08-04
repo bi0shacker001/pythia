@@ -12,7 +12,7 @@ from pythia.database.games import add_game, get_game_by_field, get_games, update
 from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
 from pythia.services.base import BaseService
-from pythia.services.pythia import sync_media
+from pythia.services.lutris import sync_media
 from pythia.services.service_game import ServiceGame
 from pythia.services.service_media import ServiceMedia
 from pythia.util.battlenet.definitions import ProductDbInfo
@@ -96,7 +96,7 @@ class BattleNetGame(ServiceGame):
                 "name": blizzard_game[1],
                 "product_code": blizzard_game[2],
                 "slug": blizzard_game[3],
-                "coverart": "https://pythia.net/games/cover/%s.jpg" % blizzard_game[3],
+                "coverart": "https://lutris.net/games/cover/%s.jpg" % blizzard_game[3],
             }
         )
         return service_game
@@ -114,7 +114,7 @@ class BattleNetService(BaseService):
     client_installer = "battlenet"
     cookies_path = os.path.join(settings.CACHE_DIR, ".bnet.auth")
     cache_path = os.path.join(settings.CACHE_DIR, "bnet-library.json")
-    redirect_uris = ["https://pythia.net"]
+    redirect_uris = ["https://lutris.net"]
 
     @property
     def battlenet_config_path(self):

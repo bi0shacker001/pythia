@@ -14,7 +14,7 @@ from pythia.services.gamejolt import GameJoltService
 from pythia.services.gog import GOGService
 from pythia.services.humblebundle import HumbleBundleService
 from pythia.services.itchio import ItchIoService
-from pythia.services.pythia import PythiaService
+from pythia.services.lutris import LutrisService
 from pythia.services.mame import MAMEService
 from pythia.services.scummvm import SCUMMVM_CONFIG_FILE, ScummvmService
 from pythia.services.steam import SteamService
@@ -59,7 +59,7 @@ def get_services() -> dict[str, "type[BaseService]"]:
     if system.path_exists(SCUMMVM_CONFIG_FILE):
         _services["scummvm"] = ScummvmService
     if os.environ.get("PYTHIA_SERVICE_ENABLED") == "1":
-        _services["pythia"] = PythiaService
+        _services["lutris"] = LutrisService
     return _services
 
 

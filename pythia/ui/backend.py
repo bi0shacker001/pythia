@@ -20,7 +20,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
-from pythia import cache, datadir, downloads, onboarding, reconciliation, scanning
+from pythia import datadir, downloads, onboarding, reconciliation, scanning
+from pythia.database import games as games_db
 from pythia.identity import get_system_uuid
 
 
@@ -213,41 +214,15 @@ class Backend(QObject):
         for entry in datadir.list_all_entries():
             if entry.get("system_uuid") == uuid and entry.get("game_id") == game_id:
                 entry["notes"] = text
-                saved_path = datadir.save_entry(entry)
-                cache.upsert_entry(entry, saved_path.name)
+                games_db.save_entry_and_sync_cache(entry)
                 self.refresh_games()
                 return
 
-    # ---- direct-launch variants ----------------------------------------------
-    @Slot(str, str, str)
-    def set_variant_direct(self, game_id: str, variant_path: str, executable: str):
-        """Flag (or clear, if `executable` is empty) a specific variant as
-        direct-launch -- Pythia's one deliberate exception to never launching a
-        game's own executable (see pythia.plugins.manager.direct). Doesn't affect
-        source/version/update tracking, only how it launches. This system's own
-        entry only, same as save_notes -- a variant's path is inherently
-        system-local."""
-        threading.Thread(
-            target=self._set_variant_direct_worker, args=(game_id, variant_path, executable), daemon=True
-        ).start()
-
-    def _set_variant_direct_worker(self, game_id: str, variant_path: str, executable: str):
-        uuid = get_system_uuid()
-        for entry in datadir.list_all_entries():
-            if entry.get("system_uuid") != uuid or entry.get("game_id") != game_id:
-                continue
-            changed = False
-            for group in entry.get("versions", []):
-                for variant in group.get("variants", []):
-                    if variant.get("path") == variant_path:
-                        variant["direct"] = bool(executable)
-                        variant["executable"] = executable or None
-                        changed = True
-            if changed:
-                saved_path = datadir.save_entry(entry)
-                cache.upsert_entry(entry, saved_path.name)
-                self.refresh_games()
-            return
+    # 2026-08-04, Lutris-base port: the old direct-launch variant flag (set_variant_
+    # direct) isn't ported -- Lutris's own "linux" runner already covers "just run
+    # this executable directly, no compatibility layer needed" (see
+    # pythia/runners/linux.py), so there's no reason to keep a second, narrower
+    # mechanism for the same thing.
 
     # ---- settings -----------------------------------------------------------
     # Real backing for both front ends' Settings screens (2026-08-03 -- big-picture

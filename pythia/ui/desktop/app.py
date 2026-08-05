@@ -1002,6 +1002,33 @@ class MainWindow(QMainWindow):
         )
         self.backend.resolveDecision(preview["path"], {"action": "new"})
 
+    # ---- the app-singleton interface real Lutris-derived core code calls
+    # (see pythia.util.app_singleton and every services/*.py call site that
+    # does get_default_application().show_installer_window(...)) -- this UI
+    # was designed around onboarding.py's folder-based tracking, which has no
+    # concept of a Lutris-style install script, so these are new: real, but
+    # minimal, since the install wizard itself isn't built out yet. ----
+    def show_installer_window(self, installers, service=None, appid=None, installation_kind=None) -> None:
+        if not installers:
+            self._status_label.setText("No installers available.")
+            return
+        try:
+            from pythia.installer.interpreter import ScriptInterpreter  # noqa: PLC0415
+            from pythia.delegates import InstallUIDelegate  # noqa: PLC0415
+        except ImportError as ex:
+            self._status_label.setText(
+                f"Can't run installers yet: {ex}. The install wizard needs a Qt port of "
+                "ScriptInterpreter (currently subclasses GObject.Object)."
+            )
+            return
+        delegate = InstallUIDelegate()
+        ScriptInterpreter(installers[0], delegate).launch_install(delegate)
+
+    def show_pythia_installer_window(self, game_slug: str) -> None:
+        from pythia.installer import get_installers  # noqa: PLC0415
+
+        self.show_installer_window(get_installers(game_slug=game_slug))
+
 
 def run(app, backend) -> int:
     # Applied at the QApplication level (2026-08-03 fix), not just on
@@ -1013,5 +1040,11 @@ def run(app, backend) -> int:
     # them whatsoever, not a mismatched one.
     app.setStyleSheet(theme.build_stylesheet())
     window = MainWindow(backend)
+    # Real Lutris-derived core code (services/*.py) reaches this window via
+    # pythia.util.app_singleton.get_default().show_installer_window(...) --
+    # see MainWindow.show_installer_window/show_pythia_installer_window above.
+    from pythia.util import app_singleton  # noqa: PLC0415
+
+    app_singleton.set_default(window)
     window.show()
     return app.exec()

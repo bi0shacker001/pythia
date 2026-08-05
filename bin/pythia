@@ -69,9 +69,11 @@ if "WEBKIT_DISABLE_DMABUF_RENDERER" not in os.environ:
 # GTK removal (2026-08-04): pythia.gui (GTK) is gone. Any real CLI flag
 # (list/install/export/exec/...) always goes through the headless entry
 # point, same as before -- scripting shouldn't need a display. Bare
-# `pythia` with no arguments tries the new Qt UI if PySide6 is installed,
-# since that's the only case that actually wants a window.
-if len(sys.argv) == 1:
+# `pythia` with no arguments, or `--ui <desktop|bigpicture|web>` explicitly
+# picking a front end (see pythia.ui.mode), tries the new Qt UI if PySide6
+# is installed; everything else is a headless CLI flag.
+wants_ui = len(sys.argv) == 1 or "--ui" in sys.argv
+if wants_ui:
     try:
         from pythia.ui.app import main as qt_main
 

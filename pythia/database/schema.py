@@ -28,10 +28,13 @@ DATABASE: dict[str, DBSchema] = {
         {"name": "platform_ids", "type": "TEXT"},  # JSON list, see datadir.PLATFORM_ID_KINDS
         {"name": "ownership", "type": "TEXT"},  # JSON list
         {"name": "updated", "type": "DATETIME"},
-        {
-            "name": "discord_id",
-            "type": "TEXT",
-        },
+        {"name": "discord_id", "type": "TEXT"},
+        # From onboarding.py (folder-scan tracking, ported 2026-08-04):
+        {"name": "game_uuid", "type": "TEXT"},  # real UUID, Milestone 9 marker-file convergence
+        {"name": "game_id_source", "type": "TEXT"},
+        {"name": "managed_externally", "type": "INTEGER"},
+        {"name": "version_management_enabled", "type": "INTEGER"},
+        {"name": "available_updates", "type": "TEXT"},  # JSON list
     ],
     # One row per install (what a Lutris "games" row used to mean in full:
     # runner/directory/executable/configpath/installed/playtime/...), plus
@@ -50,6 +53,9 @@ DATABASE: dict[str, DBSchema] = {
         {"name": "executable", "type": "TEXT"},
         {"name": "directory", "type": "TEXT"},
         {"name": "configpath", "type": "TEXT"},
+        {"name": "path", "type": "TEXT"},  # from onboarding.py: the raw on-disk install folder
+        {"name": "platforms", "type": "TEXT"},  # JSON list, from onboarding.py
+        {"name": "source", "type": "TEXT"},  # JSON {"kind", "extra"}, from onboarding.py
         {"name": "lastplayed", "type": "INTEGER"},
         {"name": "installed", "type": "INTEGER"},
         {"name": "installed_at", "type": "INTEGER"},

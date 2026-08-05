@@ -153,11 +153,16 @@ def _upsert_cache_from_entry(entry: dict) -> None:
         sql.cursor_execute(
             cursor,
             "INSERT INTO games (id, system_uuid, name, sortname, slug, installer_slug, parent_slug, notes, "
-            "platform_ids, ownership, updated, discord_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "platform_ids, ownership, updated, discord_id, game_uuid, game_id_source, managed_externally, "
+            "version_management_enabled, available_updates) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(id) DO UPDATE SET system_uuid=excluded.system_uuid, name=excluded.name, "
             "sortname=excluded.sortname, slug=excluded.slug, installer_slug=excluded.installer_slug, "
             "parent_slug=excluded.parent_slug, notes=excluded.notes, platform_ids=excluded.platform_ids, "
-            "ownership=excluded.ownership, updated=excluded.updated, discord_id=excluded.discord_id",
+            "ownership=excluded.ownership, updated=excluded.updated, discord_id=excluded.discord_id, "
+            "game_uuid=excluded.game_uuid, game_id_source=excluded.game_id_source, "
+            "managed_externally=excluded.managed_externally, "
+            "version_management_enabled=excluded.version_management_enabled, "
+            "available_updates=excluded.available_updates",
             (
                 game_id,
                 system_uuid,
@@ -171,6 +176,11 @@ def _upsert_cache_from_entry(entry: dict) -> None:
                 json.dumps(entry.get("ownership") or []),
                 entry.get("updated_at"),
                 entry.get("discord_id"),
+                entry.get("game_uuid"),
+                entry.get("game_id_source"),
+                entry.get("managed_externally"),
+                entry.get("version_management_enabled"),
+                json.dumps(entry.get("available_updates") or []),
             ),
         )
         sql.cursor_execute(cursor, "DELETE FROM variants WHERE game_id = ?", (game_id,))
@@ -178,9 +188,10 @@ def _upsert_cache_from_entry(entry: dict) -> None:
             sql.cursor_execute(
                 cursor,
                 "INSERT INTO variants (id, game_id, system_uuid, version_label, mods, language, platform, "
-                "runner, executable, directory, configpath, lastplayed, installed, installed_at, detected_at, "
-                "year, has_custom_banner, has_custom_icon, has_custom_coverart_big, playtime, service, "
-                "service_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "runner, executable, directory, configpath, path, platforms, source, lastplayed, installed, "
+                "installed_at, detected_at, year, has_custom_banner, has_custom_icon, has_custom_coverart_big, "
+                "playtime, service, service_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     variant["id"],
                     game_id,
@@ -193,6 +204,9 @@ def _upsert_cache_from_entry(entry: dict) -> None:
                     variant.get("executable"),
                     variant.get("directory"),
                     variant.get("configpath"),
+                    variant.get("path"),
+                    json.dumps(variant.get("platforms") or []),
+                    json.dumps(variant.get("source") or {}),
                     variant.get("lastplayed"),
                     variant.get("installed"),
                     variant.get("installed_at"),
@@ -206,6 +220,19 @@ def _upsert_cache_from_entry(entry: dict) -> None:
                     variant.get("service_id"),
                 ),
             )
+
+
+def save_entry_and_sync_cache(entry: dict):
+    """The one shared primitive for "persist this raw datadir entry dict,
+    then keep cache.db in sync" -- add_game()/update_existing() below use it
+    internally, and onboarding.py (which builds up richer entry dicts of its
+    own -- version groups, platform_ids, ownership, timeline_events -- rather
+    than flat per-variant kwargs) calls it directly too, so there's exactly
+    one code path that ever writes a datadir entry, not two that could drift
+    out of sync with each other. Returns the path save_entry() wrote."""
+    saved_path = datadir.save_entry(entry)
+    _upsert_cache_from_entry(entry)
+    return saved_path
 
 
 def rebuild_cache() -> None:
@@ -404,8 +431,7 @@ def add_game(**game_data: Any) -> str:
     variant["id"] = new_game_id()[:12]
     entry["versions"] = [{"version": version_label, "variants": [variant]}]
 
-    datadir.save_entry(entry)
-    _upsert_cache_from_entry(entry)
+    save_entry_and_sync_cache(entry)
     return game_id
 
 
@@ -460,8 +486,7 @@ def update_existing(**params: Any) -> str | None:
         _find_or_create_version_group(entry, version_label)["variants"].append(variant)
     variant.update(variant_fields)
 
-    datadir.save_entry(entry)
-    _upsert_cache_from_entry(entry)
+    save_entry_and_sync_cache(entry)
     return game_id
 
 

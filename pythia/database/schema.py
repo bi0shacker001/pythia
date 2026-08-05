@@ -83,7 +83,7 @@ DATABASE: dict[str, DBSchema] = {
         {"name": "name", "type": "TEXT", "unique": True},
     ],
     "games_categories": [
-        {"name": "game_id", "type": "INTEGER", "indexed": False},
+        {"name": "game_id", "type": "TEXT", "indexed": False},  # game_id, not an autoincrement int -- see games table
         {"name": "category_id", "type": "INTEGER", "indexed": False},
     ],
     "saved_searches": [

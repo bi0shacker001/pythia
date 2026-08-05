@@ -6,12 +6,6 @@ import sqlite3
 import threading
 from gettext import gettext as _
 
-import gi
-
-gi.require_version("GdkPixbuf", "2.0")
-
-from gi.repository import GdkPixbuf
-
 from pythia import runners, settings
 from pythia.database.games import get_games
 from pythia.database.schema import syncdb
@@ -120,6 +114,17 @@ def check_vulkan():
 
 
 def check_gnome():
+    """GTK/GdkPixbuf image-format diagnostic -- only meaningful when the old
+    GTK UI is actually running, so this is a no-op without GObject
+    installed (2026-08-04 GTK removal) rather than an import-time crash."""
+    try:
+        import gi
+
+        gi.require_version("GdkPixbuf", "2.0")
+        from gi.repository import GdkPixbuf
+    except (ImportError, ValueError):
+        return
+
     required_names = ["svg", "png", "jpeg"]
     format_names = [f.get_name() for f in GdkPixbuf.Pixbuf.get_formats()]
     for required in required_names:

@@ -11,7 +11,7 @@
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Main entry point for Lutris"""
+"""Main entry point for Pythia"""
 
 import gettext
 import locale
@@ -21,23 +21,25 @@ import sys
 from os.path import dirname, normpath, realpath
 
 # Python 3.14 changes the default to 'forkserver' which is very different;
-# let's not put up with _that_!
-multiprocessing.set_start_method("fork")
+# let's not put up with _that_! (Windows has no fork start method at all --
+# real, separate gap, not addressed here; this only matters on POSIX.)
+if hasattr(os, "fork"):
+    multiprocessing.set_start_method("fork")
 
 LAUNCH_PATH = dirname(realpath(__file__))
 
 # Prevent loading Python modules from home folder
-# They can interfere with Lutris and prevent it
+# They can interfere with Pythia and prevent it
 # from working.
-if os.environ.get("LUTRIS_ALLOW_LOCAL_PYTHON_PACKAGES") != "1":
+if os.environ.get("PYTHIA_ALLOW_LOCAL_PYTHON_PACKAGES") != "1":
     sys.path = [path for path in sys.path if not path.startswith("/home") and not path.startswith("/var/home")]
 
-if os.path.isdir(os.path.join(LAUNCH_PATH, "../lutris")):
+if os.path.isdir(os.path.join(LAUNCH_PATH, "../pythia")):
     sys.dont_write_bytecode = True
     SOURCE_PATH = normpath(os.path.join(LAUNCH_PATH, ".."))
     sys.path.insert(0, SOURCE_PATH)
 else:
-    sys.path.insert(0, os.path.normpath(os.path.join(LAUNCH_PATH, "../lib/lutris")))
+    sys.path.insert(0, os.path.normpath(os.path.join(LAUNCH_PATH, "../lib/pythia")))
 
 try:
     locale.setlocale(locale.LC_ALL, "")
@@ -46,13 +48,13 @@ except locale.Error as ex:
 
 try:
     # optional_settings does not exist if you don't use the meson build system
-    from lutris import optional_settings  # type: ignore
+    from pythia import optional_settings  # type: ignore
 
     try:
-        locale.bindtextdomain("lutris", optional_settings.LOCALE_DIR)
-        gettext.bindtextdomain("lutris", optional_settings.LOCALE_DIR)
-        locale.textdomain("lutris")
-        gettext.textdomain("lutris")
+        locale.bindtextdomain("pythia", optional_settings.LOCALE_DIR)
+        gettext.bindtextdomain("pythia", optional_settings.LOCALE_DIR)
+        locale.textdomain("pythia")
+        gettext.textdomain("pythia")
     except Exception as ex:
         sys.stderr.write(
             "Couldn't bind gettext domain, translations won't work.\n"
@@ -64,11 +66,20 @@ except ImportError:
 if "WEBKIT_DISABLE_DMABUF_RENDERER" not in os.environ:
     os.environ["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
 
+# GTK removal (2026-08-04): the old GTK Application (pythia.gui.application.
+# PythiaApplication) is being replaced. If GObject/GTK is installed (a real
+# Linux desktop), prefer it for now since it's still the only thing that can
+# show a window; everywhere else (Windows, or Linux without GTK installed)
+# falls back to the new headless entry point, which has real feature parity
+# for every non-window command (list/install/export/exec/...).
 try:
-    from lutris.gui.application import LutrisApplication
-except ImportError as ex:
-    sys.stderr.write("Error importing Lutris application module: %s\n" % ex)
-    sys.exit(1)
+    import gi  # noqa: F401
 
-app = LutrisApplication()
-sys.exit(app.run(sys.argv))
+    from pythia.gui.application import PythiaApplication
+
+    app = PythiaApplication()
+    sys.exit(app.run(sys.argv))
+except ImportError:
+    from pythia.app import main
+
+    main()

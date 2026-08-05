@@ -14,7 +14,7 @@ from pythia.api import (
     get_runtime_versions,
     get_time_from_api_date,
 )
-from pythia.gui.widgets.progress_box import ProgressInfo
+from pythia.util.progress_info import ProgressInfo
 from pythia.util import http, system
 from pythia.util.downloader import SimpleDownloader
 from pythia.util.extract import extract_archive

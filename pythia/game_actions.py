@@ -19,7 +19,7 @@ from pythia.gui.config.add_game_dialog import AddGameDialog
 from pythia.gui.config.edit_game import EditGameConfigDialog
 from pythia.gui.config.edit_game_categories import EditGameCategoriesDialog
 from pythia.gui.dialogs import InputDialog
-from pythia.gui.dialogs.delegates import LaunchUIDelegate
+from pythia.delegates import LaunchUIDelegate
 from pythia.gui.dialogs.log import LogWindow
 from pythia.gui.dialogs.uninstall_dialog import UninstallDialog
 from pythia.gui.widgets.utils import open_uri

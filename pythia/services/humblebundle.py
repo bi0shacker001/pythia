@@ -5,11 +5,8 @@ import json
 import os
 from gettext import gettext as _
 
-from gi.repository import Gtk
-
 from pythia import settings
 from pythia.exceptions import UnavailableGameError
-from pythia.gui.dialogs import HumbleBundleCookiesDialog, QuestionDialog
 from pythia.installer import AUTO_ELF_EXE, AUTO_WIN32_EXE
 from pythia.installer.installer_file import InstallerFile
 from pythia.services.base import SERVICE_LOGIN, OnlineService
@@ -81,6 +78,10 @@ class HumbleBundleService(OnlineService):
     supported_platforms = ("linux", "windows")
 
     def login(self, parent=None):
+        from gi.repository import Gtk  # noqa: PLC0415
+
+        from pythia.gui.dialogs import HumbleBundleCookiesDialog, QuestionDialog  # noqa: PLC0415
+
         # Clear any stale login-in-progress flag from a previous
         # abandoned WebConnect login attempt; the cookie path below
         # bypasses WebConnectDialog entirely.

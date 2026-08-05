@@ -7,8 +7,6 @@ import shlex
 import subprocess
 from gettext import gettext as _
 
-from gi.repository import Gio
-
 from pythia import settings
 from pythia.database.games import get_games_where
 from pythia.services.base import BaseService
@@ -54,7 +52,11 @@ class XDGService(BaseService):
 
     @classmethod
     def iter_xdg_games(cls):
-        """Iterates through XDG games only"""
+        """Iterates through XDG games only (Linux-desktop-specific; only
+        registered when not running as a Flatpak, and only actually iterated
+        when this service is enabled -- see services/__init__.py)."""
+        from gi.repository import Gio  # noqa: PLC0415
+
         for app in Gio.AppInfo.get_all():
             if cls._is_importable(app):
                 yield app

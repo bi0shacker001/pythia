@@ -7,12 +7,10 @@ from gettext import gettext as _
 from typing import Any
 from urllib.parse import quote_plus, urlencode
 
-from gi.repository import Gtk
 
 from pythia import settings
 from pythia.database import games as games_db
 from pythia.exceptions import UnavailableGameError
-from pythia.gui.dialogs import InputDialog
 from pythia.installer import AUTO_ELF_EXE, AUTO_WIN32_EXE
 from pythia.installer.installer_file import InstallerFile
 from pythia.runners import get_runner_human_name
@@ -121,6 +119,10 @@ class ItchIoService(OnlineService):
     )
 
     def login(self, parent=None):
+        from gi.repository import Gtk  # noqa: PLC0415
+
+        from pythia.gui.dialogs import InputDialog  # noqa: PLC0415
+
         # The InputDialog doesn't keep any state we need to protect,
         # but we used to so we'll clear this persistent flag.
         self.is_login_in_progress = False

@@ -6,13 +6,18 @@ import shutil
 import stat
 from textwrap import dedent
 
-from gi.repository import GLib
-
 from pythia.api import format_installer_url
 from pythia.settings import CACHE_DIR
 from pythia.util import system
+from pythia.util import xdg
 from pythia.util.linux import LINUX_SYSTEM
 from pythia.util.log import logger
+
+# GTK removal (2026-08-04): GLib.UserDirectory.DIRECTORY_* -> pythia.util.xdg's
+# own real-per-platform special-dir guesses (see that module's docstring for
+# what "real" means here on Windows vs Linux).
+_SPECIAL_DIRS = ("DESKTOP", "MUSIC", "PICTURES", "VIDEOS", "DOCUMENTS", "DOWNLOADS", "TEMPLATES")
+_SPECIAL_DIR_ALIASES = {"DOWNLOADS": "DOWNLOAD"}  # this module's public names vs xdg.py's GLib-matching ones
 
 
 def get_pythia_executable() -> str:
@@ -23,21 +28,10 @@ def get_pythia_executable() -> str:
 
 def get_xdg_entry(directory: str) -> str | None:
     """Return the path for specific user folders"""
-    special_dir = {
-        "DESKTOP": GLib.UserDirectory.DIRECTORY_DESKTOP,
-        "MUSIC": GLib.UserDirectory.DIRECTORY_MUSIC,
-        "PICTURES": GLib.UserDirectory.DIRECTORY_PICTURES,
-        "VIDEOS": GLib.UserDirectory.DIRECTORY_VIDEOS,
-        "DOCUMENTS": GLib.UserDirectory.DIRECTORY_DOCUMENTS,
-        "DOWNLOADS": GLib.UserDirectory.DIRECTORY_DOWNLOAD,
-        "TEMPLATES": GLib.UserDirectory.DIRECTORY_TEMPLATES,
-    }
     directory = directory.upper()
-    if directory not in special_dir:
-        raise ValueError(
-            directory + " not supported. Only those folders are supported: " + ", ".join(special_dir.keys())
-        )
-    return GLib.get_user_special_dir(special_dir[directory])
+    if directory not in _SPECIAL_DIRS:
+        raise ValueError(directory + " not supported. Only those folders are supported: " + ", ".join(_SPECIAL_DIRS))
+    return xdg.get_user_special_dir(_SPECIAL_DIR_ALIASES.get(directory, directory))
 
 
 def get_xdg_basename(game_slug: str, game_id: str, base_dir: str | None = None) -> str:
@@ -65,7 +59,7 @@ def create_launcher(
     menu: bool = False,
 ) -> None:
     """Create a .desktop file."""
-    desktop_dir = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP)
+    desktop_dir = xdg.get_user_special_dir("DESKTOP")
     if not desktop_dir:
         raise RuntimeError("Creating launcher: unable to find directory for .desktop files")
     pythia_executable = get_pythia_executable()
@@ -106,7 +100,7 @@ def create_launcher(
         logger.debug("Creating Desktop icon in %s", launcher_path)
         shutil.copy(tmp_launcher_path, launcher_path)
     if menu:
-        user_dir = os.path.expanduser("~/.local/share") if LINUX_SYSTEM.is_flatpak() else GLib.get_user_data_dir()
+        user_dir = os.path.expanduser("~/.local/share") if LINUX_SYSTEM.is_flatpak() else xdg.get_user_data_dir()
         menu_path = os.path.join(user_dir, "applications")
         os.makedirs(menu_path, exist_ok=True)
         launcher_path = os.path.join(menu_path, launcher_filename)
@@ -120,7 +114,7 @@ def get_launcher_path(game_slug: str, game_id: str) -> str:
     When legacy is set, it will return the old path with only the slug,
     otherwise it will return the path with slug + id
     """
-    desktop_dir = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP)
+    desktop_dir = xdg.get_user_special_dir("DESKTOP")
     if not desktop_dir:
         raise RuntimeError("Unable to find directory for .desktop files")
 
@@ -131,7 +125,7 @@ def get_menu_launcher_path(game_slug: str, game_id: str) -> str:
     """Return the path to a XDG menu launcher, prioritizing legacy paths if
     they exist
     """
-    menu_dir = os.path.join(GLib.get_user_data_dir(), "applications")
+    menu_dir = os.path.join(xdg.get_user_data_dir(), "applications")
     return os.path.join(menu_dir, get_xdg_basename(game_slug, game_id, base_dir=menu_dir))
 
 

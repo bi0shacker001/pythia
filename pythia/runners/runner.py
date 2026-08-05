@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from pythia.api import RunnerVersionDict
     from pythia.config import GameConfigDict, LaunchConfigDict, RunnerConfigDict, SystemConfigDict
     from pythia.game import Game
-    from pythia.gui.dialogs.delegates import InstallUIDelegate
+    from pythia.delegates import InstallUIDelegate
     from pythia.installer.installer import PythiaInstaller
     from pythia.installer.interpreter import ScriptInterpreter
 

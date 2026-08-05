@@ -8,8 +8,8 @@ from gettext import gettext as _
 from typing import Any
 from urllib.parse import unquote
 
-from gi.repository import Gio
 
+from pythia.util.app_singleton import get_default as get_default_application
 from pythia import settings
 from pythia.config import PythiaConfig, write_game_config
 from pythia.database.games import add_game, get_game_by_field, update_existing
@@ -332,7 +332,7 @@ class UbisoftConnectService(OnlineService):
     def install(self, db_game):
         """Install a game or Ubisoft Connect if not already installed"""
         ubisoft_connect = get_game_by_field(self.client_installer, "slug")
-        application = Gio.Application.get_default()
+        application = get_default_application()
         if not ubisoft_connect or not ubisoft_connect["installed"]:
             logger.warning("Ubisoft Connect (%s) not installed", self.client_installer)
             application.show_pythia_installer_window(game_slug=self.client_installer)

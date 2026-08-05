@@ -4,7 +4,6 @@ import sys
 from gettext import gettext as _
 
 from pythia.exceptions import PythiaError
-from pythia.gui.dialogs import ErrorDialog
 from pythia.util.log import logger
 from pythia.util.strings import gtk_safe
 
@@ -56,6 +55,8 @@ _excepthook = sys.excepthook  # pylint: disable=invalid-name
 def error_handler(error_type, value, traceback):
     """Intercept all possible exceptions and raise them as ScriptingErrors"""
     if error_type == ScriptingError:
+        from pythia.gui.dialogs import ErrorDialog  # noqa: PLC0415
+
         message = value.message
         if value.faulty_data:
             message += "\n<b>%s</b>" % gtk_safe(value.faulty_data)

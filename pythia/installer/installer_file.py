@@ -5,7 +5,6 @@ from gettext import gettext as _
 from urllib.parse import urlparse
 
 from pythia.cache import get_url_cache_path, has_valid_custom_cache_path, save_to_cache
-from pythia.gui.widgets.download_progress_box import DownloadProgressBox
 from pythia.installer.errors import ScriptingError
 from pythia.util import system
 from pythia.util.downloader import BaseDownloader
@@ -247,6 +246,8 @@ class InstallerFile:
             get_url_cache_path(self.url, self.id, self.game_slug, prepare=True)
 
     def create_download_progress_box(self):
+        from pythia.gui.widgets.download_progress_box import DownloadProgressBox  # noqa: PLC0415
+
         return DownloadProgressBox(
             url=self.url, dest=self.dest_file, temp=self.download_file, referer=self.referer, downloader=self.downloader
         )

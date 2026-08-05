@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import random
@@ -9,7 +11,6 @@ from pythia.database.services import ServiceGameCollection
 from pythia.util import system
 from pythia.util.http import HTTPError, download_file
 from pythia.util.log import logger
-from pythia.util.portals import TrashPortal
 
 if TYPE_CHECKING:
     from pythia.services.base import BaseService
@@ -118,11 +119,13 @@ class ServiceMedia:
     def trash_media(
         self,
         slug: str,
-        completion_function: TrashPortal.CompletionFunction | None = None,
-        error_function: TrashPortal.ErrorFunction | None = None,
+        completion_function: Callable[[], None] | None = None,
+        error_function: Callable[[Exception], None] | None = None,
     ) -> None:
         """Sends each media file for a game to the trash, and invokes callsbacks when this
         has been completed or has failed."""
+        from pythia.util.portals import TrashPortal  # noqa: PLC0415
+
         paths = [mp.path for mp in self.get_possible_media_paths(slug) if os.path.exists(mp.path)]
         if paths:
             TrashPortal(paths, completion_function=completion_function, error_function=error_function)

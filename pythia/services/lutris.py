@@ -4,15 +4,14 @@ from collections.abc import Iterable
 from gettext import gettext as _
 from typing import Any
 
-from gi.repository import Gio
 
 from pythia import settings
 from pythia.api import get_api_games, get_game_installers, read_api_key
 from pythia.database.games import get_games
 from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
-from pythia.gui import dialogs
-from pythia.gui.views.media_loader import download_media
+from pythia.util.app_singleton import get_default as get_default_application
+from pythia.util.media_loader import download_media
 from pythia.services.base import (
     SERVICE_LOGIN,
     LutrisBanner,
@@ -80,6 +79,8 @@ class LutrisService(OnlineService):
 
     def login(self, parent=None):
         """Connect to Lutris"""
+        from pythia.gui import dialogs  # noqa: PLC0415
+
         login_dialog = dialogs.ClientLoginDialog(parent=parent)
         login_dialog.connect("connected", self.on_connect_success)
 
@@ -131,7 +132,7 @@ class LutrisService(OnlineService):
                 raise error  # bounce any error off the backstop
             if not installers:
                 raise RuntimeError(_("Lutris has no installers for %s. Try using a different service instead.") % appid)
-            application = Gio.Application.get_default()
+            application = get_default_application()
             application.show_installer_window(installers)
 
         BusyAsyncCall(get_game_installers, on_installers_ready, appid)  # appid is the slug for Lutris games

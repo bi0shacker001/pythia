@@ -6,7 +6,7 @@ from pythia.game import Game
 
 if TYPE_CHECKING:
     from pythia.database.games import DbGameDict
-    from pythia.gui.dialogs.delegates import LaunchUIDelegate
+    from pythia.delegates import LaunchUIDelegate
 
 
 def generate_script(

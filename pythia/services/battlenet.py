@@ -4,10 +4,10 @@ import json
 import os
 from gettext import gettext as _
 
-from gi.repository import Gio
 
 from pythia import settings
 from pythia.config import PythiaConfig, write_game_config
+from pythia.util.app_singleton import get_default as get_default_application
 from pythia.database.games import add_game, get_game_by_field, get_games, update_existing
 from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
@@ -253,7 +253,7 @@ class BattleNetService(BaseService):
         bnet_game = get_game_by_field(self.client_installer, "slug")
         if not bnet_game or not bnet_game.get("installed"):
             return super().install(db_game, update)
-        application = Gio.Application.get_default()
+        application = get_default_application()
         application.show_installer_window(
             [self.generate_installer(db_game, bnet_game)], service=self, appid=db_game["appid"]
         )

@@ -6,8 +6,6 @@ from gettext import gettext as _
 from pathlib import Path
 from typing import Any
 
-from gi.repository import Gio
-
 from pythia import api, settings
 from pythia.api import get_game_installers
 from pythia.config import write_game_config
@@ -15,11 +13,10 @@ from pythia.database import sql
 from pythia.database.games import add_game, get_game_by_field, get_game_for_service, get_games
 from pythia.database.services import ServiceGameCollection
 from pythia.game import GAME_UPDATED, Game
-from pythia.gui.dialogs import NoticeDialog
-from pythia.gui.dialogs.webconnect_dialog import WebConnectDialog
-from pythia.gui.views.media_loader import download_media
+from pythia.util.app_singleton import get_default as get_default_application
+from pythia.util.media_loader import download_media
 from pythia.util.notifier import NotificationSource
-from pythia.gui.widgets.utils import BANNER_SIZE, ICON_SIZE
+from pythia.util.image_utils import BANNER_SIZE, ICON_SIZE
 from pythia.services.service_media import ServiceMedia
 from pythia.util import system
 from pythia.util.busy import BusyAsyncCall
@@ -34,18 +31,18 @@ class AuthTokenExpiredError(Exception):
     log-out and log-in again in response to this rather than reporting it."""
 
 
-class PythiaBanner(ServiceMedia):
-    service = "pythia"
+class LutrisBanner(ServiceMedia):
+    service = "lutris"
     size = BANNER_SIZE
     dest_path = settings.BANNER_PATH
     file_patterns = ["%s.jpg", "%s.png"]
     api_field = "banner"
 
 
-class PythiaIcon(PythiaBanner):
+class LutrisIcon(LutrisBanner):
     size = ICON_SIZE
     dest_path = settings.ICON_PATH
-    file_patterns = ["pythia_%s.png"]
+    file_patterns = ["lutris_%s.png"]
     api_field = "icon"
     can_be_fallback = False
 
@@ -60,8 +57,8 @@ class PythiaIcon(PythiaBanner):
         return None
 
 
-class PythiaCoverart(ServiceMedia):
-    service = "pythia"
+class LutrisCoverart(ServiceMedia):
+    service = "lutris"
     size = (264, 352)
     file_patterns = ["%s.jpg", "%s.png"]
     dest_path = settings.COVERART_PATH
@@ -72,7 +69,7 @@ class PythiaCoverart(ServiceMedia):
         return (66, 88)
 
 
-class PythiaCoverartMedium(PythiaCoverart):
+class LutrisCoverartMedium(LutrisCoverart):
     size = (176, 234)
 
 
@@ -210,7 +207,7 @@ class BaseService:
 
             if not service_installers:
                 service_installers = self.generate_installers(db_game)
-            application = Gio.Application.get_default()
+            application = get_default_application()
             application.show_installer_window(service_installers, service=self, appid=appid)
 
         BusyAsyncCall(self.get_installers_from_api, on_installers_ready, appid)
@@ -373,7 +370,7 @@ class BaseService:
             GAME_UPDATED.fire(existing_game)
 
         if service_installers and db_game:
-            application = Gio.Application.get_default()
+            application = get_default_application()
             application.show_installer_window(service_installers, service=self, appid=db_game["appid"])
 
     def simple_install(self, db_game):
@@ -466,6 +463,9 @@ class OnlineService(BaseService):
         return [self.cookies_path]
 
     def login(self, parent=None):
+        from pythia.gui.dialogs import NoticeDialog  # noqa: PLC0415
+        from pythia.gui.dialogs.webconnect_dialog import WebConnectDialog  # noqa: PLC0415
+
         if self.client_installer and not self.is_launcher_installed():
             NoticeDialog(
                 _(
@@ -474,7 +474,7 @@ class OnlineService(BaseService):
                 )
                 % self.name
             )
-            application = Gio.Application.get_default()
+            application = get_default_application()
             application.show_pythia_installer_window(game_slug=self.client_installer)
             return
         logger.debug("Connecting to %s", self.name)

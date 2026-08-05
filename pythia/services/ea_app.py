@@ -9,14 +9,14 @@ from xml.etree import ElementTree
 
 import requests
 import urllib3
-from gi.repository import Gio
 
+from pythia.util.app_singleton import get_default as get_default_application
 from pythia import settings
 from pythia.config import PythiaConfig, write_game_config
 from pythia.database.games import add_game, get_game_by_field
 from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
-from pythia.gui.widgets.utils import Image, thumbnail_image
+from pythia.util.image_utils import Image, thumbnail_image
 from pythia.services.base import SERVICE_LOGIN, AuthTokenExpiredError, OnlineService
 from pythia.services.lutris import sync_media
 from pythia.services.service_game import ServiceGame
@@ -564,7 +564,7 @@ class EAAppService(OnlineService):
 
     def install(self, db_game):
         ea_app_game = get_game_by_field(self.client_installer, "slug")
-        application = Gio.Application.get_default()
+        application = get_default_application()
         if not ea_app_game or not ea_app_game["installed"]:
             logger.warning("Installing the EA App client")
             application.show_pythia_installer_window(game_slug=self.client_installer)

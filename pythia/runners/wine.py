@@ -21,7 +21,6 @@ from pythia.exceptions import (
     UnspecifiedVersionError,
 )
 from pythia.game import Game
-from pythia.gui.dialogs import FileDialog
 from pythia.runners.commands.wine import (  # noqa: F401 pylint: disable=unused-import
     create_prefix,
     delete_registry_key,
@@ -1002,6 +1001,8 @@ class wine(Runner):
 
     def run_wineexec(self, *args):
         """Ask the user for an arbitrary exe file to run in the game's prefix"""
+        from pythia.gui.dialogs import FileDialog  # noqa: PLC0415
+
         dlg = FileDialog(_("Select an EXE or MSI file"), default_path=self.game_path)
         filename = dlg.filename
         if not filename:

@@ -1,18 +1,17 @@
 """Threading module, used to launch games while monitoring them."""
 
 import contextlib
-import fcntl
 import io
 import os
 import shlex
 import subprocess
 import sys
+import tempfile
+import threading
 import uuid
 from collections.abc import Callable
 from copy import copy
-from typing import IO, TYPE_CHECKING
-
-from gi.repository import GLib
+from typing import TYPE_CHECKING
 
 from pythia import settings
 from pythia.util import system
@@ -20,9 +19,8 @@ from pythia.util.log import logger
 from pythia.util.shell import get_terminal_script
 
 if TYPE_CHECKING:
-    from gi.repository import Gtk
-
     from pythia.runners.runner import Runner
+    from pythia.util.log_buffer import SimpleLogBuffer
 
 
 def get_wrapper_script_location() -> str:
@@ -48,7 +46,7 @@ RUNNING_COMMANDS = set()
 class MonitoredCommand:
     """Exexcutes a commmand while keeping track of its state"""
 
-    fallback_cwd = "/tmp"
+    fallback_cwd = tempfile.gettempdir()
 
     def __init__(
         self,
@@ -59,7 +57,7 @@ class MonitoredCommand:
         cwd: str | None = None,
         include_processes: list[str] | None = None,
         exclude_processes: list[str] | None = None,
-        log_buffer: "Gtk.TextBuffer | None" = None,
+        log_buffer: "SimpleLogBuffer | None" = None,
         title: str | None = None,
     ):  # pylint: disable=too-many-arguments
         self.ready_state = True
@@ -123,7 +121,7 @@ class MonitoredCommand:
         script_path = get_terminal_script(self.command, self.cwd, self.env)
         return wrapper_command + [terminal_path, "-e", script_path]
 
-    def set_log_buffer(self, log_buffer: "Gtk.TextBuffer | None") -> None:
+    def set_log_buffer(self, log_buffer: "SimpleLogBuffer | None") -> None:
         """Attach a TextBuffer to this command enables the buffer handler"""
         if not log_buffer:
             return None
@@ -194,18 +192,20 @@ class MonitoredCommand:
             logger.error("No game process available")
             return None
 
-        GLib.child_watch_add(self.game_process.pid, self.on_stop)  # type: ignore
+        # GTK removal (2026-08-04): this used to be GLib.child_watch_add() (wait
+        # for exit) plus GLib.io_add_watch() over a non-blocking stdout fd
+        # (fcntl O_NONBLOCK), both driven by a running GLib main loop. Neither
+        # exists anymore -- replaced with the standard portable pattern: two
+        # dedicated threads, each doing a plain *blocking* read/wait (blocking
+        # is fine off the main thread), reporting back via schedule_at_idle so
+        # callbacks still land off the calling thread the same way idle_add's
+        # callbacks did.
+        threading.Thread(target=self._wait_thread, daemon=True).start()
 
-        # make stdout nonblocking.
+        self._stdout_stop = threading.Event()
         if self.game_process.stdout:
-            fileno = self.game_process.stdout.fileno()
-            fcntl.fcntl(fileno, fcntl.F_SETFL, fcntl.fcntl(fileno, fcntl.F_GETFL) | os.O_NONBLOCK)
-
-        self.stdout_monitor = GLib.io_add_watch(
-            self.game_process.stdout,
-            GLib.IO_IN | GLib.IO_HUP,
-            self.on_stdout_output,
-        )
+            self.stdout_monitor = threading.Thread(target=self._stdout_thread, daemon=True)
+            self.stdout_monitor.start()
 
     def log_filter(self, line: str) -> bool:
         """Filter out some message we don't want to show to the user."""
@@ -249,38 +249,38 @@ class MonitoredCommand:
             logger.warning("No file %s", return_code_path)
         return return_code
 
-    def on_stop(self, pid: GLib.Pid, _user_data: None) -> bool:
-        """Callback registered on game process termination"""
+    def _wait_thread(self) -> None:
+        """Blocks until the game process exits, then handles the same
+        cleanup on_stop() used to (see start()'s docstring note)."""
+        pid = self.game_process.pid
+        self.game_process.wait()
         if self.prevent_on_stop:  # stop() already in progress
-            return False
-        if self.game_process:
-            self.game_process.wait()
+            return
         self.return_code = self.get_return_code()
         self.is_running = False
         logger.debug("Process %s has terminated with code %s", pid, self.return_code)
-        resume_stop = self.stop()
-        if not resume_stop:
+        if not self.stop():
             logger.info("Full shutdown prevented")
-            return False
-        return False
 
-    def on_stdout_output(self, stdout: IO[bytes], condition: GLib.IOCondition) -> bool:
-        """Called by the stdout monitor to dispatch output to log handlers"""
-        if condition == GLib.IO_HUP:
-            self.stdout_monitor = None
-            return False
-        if not self.is_running:
-            return False
-        try:
-            line = stdout.read(262144).decode("utf-8", errors="ignore")
-        except ValueError:
-            # file_desc might be closed
-            return True
-        if "winemenubuilder.exe" in line:
-            return True
-        for log_handler in self.log_handlers:
-            log_handler(line)
-        return True
+    def _stdout_thread(self) -> None:
+        """Blocking-read loop over the child's stdout, dispatching each chunk
+        to the log handlers -- runs on its own thread so the blocking read
+        never stalls anything else (see start()'s docstring note)."""
+        stdout = self.game_process.stdout
+        while not self._stdout_stop.is_set():
+            try:
+                chunk = stdout.read(262144)
+            except (ValueError, OSError):
+                break  # file_desc might be closed
+            if not chunk:
+                break  # EOF -- process closed stdout (equivalent of the old IO_HUP)
+            line = chunk.decode("utf-8", errors="ignore")
+            if "winemenubuilder.exe" in line:
+                continue
+            if not self.is_running:
+                break
+            for log_handler in self.log_handlers:
+                log_handler(line)
 
     def execute_process(self, command: list[str], env: dict[str, str] | None = None) -> subprocess.Popen[bytes] | None:
         """Execute and return a subprocess"""
@@ -315,7 +315,7 @@ class MonitoredCommand:
                 os.makedirs(self.cwd)
             except OSError:
                 logger.error("Failed to create working directory, falling back to %s", self.fallback_cwd)
-                self.cwd = "/tmp"
+                self.cwd = self.fallback_cwd
         try:
             return subprocess.Popen(  # pylint: disable=consider-using-with
                 command,
@@ -347,7 +347,7 @@ class MonitoredCommand:
             return False
 
         if self.stdout_monitor:
-            GLib.source_remove(self.stdout_monitor)
+            self._stdout_stop.set()
             self.stdout_monitor = None
 
         self.is_running = False

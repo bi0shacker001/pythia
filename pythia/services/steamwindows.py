@@ -1,8 +1,8 @@
 import os
 from gettext import gettext as _
 
-from gi.repository import Gio
 
+from pythia.util.app_singleton import get_default as get_default_application
 from pythia.database.games import get_game_by_field, get_games
 from pythia.game import Game
 from pythia.services.steam import SteamGame, SteamService
@@ -56,7 +56,7 @@ class SteamWindowsService(SteamService):
 
     def install(self, db_game):
         steam_game = self.get_steam()
-        application = Gio.Application.get_default()
+        application = get_default_application()
         if not steam_game:
             application.show_pythia_installer_window(game_slug=self.client_installer)
             return

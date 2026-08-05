@@ -43,7 +43,7 @@ from pythia.util.yaml import write_yaml_to_file
 
 if TYPE_CHECKING:
     from pythia.gui.application import PythiaApplication
-    from pythia.gui.dialogs.delegates import LaunchUIDelegate
+    from pythia.delegates import LaunchUIDelegate
 
 HEARTBEAT_DELAY = 2000
 

@@ -4,7 +4,6 @@ from gettext import gettext as _
 from urllib.parse import urlparse
 
 from pythia.cache import has_valid_custom_cache_path
-from pythia.gui.widgets.download_collection_progress_box import DownloadCollectionProgressBox
 from pythia.util import system
 from pythia.util.strings import gtk_safe_urls
 
@@ -133,6 +132,8 @@ class InstallerFileCollection:
                 installer_file.prepare()
 
     def create_download_progress_box(self):
+        from pythia.gui.widgets.download_collection_progress_box import DownloadCollectionProgressBox  # noqa: PLC0415
+
         return DownloadCollectionProgressBox(self)
 
     def is_ready(self, provider):

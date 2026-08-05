@@ -66,20 +66,22 @@ except ImportError:
 if "WEBKIT_DISABLE_DMABUF_RENDERER" not in os.environ:
     os.environ["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
 
-# GTK removal (2026-08-04): the old GTK Application (pythia.gui.application.
-# PythiaApplication) is being replaced. If GObject/GTK is installed (a real
-# Linux desktop), prefer it for now since it's still the only thing that can
-# show a window; everywhere else (Windows, or Linux without GTK installed)
-# falls back to the new headless entry point, which has real feature parity
-# for every non-window command (list/install/export/exec/...).
-try:
-    import gi  # noqa: F401
+# GTK removal (2026-08-04): pythia.gui (GTK) is gone. Any real CLI flag
+# (list/install/export/exec/...) always goes through the headless entry
+# point, same as before -- scripting shouldn't need a display. Bare
+# `pythia` with no arguments tries the new Qt UI if PySide6 is installed,
+# since that's the only case that actually wants a window.
+if len(sys.argv) == 1:
+    try:
+        from pythia.ui.app import main as qt_main
 
-    from pythia.gui.application import PythiaApplication
+        qt_main()
+    except ImportError as ex:
+        sys.stderr.write(f"Qt UI unavailable ({ex}), falling back to the headless CLI.\n")
+        from pythia.app import main
 
-    app = PythiaApplication()
-    sys.exit(app.run(sys.argv))
-except ImportError:
+        main()
+else:
     from pythia.app import main
 
     main()

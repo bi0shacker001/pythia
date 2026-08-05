@@ -112,8 +112,31 @@ def _new_entry(game_id: str, name: str, slug: str) -> dict:
         "discord_id": None,
         "platform_ids": [],
         "ownership": [],
-        "variants": [],
+        "versions": [],
     }
+
+
+def _iter_variants(entry: dict):
+    """Flattens the real datadir shape (versions[] groups, each with its own
+    variants[]) into variant dicts -- the "versions" wrapper groups multiple
+    variants that share the same label (different mods/language/platform of
+    the very same version); the SQL index and the merged-row view below both
+    work with the flat form, so each yielded variant is a shallow copy with
+    its group's label injected as "version_label" rather than staying nested."""
+    for group in entry.get("versions") or []:
+        for variant in group.get("variants") or []:
+            flat = dict(variant)
+            flat["version_label"] = group.get("version")
+            yield flat
+
+
+def _find_or_create_version_group(entry: dict, version_label: str | None) -> dict:
+    versions = entry.setdefault("versions", [])
+    group = next((g for g in versions if g.get("version") == version_label), None)
+    if group is None:
+        group = {"version": version_label, "variants": []}
+        versions.append(group)
+    return group
 
 
 def _upsert_cache_from_entry(entry: dict) -> None:
@@ -151,7 +174,7 @@ def _upsert_cache_from_entry(entry: dict) -> None:
             ),
         )
         sql.cursor_execute(cursor, "DELETE FROM variants WHERE game_id = ?", (game_id,))
-        for variant in entry.get("variants", []):
+        for variant in _iter_variants(entry):
             sql.cursor_execute(
                 cursor,
                 "INSERT INTO variants (id, game_id, system_uuid, version_label, mods, language, platform, "
@@ -213,7 +236,7 @@ def _primary_variant(entry: dict) -> dict | None:
     the most recently played/installed variant, falling back to the most
     recently detected one. Real games with only one variant (the common
     case) always get that one, unambiguously."""
-    variants = entry.get("variants") or []
+    variants = list(_iter_variants(entry))
     if not variants:
         return None
     installed = [v for v in variants if v.get("installed")]
@@ -235,17 +258,13 @@ def _merged_row(entry: dict, variant: dict | None) -> DbGameDict:
         "ownership": entry.get("ownership") or [],
         "updated": entry.get("updated_at"),
         "discord_id": entry.get("discord_id"),
-        "version_count": len({v.get("version_label") for v in entry.get("variants", []) if v.get("version_label")}),
+        "version_count": len({v.get("version_label") for v in _iter_variants(entry) if v.get("version_label")}),
     }
     for field in _VARIANT_FIELDS:
         row[field] = (variant or {}).get(field)
     if variant is not None:
         row["variant_id"] = variant.get("id")
     return row
-
-
-def _all_own_and_synced_entries() -> list[dict]:
-    return datadir.list_all_entries()
 
 
 # ---- reads (query cache.db, matching pga.db's old query engine exactly) ---
@@ -292,7 +311,7 @@ def _get_games_via_variant_filter(searches, filters, excludes, sorts) -> list[Db
         entry = _load_entry(row["game_id"], row["system_uuid"])
         if not entry:
             continue
-        variant = next((v for v in entry.get("variants", []) if v["id"] == row["id"]), None)
+        variant = next((v for v in _iter_variants(entry) if v["id"] == row["id"]), None)
         games.append(_merged_row(entry, variant))
     return games
 
@@ -371,6 +390,7 @@ def add_game(**game_data: Any) -> str:
     """Add a game (and its first variant) to datadir. Returns the game_id."""
     game_fields, variant_fields = _split_game_and_variant_fields(game_data)
     variant_fields.setdefault("installed_at", int(time.time()))
+    version_label = variant_fields.pop("version_label", None)
     name = game_fields.get("name") or "Unknown"
     slug = game_fields.get("slug") or slugify(name)
 
@@ -382,7 +402,7 @@ def add_game(**game_data: Any) -> str:
 
     variant = dict(variant_fields)
     variant["id"] = new_game_id()[:12]
-    entry["variants"] = [variant]
+    entry["versions"] = [{"version": version_label, "variants": [variant]}]
 
     datadir.save_entry(entry)
     _upsert_cache_from_entry(entry)
@@ -414,15 +434,31 @@ def update_existing(**params: Any) -> str | None:
 
     entry.update({k: v for k, v in game_fields.items() if k not in ("id",)})
 
-    variants = entry.setdefault("variants", [])
+    version_label = variant_fields.pop("version_label", None)
     target_configpath = variant_fields.get("configpath")
-    target = next((v for v in variants if v.get("configpath") == target_configpath and target_configpath), None)
-    if target is None and variants:
-        target = variants[0]
-    if target is None:
-        target = {"id": new_game_id()[:12]}
-        variants.append(target)
-    target.update(variant_fields)
+    if target_configpath:
+        # A specific install was named -- match it exactly, or (since the
+        # owning game was already found) treat an unmatched configpath as a
+        # new variant/version of that same game, never someone else's row.
+        existing = next((v for v in _iter_variants(entry) if v.get("configpath") == target_configpath), None)
+    else:
+        # No configpath given at all -- too ambiguous to know which variant
+        # is meant, so fall back to whichever one this game already has
+        # (matches Lutris's own single-row update_existing() behavior).
+        existing = next(iter(_iter_variants(entry)), None)
+
+    if existing is not None:
+        # Found in some version group -- update it in place there, moving it
+        # to the new group if its version_label changed.
+        old_group = _find_or_create_version_group(entry, existing["version_label"])
+        variant = next(v for v in old_group["variants"] if v["id"] == existing["id"])
+        if version_label is not None and version_label != existing["version_label"]:
+            old_group["variants"].remove(variant)
+            _find_or_create_version_group(entry, version_label)["variants"].append(variant)
+    else:
+        variant = {"id": new_game_id()[:12]}
+        _find_or_create_version_group(entry, version_label)["variants"].append(variant)
+    variant.update(variant_fields)
 
     datadir.save_entry(entry)
     _upsert_cache_from_entry(entry)

@@ -1,267 +1,478 @@
-import math
-import time
-from collections.abc import Collection, Sequence
-from itertools import chain
-from typing import Any, TypeAlias, cast
+"""Games/variants query layer -- 2026-08-04 datadir rewrite.
 
-from pythia import settings
+datadir/*.json (see pythia.datadir) is the real, authoritative, sync-safe
+store now -- not pga.db. This module keeps the exact function names/signatures
+Lutris's game.py/services/*.py/installer/*.py/runners/*.py already call
+(get_games, get_game_by_field, add_game, update_existing, delete_game, ...),
+backed by cache.db (a rebuildable SQL index over datadir, using the same
+storage-agnostic sql.py query engine pga.db used) instead of an authoritative
+table. Every write here also writes through to datadir via
+pythia.datadir.save_entry(), which is what actually persists/syncs;
+rebuild_cache() reconstructs cache.db from datadir/*.json from scratch (call
+once at startup, or any time cache.db is deleted -- it's derived, safe to
+lose).
+
+Identity model (2026-08-04, real user decision, not the Lutris default):
+a game_id (16-char hex, pythia.identity.new_game_id()) replaces Lutris's
+autoincrement int `id` one-for-one as a *game*'s identity -- "games" is the
+external, one-row-per-logical-game view. Multiple *variants* (what a flat
+Lutris row used to mean in full: one specific runner/directory/executable/
+configpath install) can share a game_id -- that's how multiple versions of
+the same game relate, which plain Lutris never modeled at all.
+"""
+
+import json
+import time
+from collections.abc import Sequence
+from typing import Any, TypeAlias
+
+from pythia import datadir
 from pythia.database import sql
+from pythia.identity import get_system_uuid, new_game_id
 from pythia.util.log import logger
 from pythia.util.strings import slugify
 
-_SERVICE_CACHE: dict[str, list[str]] = {}
-_SERVICE_CACHE_ACCESSED = False  # Keep time of last access to have a self degrading cache
-
 DbGameDict: TypeAlias = dict[str, Any]
 
+# Variant fields that came from a flat Lutris "games" row -- when a caller
+# queries/updates by one of these, it means a specific install, not the
+# owning game. See _split_game_and_variant_fields().
+_VARIANT_FIELDS = {
+    "version_label",
+    "mods",
+    "language",
+    "platform",
+    "runner",
+    "executable",
+    "directory",
+    "configpath",
+    "lastplayed",
+    "installed",
+    "installed_at",
+    "detected_at",
+    "year",
+    "has_custom_banner",
+    "has_custom_icon",
+    "has_custom_coverart_big",
+    "playtime",
+    "service",
+    "service_id",
+}
+_GAME_FIELDS = {
+    "id",
+    "system_uuid",
+    "name",
+    "sortname",
+    "slug",
+    "installer_slug",
+    "parent_slug",
+    "notes",
+    "platform_ids",
+    "ownership",
+    "updated",
+    "discord_id",
+}
 
-def _stringify_game_id(game: DbGameDict) -> DbGameDict:
-    """Convert the 'id' field from int to str.
 
-    SQLite returns ids as int, but game IDs are str throughout Pythia
-    because they share data structures with string-typed service IDs
-    in the UI layer.
-    """
-    if "id" in game:
-        game["id"] = str(game["id"])
-    return game
+def _split_game_and_variant_fields(params: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    game_fields: dict[str, Any] = {}
+    variant_fields: dict[str, Any] = {}
+    for key, value in params.items():
+        if key in _VARIANT_FIELDS:
+            variant_fields[key] = value
+        else:
+            game_fields[key] = value
+    return game_fields, variant_fields
 
 
-def _stringify_game_ids(games: list[DbGameDict]) -> list[DbGameDict]:
-    """Apply _stringify_game_id to a list of game rows."""
-    return [_stringify_game_id(row) for row in games]
+# ---- datadir entry <-> cache.db row shape ----------------------------------
+
+
+def _entry_path(game_id: str, system_uuid: str | None = None) -> Any:
+    return datadir.find_entry_file(system_uuid or get_system_uuid(), game_id)
+
+
+def _load_entry(game_id: str, system_uuid: str | None = None) -> dict | None:
+    path = _entry_path(game_id, system_uuid)
+    if path is None:
+        return None
+    return datadir.load_entry(path)
+
+
+def _new_entry(game_id: str, name: str, slug: str) -> dict:
+    return {
+        "system_uuid": get_system_uuid(),
+        "game_id": game_id,
+        "canonical_name": name,
+        "sortname": "",
+        "slug": slug,
+        "installer_slug": "",
+        "parent_slug": "",
+        "notes": "",
+        "discord_id": None,
+        "platform_ids": [],
+        "ownership": [],
+        "variants": [],
+    }
+
+
+def _upsert_cache_from_entry(entry: dict) -> None:
+    """Write (or overwrite) this entry's game row + all its variant rows in
+    cache.db. Safe to call repeatedly -- deletes this game_id's old variant
+    rows first so a variant removed from the entry disappears from the index
+    too."""
+    from pythia import settings
+
+    game_id = entry["game_id"]
+    system_uuid = entry["system_uuid"]
+
+    with sql.db_cursor(settings.DB_PATH) as cursor:
+        sql.cursor_execute(
+            cursor,
+            "INSERT INTO games (id, system_uuid, name, sortname, slug, installer_slug, parent_slug, notes, "
+            "platform_ids, ownership, updated, discord_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET system_uuid=excluded.system_uuid, name=excluded.name, "
+            "sortname=excluded.sortname, slug=excluded.slug, installer_slug=excluded.installer_slug, "
+            "parent_slug=excluded.parent_slug, notes=excluded.notes, platform_ids=excluded.platform_ids, "
+            "ownership=excluded.ownership, updated=excluded.updated, discord_id=excluded.discord_id",
+            (
+                game_id,
+                system_uuid,
+                entry.get("canonical_name"),
+                entry.get("sortname") or "",
+                entry.get("slug") or "",
+                entry.get("installer_slug") or "",
+                entry.get("parent_slug") or "",
+                entry.get("notes") or "",
+                json.dumps(entry.get("platform_ids") or []),
+                json.dumps(entry.get("ownership") or []),
+                entry.get("updated_at"),
+                entry.get("discord_id"),
+            ),
+        )
+        sql.cursor_execute(cursor, "DELETE FROM variants WHERE game_id = ?", (game_id,))
+        for variant in entry.get("variants", []):
+            sql.cursor_execute(
+                cursor,
+                "INSERT INTO variants (id, game_id, system_uuid, version_label, mods, language, platform, "
+                "runner, executable, directory, configpath, lastplayed, installed, installed_at, detected_at, "
+                "year, has_custom_banner, has_custom_icon, has_custom_coverart_big, playtime, service, "
+                "service_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    variant["id"],
+                    game_id,
+                    system_uuid,
+                    variant.get("version_label"),
+                    json.dumps(variant.get("mods") or []),
+                    variant.get("language"),
+                    variant.get("platform"),
+                    variant.get("runner"),
+                    variant.get("executable"),
+                    variant.get("directory"),
+                    variant.get("configpath"),
+                    variant.get("lastplayed"),
+                    variant.get("installed"),
+                    variant.get("installed_at"),
+                    variant.get("detected_at"),
+                    variant.get("year"),
+                    variant.get("has_custom_banner"),
+                    variant.get("has_custom_icon"),
+                    variant.get("has_custom_coverart_big"),
+                    variant.get("playtime"),
+                    variant.get("service"),
+                    variant.get("service_id"),
+                ),
+            )
+
+
+def rebuild_cache() -> None:
+    """Reconstruct cache.db from datadir/*.json from scratch. cache.db is
+    fully derived -- safe to delete or call this any time (e.g. at startup)."""
+    from pythia import settings
+
+    with sql.db_cursor(settings.DB_PATH) as cursor:
+        sql.cursor_execute(cursor, "DELETE FROM games")
+        sql.cursor_execute(cursor, "DELETE FROM variants")
+    for entry in datadir.list_all_entries():
+        _upsert_cache_from_entry(entry)
+
+
+def _row_to_game_dict(row: dict) -> DbGameDict:
+    row = dict(row)
+    for key in ("platform_ids", "ownership", "mods"):
+        if key in row and isinstance(row[key], str):
+            try:
+                row[key] = json.loads(row[key])
+            except (TypeError, ValueError):
+                row[key] = []
+    return row
+
+
+def _primary_variant(entry: dict) -> dict | None:
+    """The variant a flat "one row per game" query represents this game by:
+    the most recently played/installed variant, falling back to the most
+    recently detected one. Real games with only one variant (the common
+    case) always get that one, unambiguously."""
+    variants = entry.get("variants") or []
+    if not variants:
+        return None
+    installed = [v for v in variants if v.get("installed")]
+    pool = installed or variants
+    return max(pool, key=lambda v: (v.get("lastplayed") or 0, v.get("installed_at") or 0, v.get("detected_at") or ""))
+
+
+def _merged_row(entry: dict, variant: dict | None) -> DbGameDict:
+    row: DbGameDict = {
+        "id": entry["game_id"],
+        "system_uuid": entry["system_uuid"],
+        "name": entry.get("canonical_name"),
+        "sortname": entry.get("sortname") or "",
+        "slug": entry.get("slug") or "",
+        "installer_slug": entry.get("installer_slug") or "",
+        "parent_slug": entry.get("parent_slug") or "",
+        "notes": entry.get("notes") or "",
+        "platform_ids": entry.get("platform_ids") or [],
+        "ownership": entry.get("ownership") or [],
+        "updated": entry.get("updated_at"),
+        "discord_id": entry.get("discord_id"),
+        "version_count": len({v.get("version_label") for v in entry.get("variants", []) if v.get("version_label")}),
+    }
+    for field in _VARIANT_FIELDS:
+        row[field] = (variant or {}).get(field)
+    if variant is not None:
+        row["variant_id"] = variant.get("id")
+    return row
+
+
+def _all_own_and_synced_entries() -> list[dict]:
+    return datadir.list_all_entries()
+
+
+# ---- reads (query cache.db, matching pga.db's old query engine exactly) ---
 
 
 def get_games(
     searches: dict[str, str] | None = None,
     filters: sql.DBConditionsDict | None = None,
     excludes: sql.DBConditionsDict | None = None,
-    sorts: Sequence[str] | None = None,
+    sorts: Sequence[Any] | None = None,
 ) -> list[DbGameDict]:
-    return _stringify_game_ids(
-        sql.filtered_query(
-            settings.DB_PATH, "games", searches=searches, filters=filters, excludes=excludes, sorts=sorts
-        )
-    )
+    """One row per game (the external view), each carrying its *primary*
+    variant's install fields flattened in -- see _primary_variant(). Filters
+    naming a variant-only field (runner, installed, ...) are honored by
+    joining against variants and returning one row per matching variant
+    instead (so `filters={"installed": 1}` still finds every installed
+    variant, not just each game's primary one)."""
+    from pythia import settings
+
+    variant_filter_keys = {k.split("__")[0] for k in (filters or {})} | {k.split("__")[0] for k in (excludes or {})}
+    if variant_filter_keys & _VARIANT_FIELDS:
+        return _get_games_via_variant_filter(searches, filters, excludes, sorts)
+
+    rows = sql.filtered_query(settings.DB_PATH, "games", searches=searches, filters=filters, excludes=excludes, sorts=sorts)
+    games = []
+    for row in rows:
+        row = _row_to_game_dict(row)
+        entry = _load_entry(row["id"], row["system_uuid"])
+        variant = _primary_variant(entry) if entry else None
+        games.append(_merged_row(entry, variant) if entry else row)
+    return games
+
+
+def _get_games_via_variant_filter(searches, filters, excludes, sorts) -> list[DbGameDict]:
+    from pythia import settings
+
+    # filtered_query() defaults to "ORDER BY slug" when no sorts are given --
+    # the "variants" table has no slug column (that's a game-level field), so
+    # a variant-scoped query always needs an explicit sort.
+    sorts = sorts or [("id", "ASC")]
+    rows = sql.filtered_query(settings.DB_PATH, "variants", searches=searches, filters=filters, excludes=excludes, sorts=sorts)
+    games = []
+    for row in rows:
+        entry = _load_entry(row["game_id"], row["system_uuid"])
+        if not entry:
+            continue
+        variant = next((v for v in entry.get("variants", []) if v["id"] == row["id"]), None)
+        games.append(_merged_row(entry, variant))
+    return games
 
 
 def get_games_where(**conditions: Any) -> list[DbGameDict]:
-    """
-    Query games table based on conditions
-
-    Args:
-        conditions (dict): named arguments with each field matches its desired value.
-        Special values for field names can be used:
-            <field>__lessthan will return rows where `field` is less than the value
-            <field>__isnull will return rows where `field` is NULL if the value is True
-            <field>__not will invert the condition using `!=` instead of `=`
-            <field>__in will match rows for every value of `value`, which should be an iterable
-
-    Returns:
-        list: Rows matching the query
-
-    """
-    query = "select * from games"
-    condition_fields = []
-    condition_values = []
+    """Same field__lessthan / __isnull / __not / __in conditions as before,
+    against the merged games+primary-variant view (or per-variant rows, for
+    variant-scoped fields -- see get_games())."""
+    filters: dict[str, Any] = {}
     for field, value in conditions.items():
-        field, *extra_conditions = field.split("__")
-        if extra_conditions:
-            extra_condition = extra_conditions[0]
-            if extra_condition == "lessthan":
-                condition_fields.append("{} < ?".format(field))
-                condition_values.append(value)
-            if extra_condition == "isnull":
-                condition_fields.append("{} is {} null".format(field, "" if value else "not"))
-            if extra_condition == "not":
-                condition_fields.append("{} != ?".format(field))
-                condition_values.append(value)
-            if extra_condition == "in":
-                if not hasattr(value, "__iter__"):
-                    raise ValueError("Value should be an iterable (%s given)" % value)
-                if len(value) > 999:
-                    raise ValueError("SQLite limited to a maximum of 999 parameters.")
-                if value:
-                    condition_fields.append("{} in ({})".format(field, ", ".join("?" * len(value)) or ""))
-                    condition_values = list(chain(condition_values, value))
-        else:
-            condition_fields.append("{} = ?".format(field))
-            condition_values.append(value)
-    condition = " AND ".join(condition_fields)
-    if condition:
-        query = " WHERE ".join((query, condition))
-    else:
-        # Inspect and document why we should return
-        # an empty list when no condition is present.
-        return []
-    return _stringify_game_ids(sql.db_query(settings.DB_PATH, query, tuple(condition_values)))
+        base_field = field.split("__")[0]
+        filters[field] = value
+    return get_games(filters=filters)
 
 
-def get_games_by_ids(game_ids: Collection[str]) -> list[DbGameDict]:
-    # sqlite limits the number of query parameters to 999, to
-    # bypass that limitation, divide the query in chunks
-    size = 999
-    return list(
-        chain.from_iterable(
-            [
-                get_games_where(id__in=list(game_ids)[page * size : page * size + size])
-                for page in range(math.ceil(len(game_ids) / size))
-            ]
-        )
-    )
+def get_games_by_ids(game_ids) -> list[DbGameDict]:
+    game_ids = list(game_ids)
+    return get_games(filters={"id": game_ids}) if game_ids else []
 
 
 def get_game_for_service(service: str, appid: str) -> DbGameDict | None:
-    if service == "pythia":
-        return get_game_by_field(appid, field="slug")
-
-    existing_games = get_games(filters={"service_id": appid, "service": service})
-    if existing_games:
-        return existing_games[0]
-
-    return None
+    existing = get_games(filters={"service_id": appid, "service": service})
+    return existing[0] if existing else None
 
 
 def get_all_installed_game_for_service(service: str) -> dict[str, DbGameDict]:
-    if service == "pythia":
-        db_games = get_games(filters={"installed": 1})
-        return {g["slug"]: g for g in db_games}
-
     db_games = get_games(filters={"service": service, "installed": 1})
     return {g["service_id"]: g for g in db_games}
 
 
 def get_service_games(service: str) -> list[str]:
-    """Return the list of all installed games for a service"""
-    global _SERVICE_CACHE_ACCESSED
-    previous_cache_accessed = _SERVICE_CACHE_ACCESSED or 0
-    _SERVICE_CACHE_ACCESSED = time.time()
-    if service not in _SERVICE_CACHE or _SERVICE_CACHE_ACCESSED - previous_cache_accessed > 1:
-        if service == "pythia":
-            _SERVICE_CACHE[service] = [game["slug"] for game in get_games(filters={"installed": "1"})]
-        else:
-            _SERVICE_CACHE[service] = [
-                game["service_id"] for game in get_games(filters={"service": service, "installed": "1"})
-            ]
-    return _SERVICE_CACHE[service]
+    return [g["service_id"] for g in get_games(filters={"service": service, "installed": 1})]
 
 
 def get_game_by_field(value: Any, field: str = "slug") -> DbGameDict | None:
-    """Query a game based on a database field, or None if not found."""
     if field not in ("slug", "installer_slug", "id", "configpath", "name"):
         raise ValueError("Can't query by field '%s'" % field)
-    game_result = sql.db_select(settings.DB_PATH, "games", condition=(field, value))
-    if game_result:
-        return _stringify_game_id(game_result[0])
-    return None
+    results = get_games(filters={field: value})
+    return results[0] if results else None
 
 
 def get_games_by_runner(runner: str) -> list[DbGameDict]:
-    """Return all games using a specific runner"""
-    return _stringify_game_ids(sql.db_select(settings.DB_PATH, "games", condition=("runner", runner)))
+    return get_games(filters={"runner": runner})
 
 
 def get_games_by_slug(slug: str) -> list[DbGameDict]:
-    """Return all games using a specific slug"""
-    return _stringify_game_ids(sql.db_select(settings.DB_PATH, "games", condition=("slug", slug)))
+    return get_games(filters={"slug": slug})
+
+
+# ---- writes (through to datadir, cache.db kept in sync) --------------------
+
+
+def _find_owning_game_id(game_fields: dict, variant_fields: dict) -> str | None:
+    """Real match heuristic, same shape as Lutris's own get_matching_game():
+    an explicit id wins outright; otherwise match by slug plus (for an
+    installed variant) configpath, or (for an uninstalled one) runner."""
+    if game_fields.get("id"):
+        existing = get_game_by_field(game_fields["id"], "id")
+        if existing:
+            return existing["id"]
+    slug = game_fields.get("slug") or (slugify(game_fields["name"]) if game_fields.get("name") else None)
+    if not slug:
+        return None
+    for game in get_games_by_slug(slug):
+        if game.get("installed"):
+            if game.get("configpath") == variant_fields.get("configpath"):
+                return game["id"]
+        elif game.get("runner") == variant_fields.get("runner") or not all(
+            [variant_fields.get("runner"), game.get("runner")]
+        ):
+            return game["id"]
+    return None
 
 
 def add_game(**game_data: Any) -> str:
-    """Add a game to the database."""
-    game_data["installed_at"] = int(time.time())
-    if "slug" not in game_data:
-        game_data["slug"] = slugify(game_data["name"])
-    return str(sql.db_insert(settings.DB_PATH, "games", game_data))
+    """Add a game (and its first variant) to datadir. Returns the game_id."""
+    game_fields, variant_fields = _split_game_and_variant_fields(game_data)
+    variant_fields.setdefault("installed_at", int(time.time()))
+    name = game_fields.get("name") or "Unknown"
+    slug = game_fields.get("slug") or slugify(name)
+
+    game_id = new_game_id()
+    entry = _new_entry(game_id, name, slug)
+    entry.update({k: v for k, v in game_fields.items() if k != "id"})
+    entry["canonical_name"] = name
+    entry["slug"] = slug
+
+    variant = dict(variant_fields)
+    variant["id"] = new_game_id()[:12]
+    entry["variants"] = [variant]
+
+    datadir.save_entry(entry)
+    _upsert_cache_from_entry(entry)
+    return game_id
 
 
 def add_games_bulk(games: list[DbGameDict]) -> list[str]:
-    """
-    Add a list of games to the database.
-    The dicts must have an identical set of keys.
-
-    Args:
-        games (list): list of games in dict format
-    Returns:
-        list: List of inserted game ids
-    """
-    return [str(sql.db_insert(settings.DB_PATH, "games", game)) for game in games]
+    return [add_game(**game) for game in games]
 
 
 def add_or_update(**params: Any) -> str:
-    """Add a game to the database or update an existing one
-
-    If an 'id' is provided in the parameters then it
-    will try to match it, otherwise it will try matching
-    by slug, creating one when possible.
-    """
     game_id = update_existing(**params)
     if game_id:
         return game_id
-
     return add_game(**params)
 
 
 def update_existing(**params: Any) -> str | None:
-    """Updates a game, but do not add one. If the game exists, this returns its ID;
-    if not it returns None and makes no changes."""
-    game_id = get_matching_game(params)
-    if game_id:
-        params["id"] = game_id
-        sql.db_update(settings.DB_PATH, "games", params, {"id": game_id})
-        return game_id
-    return None
+    """Updates a game/variant, but never creates one. Returns the game_id if
+    a match was found, else None."""
+    game_fields, variant_fields = _split_game_and_variant_fields(params)
+    game_id = _find_owning_game_id(game_fields, variant_fields)
+    if not game_id:
+        return None
+
+    entry = _load_entry(game_id)
+    if entry is None:
+        return None
+
+    entry.update({k: v for k, v in game_fields.items() if k not in ("id",)})
+
+    variants = entry.setdefault("variants", [])
+    target_configpath = variant_fields.get("configpath")
+    target = next((v for v in variants if v.get("configpath") == target_configpath and target_configpath), None)
+    if target is None and variants:
+        target = variants[0]
+    if target is None:
+        target = {"id": new_game_id()[:12]}
+        variants.append(target)
+    target.update(variant_fields)
+
+    datadir.save_entry(entry)
+    _upsert_cache_from_entry(entry)
+    return game_id
 
 
 def get_matching_game(params: dict[str, Any]) -> str | None:
-    """Tries to match given parameters with an existing game"""
-    # Always match by ID if provided
-    if params.get("id"):
-        game = get_game_by_field(params["id"], "id")
-        if game:
-            game_id: str = game["id"]
-            return game_id
-        logger.warning("Game ID %s provided but couldn't be matched", params["id"])
-    slug = params.get("slug") or slugify(cast(str, params.get("name")))
-    if not slug:
-        raise ValueError("Can't add or update without an identifier")
-    for game in get_games_by_slug(slug):
-        game_id = game["id"]
-        if game["installed"]:
-            if game["configpath"] == params.get("configpath"):
-                return game_id
-        else:
-            if game["runner"] == params.get("runner") or not all([params.get("runner"), game["runner"]]):
-                return game_id
-    return None
+    game_fields, variant_fields = _split_game_and_variant_fields(params)
+    return _find_owning_game_id(game_fields, variant_fields)
 
 
 def delete_game(game_id: str) -> None:
-    """Delete a game from the PGA."""
-    sql.db_delete(settings.DB_PATH, "games", "id", game_id)
+    """Delete a game -- all its variants go with it. This system's own entry
+    only (can't delete another synced system's file, see the datadir
+    single-writer-per-file rule)."""
+    from pythia import settings
+
+    entry = _load_entry(game_id)
+    if entry is not None:
+        path = datadir.find_entry_file(entry["system_uuid"], game_id)
+        if path is not None and entry["system_uuid"] == get_system_uuid():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+    with sql.db_cursor(settings.DB_PATH) as cursor:
+        sql.cursor_execute(cursor, "DELETE FROM games WHERE id = ?", (game_id,))
+        sql.cursor_execute(cursor, "DELETE FROM variants WHERE game_id = ?", (game_id,))
 
 
 def get_used_runners() -> list[str]:
-    """Return a list of the runners in use by installed games."""
+    from pythia import settings
+
     with sql.db_cursor(settings.DB_PATH) as cursor:
-        query = "select distinct runner from games where runner is not null order by runner"
-        rows = cursor.execute(query)
-        results = rows.fetchall()
-    return [result[0] for result in results if result[0]]
+        rows = sql.cursor_execute(
+            cursor, "select distinct runner from variants where runner is not null order by runner"
+        ).fetchall()
+    return [r[0] for r in rows if r[0]]
 
 
 def get_used_platforms() -> list[str]:
-    """Return a list of platforms currently in use"""
+    from pythia import settings
+
     with sql.db_cursor(settings.DB_PATH) as cursor:
-        query = (
-            "select distinct platform from games where platform is not null and platform is not '' order by platform"
-        )
-        rows = cursor.execute(query)
-        results = rows.fetchall()
-    return [result[0] for result in results if result[0]]
+        rows = sql.cursor_execute(
+            cursor,
+            "select distinct platform from variants where platform is not null and platform is not '' order by platform",
+        ).fetchall()
+    return [r[0] for r in rows if r[0]]
 
 
 def get_game_count(param: str, value: Any) -> int | None:
-    res = sql.db_select(settings.DB_PATH, "games", fields=("COUNT(id)",), condition=(param, value))
-    if res:
-        return cast(int, res[0]["COUNT(id)"])
-    return None
+    return len(get_games(filters={param: value}))

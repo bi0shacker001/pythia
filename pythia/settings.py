@@ -42,13 +42,20 @@ COVERART_PATH = os.path.join(DATA_DIR, "coverart")
 RUNTIME_VERSIONS_PATH = os.path.join(CACHE_DIR, "versions.json")
 ICON_PATH = os.path.join(get_user_data_dir(), "icons", "hicolor", "128x128", "apps")
 
-DB_PATH = sio.read_setting("pga_path") or os.path.join(DATA_DIR, "pga.db")
+# 2026-08-04: DB_PATH now points at cache.db, a *rebuildable* SQL index over
+# datadir/*.json -- not an authoritative pga.db. Lives alongside local.db in
+# pythia.identity's app-data dir (not settings.py's own DATA_DIR/CONFIG_DIR --
+# a real, still-unreconciled inconsistency between the two "app data dir"
+# concepts this codebase carries, not something papered over here).
+from pythia.identity import app_data_dir as _identity_app_data_dir  # noqa: E402
+
+DB_PATH = sio.read_setting("cache_db_path") or os.path.join(str(_identity_app_data_dir()), "cache.db")
 
 TEST_TEMP_DIR = TemporaryDirectory()
 test_modules = ["unittest", "nosetests", "nose2", "nose", "pytest"]
 for test_module in test_modules:
     if test_module in sys.modules.keys():
-        DB_PATH = os.path.join(TEST_TEMP_DIR.name, "pga.db")
+        DB_PATH = os.path.join(TEST_TEMP_DIR.name, "cache.db")
         break
 
 

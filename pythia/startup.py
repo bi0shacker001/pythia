@@ -173,6 +173,14 @@ def init_pythia():
         raise RuntimeError(
             _("Failed to open database file in %s. Try renaming this file and relaunch Pythia") % settings.DB_PATH
         ) from err
+
+    # 2026-08-04: cache.db is fully derived from datadir/*.json (see
+    # pythia.database.games's module docstring) -- rebuild it fresh every
+    # startup rather than trusting a possibly-stale copy from last run.
+    from pythia.database.games import rebuild_cache  # noqa: PLC0415
+
+    rebuild_cache()
+
     for service in DEFAULT_SERVICES:
         if not settings.read_setting(service, section="services"):
             settings.write_setting(service, True, section="services")

@@ -7,36 +7,60 @@ from pythia.util.log import logger
 DBSchema: TypeAlias = list[dict[str, Any]]
 
 DATABASE: dict[str, DBSchema] = {
+    # 2026-08-04 datadir rewrite: this table is now a rebuildable SQL index over
+    # datadir/*.json (real source of truth), not the authoritative store pga.db
+    # used to be -- see pythia/database/games.py's module docstring. "games" is
+    # the external, one-row-per-logical-game view (id = a 16-char game_id,
+    # replacing Lutris's autoincrement int one-for-one); per-install detail
+    # (what used to be this row's own runner/directory/executable/etc.) now
+    # lives in the sibling "variants" table, keyed by game_id -- a game_id can
+    # own more than one variant (different versions/installs of the same game),
+    # which plain Lutris never modeled.
     "games": [
-        {"name": "id", "type": "INTEGER", "indexed": True},
+        {"name": "id", "type": "TEXT", "indexed": True},
+        {"name": "system_uuid", "type": "TEXT"},
         {"name": "name", "type": "TEXT"},
-        {
-            "name": "sortname",
-            "type": "TEXT",
-        },
+        {"name": "sortname", "type": "TEXT"},
         {"name": "slug", "type": "TEXT"},
         {"name": "installer_slug", "type": "TEXT"},
         {"name": "parent_slug", "type": "TEXT"},
+        {"name": "notes", "type": "TEXT"},
+        {"name": "platform_ids", "type": "TEXT"},  # JSON list, see datadir.PLATFORM_ID_KINDS
+        {"name": "ownership", "type": "TEXT"},  # JSON list
+        {"name": "updated", "type": "DATETIME"},
+        {
+            "name": "discord_id",
+            "type": "TEXT",
+        },
+    ],
+    # One row per install (what a Lutris "games" row used to mean in full:
+    # runner/directory/executable/configpath/installed/playtime/...), plus
+    # Pythia's own version-tracking fields (version_label/mods/language) that
+    # Lutris never had a place for. Multiple variants can share a game_id --
+    # that's the "different versions of the same game" relationship.
+    "variants": [
+        {"name": "id", "type": "TEXT", "indexed": True},
+        {"name": "game_id", "type": "TEXT"},
+        {"name": "system_uuid", "type": "TEXT"},
+        {"name": "version_label", "type": "TEXT"},
+        {"name": "mods", "type": "TEXT"},  # JSON list
+        {"name": "language", "type": "TEXT"},
         {"name": "platform", "type": "TEXT"},
         {"name": "runner", "type": "TEXT"},
         {"name": "executable", "type": "TEXT"},
         {"name": "directory", "type": "TEXT"},
-        {"name": "updated", "type": "DATETIME"},
+        {"name": "configpath", "type": "TEXT"},
         {"name": "lastplayed", "type": "INTEGER"},
         {"name": "installed", "type": "INTEGER"},
         {"name": "installed_at", "type": "INTEGER"},
+        {"name": "detected_at", "type": "DATETIME"},
         {"name": "year", "type": "INTEGER"},
-        {"name": "configpath", "type": "TEXT"},
         {"name": "has_custom_banner", "type": "INTEGER"},
         {"name": "has_custom_icon", "type": "INTEGER"},
         {"name": "has_custom_coverart_big", "type": "INTEGER"},
         {"name": "playtime", "type": "REAL"},
         {"name": "service", "type": "TEXT"},
         {"name": "service_id", "type": "TEXT"},
-        {
-            "name": "discord_id",
-            "type": "TEXT",
-        },
     ],
     "service_games": [
         {"name": "id", "type": "INTEGER", "indexed": True},

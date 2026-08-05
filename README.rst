@@ -2,137 +2,59 @@
 Pythia
 ******
 
-|LiberaPayBadge|_ |PatreonBadge|_
+Pythia is a personal, multi-system game library manager. It started as a
+Ren'Py ARM/x86_64 library patcher and grew into a tool for organizing and
+tracking a game library spread across multiple machines, drives, and
+storefronts.
 
-Pythia helps you install and play video games from all eras and from most
-gaming systems. By leveraging and combining existing emulators, engine
-re-implementations and compatibility layers, it gives you a central interface
-to launch all your games.
+Pythia is based on `Lutris <https://github.com/lutris/lutris>`_ -- it reuses
+Lutris's real runner, service, and installer infrastructure (Wine/Proton
+management, Steam/GOG/Epic/itch.io/etc. library sync, scripted installers)
+rather than reinventing that plumbing. **Pythia is not Lutris**, is not
+affiliated with or endorsed by the Lutris project, and does not connect to
+lutris.net as an account/sync service the way upstream Lutris does. The most
+visible difference: Pythia replaces Lutris's GTK desktop UI with its own,
+built for this project's specific workflow (library organization across
+systems, not a single-machine game launcher front-end).
 
-The client can connect with existing services like Humble Bundle, GOG and Steam
-to make your game libraries easily available. Game downloads and installations
-are automated and can be modified through user made scripts.
+Pythia is licensed under the GPL-3.0, the same license as Lutris -- see
+``LICENSE``. ``AUTHORS`` credits the real Lutris contributors whose code this
+project is built on top of.
+
+Status
+======
+
+This is an active rework in progress, not a finished product. The current
+branch (``lutris-core``) is Lutris's real source with its GTK UI (``lutris/gui/``,
+now ``pythia/gui/``) being decoupled from the rest of the codebase and
+replaced with a new UI. Large parts of the original GTK interface still exist
+in the tree but are being phased out; some Linux-desktop-specific
+functionality (X11/Wayland display management, D-Bus screensaver inhibition,
+XDG portals) is real and works on Linux, but isn't yet reimplemented for
+Windows.
 
 Running Pythia
 ==============
 
-If you have not installed Pythia through your package manager and are using the
-source package, it is recommended that you install pythia at least once, even an
-older version to have all dependencies available.
-Once all dependencies are satisfied, you can run pythia directly from the source
-directory with ``./bin/pythia``
-
-If you need to run pythia through gdb to troubleshoot segmentation faults, you
-can use the following command:
-
-``gdb -ex r --args "/usr/bin/python3" "./bin/pythia"``
-
-Installer scripts
-=================
-
-Pythia installations are fully automated through scripts, which can be written
-in either JSON or YAML.
-The scripting syntax is described in ``docs/installers.rst``, and is also
-available online at `pythia.net <https://pythia.net>`_.
-
-Game library
-============
-
-Optional accounts can be created at `pythia.net
-<https://pythia.net>`_ and linked with Pythia clients.
-This enables your client to automatically sync fetch library from the website.
-Via the website, it is also possible to sync your Steam library to your Pythia
-library.
-
-The Pythia client only stores a token when connected with the website, and your
-login credentials are never saved.
-This token is stored in ``~/.cache/pythia/auth-token``.
+Pythia targets both Windows and Linux. On Linux, once dependencies are
+installed you can run it from the source directory with ``./bin/pythia``.
+Windows support is in progress alongside the UI rework.
 
 Configuration files
-===================
-
-* ``~/.local/share/pythia``: The client, runners, and game configuration files
-
-   There is no need to manually edit these files as everything should be done from the client.
-
-* ``pythia.conf``: Preferences for the client's UI
-
-* ``system.yml``: Default game configuration, which applies to every game
-
-* ``runners/*.yml``: Runner-specific configurations
-
-* ``games/*.yml``: Game-specific configurations
-
-* ``pga.db``: An SQLite database tracking the game library, game installation status, various file locations, and some additional metadata
-
-* ``runners/*``: Runners downloaded from `pythia.net <https://pythia.net>`_
-
-* ``banners/*.jpg``: Game banners
-
-``~/.local/share/icons/hicolor/128x128/apps/pythia_*.png``: Game icons
-
-Game-specific configurations overwrite runner-specific configurations, which in
-turn overwrite the system configuration.
-
-Command line options
 ====================
 
-The following command line arguments are available::
+* ``~/.local/share/pythia`` (Linux) / the platform-appropriate app-data
+  folder (Windows): client, runner, and game configuration files.
+* ``pythia.conf``: preferences for the client.
+* ``system.yml`` / ``runners/*.yml`` / ``games/*.yml``: default, per-runner,
+  and per-game configuration, in increasing priority order.
+* ``pga.db``: SQLite database tracking the game library, install status,
+  file locations, and metadata.
 
--v, --version                    Print the version of Pythia and exit
--d, --debug                      Show debug messages
--i, --install                    Install a game from a yml file
--b, --output-script              Generate a bash script to run a game without the client
--e, --exec                       Execute a program with the pythia runtime
--l, --list-games                 List all games in database
--o, --installed                  Only list installed games
--s, --list-steam-games           List available Steam games
---list-steam-folders             List all known Steam library folders
---list-runners                   List all known runners
---list-wine-versions             List all known Wine runners
--a, --list-all-service-games     List all games for all services in database
---list-service-games             List all games for provided service in database
--r, --install-runner             Install a Runner
--u, --uninstall-runner           Uninstall a Runner
--j, --json                       Display the list of games in JSON format
---reinstall                      Reinstall game
---display=DISPLAY                X display to use
---export <game>                  Exports specified game (requires --dest)
---import <game.7z>               Import games from exportfile (requires --dest)
---dest <folder>                  Specifies Export/Import destination folder
+Contributing
+============
 
-Additionally, you can pass a ``pythia:`` protocol link followed by a game
-identifier on the command line such as::
-
-    pythia pythia:quake
-
-This will install the game if it is not already installed, otherwise it will
-launch the game. The game will always be installed if the ``--reinstall`` flag is passed.
-
-Support the project
-===================
-
-Pythia is 100% community supported, to ensure a continuous development on the
-project, please consider donating to the project.
-Our main platform for supporting Pythia is Patreon: https://www.patreon.com/pythia
-but there are also other options available at https://pythia.net/donate
-
-Come with us!
-=============
-
-Want to make Pythia better? Help implement features, fix bugs, test
-pre-releases, or simply chat with the developers?
-
-Improve the code by just cloning the repository, editing the scripts and then starting Pythia with the ``./bin/pythia -d`` command.
-
-You can always reach us on:
-
-* Discord: https://discordapp.com/invite/Pnt5CuY
-* IRC: ircs://irc.libera.chat:6697/pythia
-* Github: https://github.com/pythia
-* Mastodon: https://fosstodon.org/@pythia
-
-.. |LiberaPayBadge| image:: http://img.shields.io/liberapay/receives/Pythia.svg?logo=liberapay
-.. _LiberaPayBadge: https://liberapay.com/Pythia/
-.. |PatreonBadge| image:: https://img.shields.io/badge/dynamic/json?color=%23ff424d&label=Patreon&query=data.attributes.patron_count&suffix=%20Patreons&url=https%3A%2F%2Fwww.patreon.com%2Fapi%2Fcampaigns%2F556103&style=flat&logo=patreon
-.. _PatreonBadge: https://www.patreon.com/pythia
+This is a personal project, not a community-run one -- there's no public
+Discord, Patreon, or issue tracker to join. If you're looking for the
+original, actively maintained community project this is based on, that's
+`Lutris <https://lutris.net>`_.

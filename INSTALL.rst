@@ -53,16 +53,12 @@ If you use OpenSUSE, some dependencies are missing. You need to install python3-
 Installation
 ------------
 
-To install Pythia, please follow instructions listed on our `Downloads Page <https://pythia.net/downloads/>`_.
-Getting Pythia from a PPA or a repository is the preferred way of installing
-it and we *strongly advise* to use this method if you can.
+Pythia is not packaged or distributed anywhere -- it's a personal project you
+run from source::
 
-However, if the instructions on our Downloads page don't apply to your Linux
-distribution or there's some other reason you can't get it from a package,
-you can run it directly from the source directory::
-
-    git clone https://github.com/pythia/pythia
+    git clone https://github.com/bi0shacker001/pythia
     cd pythia
+    git checkout lutris-core
     ./bin/pythia
 
 Run Pythia

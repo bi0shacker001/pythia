@@ -68,6 +68,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dest", metavar="PATH", help="Destination path for export/import")
     parser.add_argument("-j", "--json", action="store_true", help="Display the list of games in JSON format")
     parser.add_argument("--reinstall", action="store_true", help="Reinstall game")
+    droidtop = parser.add_argument_group("droidtop", "This computer as the droidtop agent of paired handhelds")
+    droidtop.add_argument("--droidtop-serve", action="store_true", help="Serve paired droidtop handhelds until stopped")
+    droidtop.add_argument("--droidtop-pair", metavar="CODE", help="Pair with a handheld showing CODE")
+    droidtop.add_argument(
+        "--droidtop-pair-show",
+        action="store_true",
+        help="Show a code and this computer's addresses for a handheld to pair",
+    )
+    droidtop.add_argument("--droidtop-devices", action="store_true", help="List the paired handhelds")
+    droidtop.add_argument(
+        "--droidtop-unpair", metavar="ID", help="Forget a paired handheld (the start of its id is enough)"
+    )
     parser.add_argument(
         "uri",
         nargs="?",
@@ -225,6 +237,63 @@ def _execute_command(command: str) -> None:
         monitored_command.stop()
 
 
+def _droidtop_command(args) -> bool:
+    return any(
+        (args.droidtop_serve, args.droidtop_pair, args.droidtop_pair_show, args.droidtop_devices, args.droidtop_unpair)
+    )
+
+
+def _run_droidtop_command(args) -> int:
+    """The droidtop agent's commands (pythia.droidtop): Pythia is this
+    computer's agent while it runs."""
+    from pythia.droidtop import agent  # noqa: PLC0415
+
+    try:
+        if args.droidtop_pair:
+            print(f"Paired with {agent.pair(args.droidtop_pair)}.")
+        elif args.droidtop_pair_show:
+            shown = agent.pair_show()
+            print("On droidtop: Settings > Computers > Pair a computer > Use a code from the computer.")
+            for place in shown["places"]:
+                print(f"Address: {place['address']}  ({place['label']})")
+            print(f"Code:    {shown['code'][:3]} {shown['code'][3:]}")
+            print("Waiting up to 10 minutes; Ctrl+C stops.")
+            try:
+                while (status := agent.pair_status())["state"] == "waiting":
+                    time.sleep(0.5)
+            except KeyboardInterrupt:
+                agent.pair_cancel()
+                return 1
+            if status["state"] != "paired":
+                print(status.get("error", "Pairing stopped."))
+                return 1
+            print(f"Paired with {status['paired']}.")
+        elif args.droidtop_devices:
+            devices = agent.devices()
+            if not devices:
+                print("No handheld is paired. On droidtop: Settings > Computers > Pair a computer.")
+            for d in devices:
+                print(f"{d['id'][:16]}  {d['name']}{'  (primary)' if d.get('primary') else ''}")
+        elif args.droidtop_unpair:
+            agent.unpair(args.droidtop_unpair)
+            print("Forgotten.")
+        elif args.droidtop_serve:
+            me = agent.identity()
+            agent.serve()
+            print(f"{me['name']} ({me['id'][:16]}) serves paired droidtop handhelds. Ctrl+C stops.")
+            try:
+                while agent.serving()["state"] == "serving":
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                return 0
+            print(agent.serving().get("reason", "The agent stopped."))
+            return 1
+    except agent.AgentError as ex:
+        print(ex)
+        return 1
+    return 0
+
+
 def run(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -240,6 +309,9 @@ def run(argv: list[str] | None = None) -> int:
     init_pythia()
     migrate()
     run_all_checks(async_ops=False)
+
+    if _droidtop_command(args):
+        return _run_droidtop_command(args)
 
     if args.output_script:
         game = (

@@ -61,6 +61,30 @@ Pythia targets both Windows and Linux. On Linux, once dependencies are
 installed you can run it from the source directory with ``./bin/pythia``.
 Windows support is in progress alongside the UI rework.
 
+Handhelds running droidtop
+==========================
+
+While Pythia runs, it is this computer's `droidtop <https://github.com/Droidtop/droidtop>`_
+agent. Paired handhelds see the computer's games, Pythia's own tracked games
+among them, and keep their saves in step with it. Pythia does not talk to a
+separate agent program. It loads droidtop-agent's own code,
+the ``droidtop_agent`` Python module, so the pairing, the encrypted
+connection, the library and save sync are the same code droidtop-agent runs,
+over the same files. Run either Pythia or droidtop-agent on a computer, not
+both. If droidtop-agent is already running, it keeps serving and Pythia says so.
+
+Install the ``droidtop_agent`` wheel for your system from
+`droidtop-agent's releases <https://github.com/Droidtop/droidtop-agent/releases>`_
+(``pip install droidtop_agent-*.whl``). Without it, Pythia works as before.
+
+* ``pythia --droidtop-pair 123456``: pair with the handheld showing that code
+  (droidtop: Settings > Computers > Pair a computer).
+* ``pythia --droidtop-pair-show``: show a code on this computer for a handheld
+  that cannot reach it.
+* ``pythia --droidtop-devices`` and ``--droidtop-unpair <id>``: list or forget
+  paired handhelds.
+* ``pythia --droidtop-serve``: serve the paired handhelds from the command line.
+
 Configuration files
 ====================
 

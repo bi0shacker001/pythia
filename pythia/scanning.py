@@ -116,4 +116,8 @@ def scan_library(root: Path):
     results = []
     for discovered in _discover_roots(root, enabled, generic):
         results.append(onboarding.onboard(discovered))
+    # While Pythia serves droidtop handhelds, what it found is this computer's library there too.
+    from pythia.droidtop import library as droidtop_library  # noqa: PLC0415
+
+    droidtop_library.export_if_serving()
     return results

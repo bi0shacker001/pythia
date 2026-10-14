@@ -47,14 +47,17 @@ def _jsonable(obj):
 
 class Backend(QObject):
     logLine = Signal(str)
-    decisionNeeded = Signal(object)  # a preview-shaped dict: {"path", "name", "candidates", ...}
-    onboardComplete = Signal(object)
-    scanComplete = Signal(object)
+    # Dict and list payloads are declared as QVariant, not a bare Python object:
+    # QWebChannel (the web UI) can only serialize QVariant values, and QML reads
+    # both the same way.
+    decisionNeeded = Signal("QVariant")  # a preview-shaped dict: {"path", "name", "candidates", ...}
+    onboardComplete = Signal("QVariant")
+    scanComplete = Signal("QVariant")
     gamesChanged = Signal()
     downloadDetected = Signal(str)  # a new file's path, from a watched Downloads folder
-    mergeCandidatesReady = Signal(object)
-    mergeComplete = Signal(object)
-    accountSyncComplete = Signal(str, object)
+    mergeCandidatesReady = Signal("QVariant")
+    mergeComplete = Signal("QVariant")
+    accountSyncComplete = Signal(str, "QVariant")
 
     def __init__(self):
         super().__init__()
@@ -68,9 +71,7 @@ class Backend(QObject):
     # ---- games list -----------------------------------------------------------
     def refresh_games(self):
         games = datadir.list_known_games()
-        self._games = [
-            {"game_id": gid, "entries": _jsonable(entries)} for gid, entries in sorted(games.items())
-        ]
+        self._games = [{"game_id": gid, "entries": _jsonable(entries)} for gid, entries in sorted(games.items())]
         self.gamesChanged.emit()
 
     @Property("QVariantList", notify=gamesChanged)
@@ -406,12 +407,22 @@ class Backend(QObject):
         than one applies, without launching anything itself (see
         pythia.plugins.manager.find_for_game())."""
         from pythia.plugins import manager as manager_plugins
+        from pythia.plugins.context import PluginContext
 
         games = datadir.list_known_games()
         entries = games.get(game_id, [])
         candidates = manager_plugins.find_for_game(entries)
+        ctx = PluginContext(log=self.logLine.emit)
         return _jsonable(
-            [{"manager_id": p.id, "manager_name": p.display_name, "kind": d["kind"]} for p, d in candidates]
+            [
+                {
+                    "manager_id": p.id,
+                    "manager_name": p.display_name,
+                    "kind": d["kind"],
+                    "available": bool(p.is_available(ctx)),
+                }
+                for p, d in candidates
+            ]
         )
 
     @Slot(str, str)
@@ -437,3 +448,70 @@ class Backend(QObject):
         ctx = PluginContext(log=self.logLine.emit)
         ok = plugin.open(detection, ctx)
         self.logLine.emit("Hand-off attempted." if ok else "Hand-off failed or not supported for this game.")
+
+    # ---- the web UI's own needs (2026-10-14, pythia/ui/desktop/web) -------------
+    # Small, real operations the browser page cannot do itself: native pickers,
+    # opening a folder, renaming or forgetting a record, rebuilding the index.
+    @Slot(str, result=str)
+    def pick_folder(self, title: str) -> str:
+        from PySide6.QtWidgets import QFileDialog
+
+        return QFileDialog.getExistingDirectory(None, title or "Choose a folder") or ""
+
+    @Slot(str, result=str)
+    def pick_file(self, title: str) -> str:
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _filter = QFileDialog.getOpenFileName(None, title or "Choose a file")
+        return path or ""
+
+    @Slot(str)
+    def open_path(self, path: str):
+        """Open a folder (or file) in the system's own file manager."""
+        from PySide6.QtGui import QDesktopServices
+
+        if path:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+    @Slot(str, str)
+    def rename_game(self, game_id: str, name: str):
+        """Change this system's own canonical name for a game; other systems keep
+        theirs (one writer per file). Recorded in the entry's history."""
+        name = (name or "").strip()
+        if not name:
+            return
+        uuid = get_system_uuid()
+        for entry in datadir.list_all_entries():
+            if entry.get("system_uuid") == uuid and entry.get("game_id") == game_id:
+                old = entry.get("canonical_name") or ""
+                if old == name:
+                    return
+                entry["canonical_name"] = name
+                datadir.add_timeline_event(entry, "renamed", f"{old} -> {name}")
+                games_db.save_entry_and_sync_cache(entry)
+                self.refresh_games()
+                return
+
+    @Slot(str)
+    def forget_game(self, game_id: str):
+        """Remove this system's record of a game. Files on disk are untouched."""
+        games_db.delete_game(game_id)
+        self.refresh_games()
+
+    @Slot()
+    def rebuild_index(self):
+        games_db.rebuild_cache()
+        self.refresh_games()
+
+    @Slot(result="QVariant")
+    def get_app_info(self):
+        import platform
+        import sys
+
+        from pythia import settings
+
+        return {
+            "version": settings.VERSION,
+            "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",
+            "python": sys.version.split()[0],
+        }

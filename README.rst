@@ -7,19 +7,40 @@ Ren'Py ARM/x86_64 library patcher and grew into a tool for organizing and
 tracking a game library spread across multiple machines, drives, and
 storefronts.
 
-Pythia is based on `Lutris <https://github.com/lutris/lutris>`_ -- it reuses
-Lutris's real runner, service, and installer infrastructure (Wine/Proton
-management, Steam/GOG/Epic/itch.io/etc. library sync, scripted installers)
-rather than reinventing that plumbing. **Pythia is not Lutris**, is not
-affiliated with or endorsed by the Lutris project, and does not connect to
-lutris.net as an account/sync service the way upstream Lutris does. The most
-visible difference: Pythia replaces Lutris's GTK desktop UI with its own,
-built for this project's specific workflow (library organization across
-systems, not a single-machine game launcher front-end).
+Based on Lutris
+===============
 
-Pythia is licensed under the GPL-3.0, the same license as Lutris -- see
-``LICENSE``. ``AUTHORS`` credits the real Lutris contributors whose code this
-project is built on top of.
+**Pythia is largely based on** `Lutris <https://github.com/lutris/lutris>`_.
+The ``lutris-core`` branch is Lutris's own source (imported at upstream commit
+b33d7d8, 2026-07-30), renamed and reworked. Lutris's runner, service and
+installer infrastructure (Wine/Proton management, Steam/GOG/Epic/itch.io/etc.
+library sync, scripted installers) is reused as it is rather than reinvented.
+
+What Pythia changes or adds on top of Lutris:
+
+- a multi-system library model: one record per (system, game) in a synced
+  ``datadir/`` folder, with versions and variants (mods, language, platform)
+  per game, store identities and ownership separate from the game itself,
+  and a review step for merging duplicate entries;
+- a plugin architecture (library, engine, manager, downloader, metadata,
+  source, mod and patcher plugins; built-in, pip-installed or drop-in);
+- engine detection and remediation (the Ren'Py ARM/x86_64 library patcher
+  Pythia started as, and detection for Unity, KiriKiri, RPG Maker, Godot and
+  others);
+- F95zone watchlist import, export and update checking;
+- its own user interfaces in place of Lutris's GTK one (Qt desktop and
+  big-picture modes, and a browser-based UI), and a Windows build.
+
+**Pythia is not Lutris**, is not affiliated with or endorsed by the Lutris
+project, and does not connect to lutris.net as an account/sync service the
+way upstream Lutris does.
+
+Pythia is licensed under the **GPL-3.0, the same license as Lutris** -- see
+``LICENSE``. ``AUTHORS`` credits the Lutris contributors whose code this
+project is built on top of. Thank you to the Lutris developers: without their
+years of work on runners, services and installers this project would not
+exist. If you find Pythia useful, consider supporting Lutris
+(https://lutris.net/donate).
 
 Status
 ======

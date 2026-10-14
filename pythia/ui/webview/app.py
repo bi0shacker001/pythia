@@ -1,24 +1,15 @@
 """
-"UI-next" -- the real mockup HTML/CSS/JS (pythia/ui/desktop/web/index.html, the
-signed-off Pass-5 mockup) rendered directly via QtWebEngine, bridged to the same
-real `Backend` QObject (pythia/ui/backend.py) both other front ends already use.
-Explicitly not a throwaway prototype (2026-08-03, user direction): this is the
-fast-iteration testing path for UI changes going forward -- land something here
-first, and once it's approved, port the confirmed piece into the QtWidgets
-desktop UI (pythia/ui/desktop/app.py), which stays the stable/shipped target.
+The web UI: pythia/ui/desktop/web (index.html, tokens.css, components.css,
+components.js, app.js; README.md there documents the tokens, components and
+behaviour) rendered by QtWebEngine and bridged over QWebChannel to the same
+`Backend` QObject (pythia/ui/backend.py) the QML big-picture front end uses.
+This is the fast-iteration design surface and the reference for the native
+desktop UI (pythia/ui/desktop/app.py): a piece lands and is checked here
+first, then the native UI implements the same component the same way.
 
-Same "Steam's client is basically a webpage" shape: a native window hosting a
-Chromium-based view, with a thin JS<->Python bridge (QWebChannel) standing in
-for what would otherwise be a REST/IPC layer. `Backend` needed zero changes to
-work here -- it was already a plain QObject with @Property/@Slot members for
-the QML big-picture front end, and QWebChannel exposes exactly that same
-surface to JavaScript automatically.
-
-Real, known gap: only the Library view's game list is actually wired to real
-data right now (via `pythia.games`, kept live through its own gamesChanged
-signal). Every other page in the mockup (Downloads, Systems, Activity,
-Plugins, Settings) still renders its own bundled placeholder data -- wiring
-those up is real follow-up work, not done in this pass.
+Same shape as Steam's client: a native window hosting a Chromium view with a
+thin JS<->Python bridge. The page shows only what `Backend` reports (its
+properties, slots and signals); it carries no sample data of its own.
 """
 
 import sys
@@ -46,7 +37,7 @@ class _LoggingPage(QWebEnginePage):
 class WebviewWindow(QMainWindow):
     def __init__(self, backend):
         super().__init__()
-        self.setWindowTitle("Pythia (UI-next)")
+        self.setWindowTitle("Pythia")
         self.resize(1280, 800)
 
         self._view = QWebEngineView(self)

@@ -38,6 +38,10 @@ def init_dirs():
         settings.INSTALLER_CACHE_DIR,
         settings.TMP_DIR,
     ]
+    # cache.db lives in pythia.identity's app-data folder, which none of the
+    # folders above is on Windows (%APPDATA%\Pythia vs %LOCALAPPDATA%\pythia):
+    # without it a fresh install cannot open its database.
+    directories.append(os.path.dirname(settings.DB_PATH))
     for directory in directories:
         create_folder(directory)
     _clear_tmp_dir()

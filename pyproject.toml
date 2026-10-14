@@ -2,13 +2,14 @@
 name = "pythia"
 version = "0.5.23"
 authors = [
-    {name = "Mathieu Comandon", email = "strider@strycore.com"}
+    {name = "bi0shacker001"},
+    {name = "Mathieu Comandon and the Lutris contributors", email = "strider@strycore.com"},
 ]
 description = """
-Pythia is a video game preservation platform that helps you install and play video games from all eras and from most gaming systems.
-By leveraging and combining existing emulators, engine re-implementations and compatibility layers, it gives you a central interface to launch all your games.
+Pythia is a multi-system game library manager, largely based on Lutris: it tracks which versions of which games
+exist on which of your computers and handhelds, where you own them, and what each one needs to run.
 """
-readme = "README.md"
+readme = "README.rst"
 requires-python = ">=3.10"
 
 license = "GPL-3.0-or-later"
@@ -19,22 +20,24 @@ dependencies = [
     "requests",
     "Pillow",
     "setproctitle",
-    "python-magic",
+    "python-magic; sys_platform == 'linux'",
     "distro",
-    "dbus-python",
+    "dbus-python; sys_platform == 'linux'",
     "types-requests",
     "types-PyYAML",
-    "evdev",
-    "PyGObject",
+    "evdev; sys_platform == 'linux'",
+    "PyGObject; sys_platform == 'linux'",
     "pypresence",
     "protobuf",
-    "moddb"
+    "moddb",
+    "PySide6",
 ]
 
 [project.urls]
-Homepage = "https://pythia.net/"
-Repository = "https://github.com/pythia/pythia"
-Issues = "https://github.com/pythia/pythia/issues"
+Homepage = "https://github.com/bi0shacker001/pythia"
+Repository = "https://github.com/bi0shacker001/pythia"
+Issues = "https://github.com/bi0shacker001/pythia/issues"
+Lutris = "https://github.com/lutris/lutris"
 
 [dependency-groups]
 dev = [

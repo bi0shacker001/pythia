@@ -1,5 +1,18 @@
 # Pythia
 
+> **Pythia is largely based on [Lutris](https://github.com/lutris/lutris).**
+> Current development happens on the [`lutris-core`](../../tree/lutris-core)
+> branch, which is Lutris's own source renamed and reworked: Lutris's runner,
+> service and installer infrastructure is reused as it is, and Pythia adds a
+> multi-system library model with versions and variants, a plugin
+> architecture, engine detection and remediation, F95zone tracking, and its
+> own user interfaces in place of Lutris's GTK one. This `master` branch is
+> the earlier, standard-library-only codebase those pieces came from.
+> Pythia is licensed under the GPL-3.0, the same licence as Lutris (see
+> `LICENSE`). Pythia is not Lutris and is not affiliated with or endorsed by
+> the Lutris project. Thank you to the Lutris developers, whose work this
+> project is built on; consider supporting them at https://lutris.net/donate.
+
 A multi-system game library manager. Pythia doesn't run your games -- Lutris, Steam,
 EmulationStation, and Playnite already do that well. It keeps track of what versions
 of what games exist, where, on which of your systems, on which platforms, who you

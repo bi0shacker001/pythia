@@ -81,16 +81,30 @@ def find_merge_candidates():
 def merge(surviving_game_id: str, retired_game_id: str) -> dict:
     """Fold `retired_game_id`'s versions/platform_ids/ownership into
     `surviving_game_id`, on this system's own records only, then delete the retired
-    entry's file. Returns {"status": "ok", "game_id", "retired_game_id"} or an error
-    dict."""
+    entry's file. Returns {"status": "ok"|"error", "game_id", "retired_game_id",
+    "message" (error only)} -- `game_id`/`retired_game_id` are echoed back on every
+    path, including errors (2026-08-08, native UI reconcile-review pass: a caller
+    driving several concurrent merges via the async mergeComplete signal has no
+    other way to correlate a *failure* back to which request caused it, since
+    nothing else in the payload identifies the attempt)."""
     if surviving_game_id == retired_game_id:
-        return {"status": "error", "message": "Cannot merge a game into itself."}
+        return {
+            "status": "error",
+            "game_id": surviving_game_id,
+            "retired_game_id": retired_game_id,
+            "message": "Cannot merge a game into itself.",
+        }
 
     entries = {e["game_id"]: e for e in _own_entries()}
     survivor = entries.get(surviving_game_id)
     retired = entries.get(retired_game_id)
     if survivor is None or retired is None:
-        return {"status": "error", "message": "Both game IDs must be tracked by this system."}
+        return {
+            "status": "error",
+            "game_id": surviving_game_id,
+            "retired_game_id": retired_game_id,
+            "message": "Both game IDs must be tracked by this system.",
+        }
 
     # Merge versions -> variants, avoiding duplicate paths (same shape as
     # onboarding._merge_version, but folding whole groups instead of one variant).

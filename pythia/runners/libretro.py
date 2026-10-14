@@ -5,6 +5,8 @@ from gettext import gettext as _
 from operator import itemgetter
 from zipfile import ZipFile
 
+from pythia.util.safe_archive import safe_extract_zip
+
 import requests
 
 from pythia import settings
@@ -154,7 +156,7 @@ def _download_libretro_info():
         with open(os.path.join(RETROARCH_DIR, "info.zip"), "wb") as info_zip:
             info_zip.write(req.content)
         with ZipFile(os.path.join(RETROARCH_DIR, "info.zip"), "r") as info_zip:
-            info_zip.extractall(info_path)
+            safe_extract_zip(info_zip, info_path, max_total_size=512 * 1024**2)
         return True
     logger.error("Error retrieving libretro info archive from server: %s - %s", req.status_code, req.reason)
     return False

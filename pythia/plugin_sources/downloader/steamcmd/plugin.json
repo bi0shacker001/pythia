@@ -1,0 +1,14 @@
+{
+  "id": "pythia.downloader.steamcmd",
+  "display_name": "SteamCMD",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "steamcmd",
+  "entry_classes": [
+    "SteamCmdDownloaderPlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "downloader"
+  ]
+}

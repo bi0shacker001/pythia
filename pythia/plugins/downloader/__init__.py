@@ -7,8 +7,6 @@ this is what makes "multiple downloaders may work with multiple library sources"
 (2026-08-02) an ordinary case instead of a special one.
 """
 
-from pythia.plugins.downloader.f95checker import plugin as f95checker_plugin  # noqa: F401
-from pythia.plugins.downloader.steamcmd import plugin as steamcmd_plugin  # noqa: F401
 from pythia.plugins.registry import filter_enabled, for_category
 
 

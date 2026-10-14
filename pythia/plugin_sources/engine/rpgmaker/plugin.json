@@ -1,0 +1,9 @@
+{
+  "id": "pythia.engine.rpgmaker",
+  "display_name": "RPG Maker (MV/MZ/VX Ace)",
+  "version": "1.0.0",
+  "author": "pythia",
+  "categories": [
+    "engine"
+  ]
+}

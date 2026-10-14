@@ -1,0 +1,238 @@
+{
+  "plugins": [
+    {
+      "id": "pythia.downloader.f95checker",
+      "display_name": "F95Checker",
+      "version": "1.0.0",
+      "categories": [
+        "downloader"
+      ],
+      "sha256": "e47ae80153b87a568fd0143e9baffa0a59a9d6bfe1ae796e447d4e907151ca57",
+      "download": "plugins/pythia.downloader.f95checker.zip"
+    },
+    {
+      "id": "pythia.downloader.steamcmd",
+      "display_name": "SteamCMD",
+      "version": "1.0.0",
+      "categories": [
+        "downloader"
+      ],
+      "sha256": "46c9fde21a491f09c1439b350c508bd57985485d2b2a253fca0d4a5018355ff1",
+      "download": "plugins/pythia.downloader.steamcmd.zip"
+    },
+    {
+      "id": "pythia.engine.august",
+      "display_name": "AUGUST engine",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "f10c81c6f093e17e91261799b8024970075817a008bf314359b7974c5076e76e",
+      "download": "plugins/pythia.engine.august.zip"
+    },
+    {
+      "id": "pythia.engine.buriko",
+      "display_name": "Buriko General Interpreter (BGI/Ethornell)",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "ffa92b4c8994a68cf6a1009e6a2ba086502bae9111fd88633a38a2124ff79b03",
+      "download": "plugins/pythia.engine.buriko.zip"
+    },
+    {
+      "id": "pythia.engine.catsystem2",
+      "display_name": "CatSystem2",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "2d3958e6e16ce88e1cc942148f800864d60fd2c3cc5c8d4d4065d81c5fc7c14d",
+      "download": "plugins/pythia.engine.catsystem2.zip"
+    },
+    {
+      "id": "pythia.engine.cmvs",
+      "display_name": "CMVS",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "3e8a54746dcc7526817165a20d7ad7c315bad104b0ebb8bef024b7c482040a4f",
+      "download": "plugins/pythia.engine.cmvs.zip"
+    },
+    {
+      "id": "pythia.engine.flash_air",
+      "display_name": "Flash (Adobe AIR package)",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "8eb6179b04b9d6005388139774522b6b6527ecd71130fe6a05c334cd8b5d1bb3",
+      "download": "plugins/pythia.engine.flash_air.zip"
+    },
+    {
+      "id": "pythia.engine.godot",
+      "display_name": "Godot",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "7d3b12a5c9a44c7f0374f41e6b03896699a07a617b0a83e85fec06a9f76d34f8",
+      "download": "plugins/pythia.engine.godot.zip"
+    },
+    {
+      "id": "pythia.engine.kirikiri",
+      "display_name": "Kirikiri/KAG3",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "d7cea0e62ed780a7d54f7a76667e3e501f52f95add0d5ddcb48419f05733f6ec",
+      "download": "plugins/pythia.engine.kirikiri.zip"
+    },
+    {
+      "id": "pythia.engine.renpy",
+      "display_name": "Ren'Py",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "8316ad88919b43bd097b6fa17250e31deeb131142b27a33dd1bb8eb417bb1313",
+      "download": "plugins/pythia.engine.renpy.zip"
+    },
+    {
+      "id": "pythia.engine.rpgmaker",
+      "display_name": "RPG Maker (MV/MZ/VX Ace)",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "16fae4f90ec3e6b3b65aad3f40a42b9b96b7f82fdce4e9bcf7b4aba78314c55b",
+      "download": "plugins/pythia.engine.rpgmaker.zip"
+    },
+    {
+      "id": "pythia.engine.twine",
+      "display_name": "Twine/HTML",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "61f9ba250ac541cef6e4a7ea7ee8c9cb0ac151b0d66e0a0e3c5e2da79fb380c6",
+      "download": "plugins/pythia.engine.twine.zip"
+    },
+    {
+      "id": "pythia.engine.unity",
+      "display_name": "Unity",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "d3f6aa2c24045de5ca5c6b480aead628cd05b03524fcd6dbea9a044aee24dd11",
+      "download": "plugins/pythia.engine.unity.zip"
+    },
+    {
+      "id": "pythia.engine.unreal",
+      "display_name": "Unreal Engine",
+      "version": "1.0.0",
+      "categories": [
+        "engine"
+      ],
+      "sha256": "5724b7407c64ffe00282f5310bb5df3cb0ede2e95fe7f1f7b81887082c3645b7",
+      "download": "plugins/pythia.engine.unreal.zip"
+    },
+    {
+      "id": "pythia.library.egs",
+      "display_name": "Epic Games Store",
+      "version": "1.0.0",
+      "categories": [
+        "library",
+        "manager"
+      ],
+      "sha256": "f9a17b744180a17f7a2bc03fe4782f8d9b7acfaf6738de3e12f2c5135b128900",
+      "download": "plugins/pythia.library.egs.zip"
+    },
+    {
+      "id": "pythia.library.f95",
+      "display_name": "F95zone",
+      "version": "1.0.0",
+      "categories": [
+        "library"
+      ],
+      "sha256": "edcf0161de500296bdeca2360d80201d718d6087e8d0262a792422450842ec6b",
+      "download": "plugins/pythia.library.f95.zip"
+    },
+    {
+      "id": "pythia.library.generic",
+      "display_name": "Generic (unknown engine)",
+      "version": "1.0.0",
+      "categories": [
+        "library"
+      ],
+      "sha256": "33a6b38528474b45514f06371670015fff11ea32730a79a2e78836a5bf06b882",
+      "download": "plugins/pythia.library.generic.zip"
+    },
+    {
+      "id": "pythia.library.gog",
+      "display_name": "GOG",
+      "version": "1.0.0",
+      "categories": [
+        "library",
+        "metadata"
+      ],
+      "sha256": "779b913e53553965a914fe077b5d81052153eba44545ec584d2c14c7298736f1",
+      "download": "plugins/pythia.library.gog.zip"
+    },
+    {
+      "id": "pythia.library.itch",
+      "display_name": "itch.io",
+      "version": "1.0.0",
+      "categories": [
+        "library"
+      ],
+      "sha256": "31ff02629f84a30000eff46db845356639c17eaa988e4008a6e8e1e58a2856af",
+      "download": "plugins/pythia.library.itch.zip"
+    },
+    {
+      "id": "pythia.library.steam",
+      "display_name": "Steam",
+      "version": "1.0.0",
+      "categories": [
+        "library",
+        "manager",
+        "metadata"
+      ],
+      "sha256": "43200534c612874ea223d26bb3372d020d114633e0585b2ffcb526c721614343",
+      "download": "plugins/pythia.library.steam.zip"
+    },
+    {
+      "id": "pythia.mod.locale_remulator",
+      "display_name": "Locale Remulator",
+      "version": "1.0.0",
+      "categories": [
+        "mod"
+      ],
+      "sha256": "70db6070b0b558b595479a49cd95e64fbf8a3bbfb8803ff049c1c4a78b1e5444",
+      "download": "plugins/pythia.mod.locale_remulator.zip"
+    },
+    {
+      "id": "pythia.patcher.bundled",
+      "display_name": "Bundled patcher tool (generic)",
+      "version": "1.0.0",
+      "categories": [
+        "patcher"
+      ],
+      "sha256": "010d821ae765db61e5225e2c5e45296d2ce31a14b1ae0230b62e01a5b3bedfb0",
+      "download": "plugins/pythia.patcher.bundled.zip"
+    },
+    {
+      "id": "pythia.source.local_path",
+      "display_name": "Local/mounted path",
+      "version": "1.0.0",
+      "categories": [
+        "source"
+      ],
+      "sha256": "833ffb7d619d88e188d7c9d38ccc02cd96632080d4a8651456564980b91eda72",
+      "download": "plugins/pythia.source.local_path.zip"
+    }
+  ]
+}

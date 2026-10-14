@@ -1,0 +1,14 @@
+{
+  "id": "pythia.library.generic",
+  "display_name": "Generic (unknown engine)",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "generic",
+  "entry_classes": [
+    "GenericLibraryPlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "library"
+  ]
+}

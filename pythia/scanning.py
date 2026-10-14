@@ -99,7 +99,30 @@ def _discover_roots(scan_root: Path, plugins, generic):
             yield from _generic_roots(child, generic)
 
 
-def scan_library(root: Path):
+def _discover_roots_shallow(scan_root: Path, plugins, generic):
+    """Honor a configured non-recursive root: root/container/direct children only."""
+    shortcut = _shortcut_roots(scan_root, plugins)
+    if shortcut is not None:
+        yield from shortcut
+        return
+    if any(plugin.is_root(scan_root) for plugin in plugins):
+        yield scan_root
+        return
+    try:
+        children = sorted(path for path in scan_root.iterdir() if path.is_dir())
+    except OSError:
+        return
+    for child in children:
+        shortcut = _shortcut_roots(child, plugins)
+        if shortcut is not None:
+            yield from shortcut
+        elif any(plugin.is_root(child) for plugin in plugins):
+            yield child
+        elif generic is not None and generic.match(child) is not None:
+            yield child
+
+
+def scan_library(root: Path, *, recursive: bool = True):
     """Discover and onboard every game root under `root`. Returns the list of
     onboarding result dicts (see onboarding.onboard)."""
     root = Path(root).resolve()
@@ -107,13 +130,64 @@ def scan_library(root: Path):
     # module docstring) -- is_root()/shortcut_roots() are the same shape on both
     # categories, so the walk itself doesn't need to know or care which category
     # found a given root.
-    enabled = library.enabled_plugins() + engine.enabled_plugins()
+    enabled_library = library.enabled_plugins()
+    enabled = enabled_library + engine.enabled_plugins()
     # The generic catch-all step is handled separately below (it has no is_root()/
     # shortcut_roots() of its own -- see GenericLibraryPlugin), and only applies if
-    # the user hasn't disabled it.
-    generic = library.generic_plugin if library.generic_plugin in library.enabled_plugins() else None
+    # the user hasn't disabled it. Looked up by id, not a module-level name (2026-08-06:
+    # the old `library.generic_plugin` attribute was a side effect of an eager
+    # import-time `register_builtin()` call that no longer exists -- see registry.py's
+    # real lazy-loader rewrite; every plugin is found through the registry now, not a
+    # per-file module attribute).
+    generic = next((p for p in enabled_library if p.id == "pythia.library.generic"), None)
 
     results = []
-    for discovered in _discover_roots(root, enabled, generic):
+    discovered_roots = _discover_roots(root, enabled, generic) if recursive else _discover_roots_shallow(root, enabled, generic)
+    seen = set()
+    for discovered in discovered_roots:
+        key = str(discovered.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
         results.append(onboarding.onboard(discovered))
     return results
+
+
+def scan_configured_roots(progress=None):
+    """Scan every enabled persisted root and report each real failure independently."""
+    from pythia import library_roots
+
+    roots = library_roots.list_roots()
+    scanned = []
+    games = []
+    errors = []
+    disabled = 0
+    for root in roots:
+        if not root["enabled"]:
+            disabled += 1
+            continue
+        path = Path(root["path"])
+        if not path.is_dir():
+            errors.append({"id": root["id"], "path": str(path), "message": "Library root is offline or inaccessible."})
+            if progress:
+                progress(root, {"status": "error", "message": errors[-1]["message"]})
+            continue
+        try:
+            results = scan_library(path, recursive=root["recursive"])
+        except Exception as exc:
+            errors.append({"id": root["id"], "path": str(path), "message": str(exc)})
+            if progress:
+                progress(root, {"status": "error", "message": str(exc)})
+            continue
+        scanned.append(root["id"])
+        games.extend(results)
+        if progress:
+            progress(root, {"status": "ok", "games": len(results)})
+    return {
+        "status": "ok" if not errors else "partial",
+        "roots": len(scanned),
+        "disabled": disabled,
+        "games": games,
+        "game_count": len(games),
+        "errors": errors,
+    }

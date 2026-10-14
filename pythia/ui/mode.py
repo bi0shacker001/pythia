@@ -30,11 +30,10 @@ def _detect_screen_mode(app) -> str:
 
 
 def resolve_mode(app, hint: str | None) -> str:
-    # "web" (UI-next, see pythia/ui/webview/app.py) is deliberately never
-    # auto-selected by the saved-preference or screen-size paths below -- it's
-    # the fast-iteration testing surface, reached only via an explicit --ui
-    # web hint, never something a user lands in by default.
-    if hint in ("desktop", "bigpicture", "web"):
+    # "web" is an explicit QtWebEngine shell. "native" remains a supported
+    # compatibility hint for the maintained QtWidgets UI; ordinary "desktop"
+    # startup reaches the same implemented window through desktop/app.py.
+    if hint in ("desktop", "bigpicture", "web", "native"):
         return hint
     saved = get_setting("ui_mode")
     if saved in ("desktop", "bigpicture"):
@@ -76,6 +75,8 @@ def launch(hint: str | None = None, relaunch: bool = False):
         from pythia.ui.bigpicture.app import run
     elif mode == "web":
         from pythia.ui.webview.app import run
+    elif mode == "native":
+        from pythia.ui.native.app import run
     else:
         from pythia.ui.desktop.app import run
 

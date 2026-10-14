@@ -46,7 +46,6 @@ GRPICONDIRENTRY_FORMAT = (
 GRPICONDIR_FORMAT = ("GRPICONDIR", ("H,Reserved", "H,Type", "H,Count"))
 
 logger = logging.getLogger("icoextract")
-logging.basicConfig()
 
 
 class IconExtractorError(Exception):

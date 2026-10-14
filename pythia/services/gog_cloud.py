@@ -16,7 +16,12 @@ import datetime
 import gzip
 import hashlib
 import json
+import math
+import ntpath
 import os
+import posixpath
+import stat
+import tempfile
 import urllib.parse
 import urllib.request
 import zlib
@@ -41,11 +46,42 @@ GOG_CLOUD_USER_AGENT = (
     "GOGGalaxyCommunicationService/2.0.13.27 (Windows_32bit) dont_sync_marker/true installation_source/gog"
 )
 
+
+def _normalize_cloud_relative_path(value: object) -> str | None:
+    """Return a safe portable cloud object path, or None for hostile input."""
+    if not isinstance(value, str) or not value or "\\" in value or "\x00" in value:
+        return None
+    if any(ord(char) < 32 for char in value):
+        return None
+    parts = value.split("/")
+    if any(not part or part in (".", "..") or ":" in part for part in parts):
+        return None
+    return "/".join(parts)
+
+
+def _normalize_cloud_directory_name(value: object) -> str | None:
+    if not isinstance(value, str) or not value or value in (".", ".."):
+        return None
+    if any(ord(char) < 32 for char in value) or any(char in value for char in "/\\:"):
+        return None
+    return value
+
+
+def _normalize_api_identifier(value: object) -> str | None:
+    if not isinstance(value, str) or not value or len(value) > 256 or value in (".", ".."):
+        return None
+    if any(ord(char) < 33 or char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in value):
+        return None
+    return value
+
 # MD5 hash of an empty gzip-compressed file — these are skipped during sync
 EMPTY_GZIP_MD5 = "aadd86936a80ee8a369579c3926f1b3c"
 
 # Default timeout for cloud storage API requests (seconds)
 CLOUD_API_TIMEOUT = 30
+MAX_CLOUD_RESPONSE_BYTES = 64 * 1024 * 1024
+MAX_SAVE_FILE_BYTES = 256 * 1024 * 1024
+MAX_CLOUD_INDEX_ENTRIES = 100_000
 
 LOCAL_TIMEZONE = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
 
@@ -141,8 +177,14 @@ class GOGCloudStorageClient:
     """
 
     def __init__(self, user_id: str, client_id: str, access_token: str) -> None:
-        self.user_id = user_id
-        self.client_id = client_id
+        normalized_user = _normalize_api_identifier(user_id)
+        normalized_client = _normalize_api_identifier(client_id)
+        if normalized_user is None or normalized_client is None:
+            raise ValueError("GOG cloud user/client identifier is invalid")
+        if not isinstance(access_token, str) or not access_token or any(ord(char) < 32 for char in access_token):
+            raise ValueError("GOG cloud access token is invalid")
+        self.user_id = normalized_user
+        self.client_id = normalized_client
         self.access_token = access_token
 
     def _make_request(
@@ -178,7 +220,10 @@ class GOGCloudStorageClient:
         req = urllib.request.Request(url=url, data=data, headers=headers, method=method)
         try:
             response = urllib.request.urlopen(req, timeout=CLOUD_API_TIMEOUT)
-            response_body = response.read()
+            response_body = response.read(MAX_CLOUD_RESPONSE_BYTES + 1)
+            if len(response_body) > MAX_CLOUD_RESPONSE_BYTES:
+                response.close()
+                raise HTTPError("Cloud storage response exceeds the 64 MiB safety limit")
             response_headers = {k: v for k, v in response.getheaders()}
             response.close()
             return response_body, response_headers
@@ -201,6 +246,10 @@ class GOGCloudStorageClient:
         Returns:
             List of SyncFile objects representing cloud files.
         """
+        dir_name = _normalize_cloud_directory_name(dir_name)
+        if dir_name is None:
+            logger.error("Refusing unsafe cloud directory name")
+            return []
         path = f"/v1/{self.user_id}/{self.client_id}"
         body, _ = self._make_request("GET", path, extra_headers={"Accept": "application/json"})
 
@@ -212,13 +261,24 @@ class GOGCloudStorageClient:
         except json.JSONDecodeError:
             logger.error("Failed to parse cloud file listing response")
             return []
+        if not isinstance(json_data, list) or len(json_data) > MAX_CLOUD_INDEX_ENTRIES:
+            logger.error("Cloud file listing has an invalid or excessive shape")
+            return []
 
         files = []
         for entry in json_data:
+            if not isinstance(entry, dict):
+                logger.warning("Ignoring malformed cloud file listing entry")
+                continue
             name = entry.get("name", "")
+            if not isinstance(name, str):
+                continue
             if not name.startswith(dir_name + "/"):
                 continue
-            relative_path = name.replace(f"{dir_name}/", "", 1)
+            relative_path = _normalize_cloud_relative_path(name.replace(f"{dir_name}/", "", 1))
+            if relative_path is None:
+                logger.warning("Ignoring unsafe cloud save path: %r", name)
+                continue
             md5 = entry.get("hash")
             last_modified = entry.get("last_modified")
             logger.debug(
@@ -227,17 +287,19 @@ class GOGCloudStorageClient:
                 md5,
                 last_modified,
             )
+            update_ts = None
+            if isinstance(last_modified, str) and last_modified:
+                try:
+                    update_ts = datetime.datetime.fromisoformat(last_modified).astimezone().timestamp()
+                except (ValueError, OverflowError):
+                    logger.warning("Ignoring invalid cloud timestamp for %s: %r", relative_path, last_modified)
             files.append(
                 SyncFile(
                     relative_path=relative_path,
                     absolute_path="",  # Will be set later when resolving local path
                     md5=md5,
                     update_time=last_modified,
-                    update_ts=(
-                        datetime.datetime.fromisoformat(last_modified).astimezone().timestamp()
-                        if last_modified
-                        else None
-                    ),
+                    update_ts=update_ts,
                 )
             )
         logger.info("Found %d files in cloud for directory '%s'", len(files), dir_name)
@@ -255,15 +317,30 @@ class GOGCloudStorageClient:
         Returns:
             True if upload succeeded, False otherwise.
         """
+        dir_name = _normalize_cloud_directory_name(dir_name)
+        if dir_name is None:
+            logger.error("Refusing unsafe cloud directory name")
+            return False
+        relative_path = _normalize_cloud_relative_path(sync_file.relative_path)
+        if relative_path is None:
+            logger.error("Refusing unsafe cloud relative path")
+            return False
         if not os.path.exists(sync_file.absolute_path):
             logger.error("Cannot upload %s: file does not exist", sync_file.absolute_path)
+            return False
+        try:
+            if os.path.getsize(sync_file.absolute_path) > MAX_SAVE_FILE_BYTES:
+                logger.error("Cannot upload %s: file exceeds the 256 MiB safety limit", sync_file.absolute_path)
+                return False
+        except OSError as ex:
+            logger.error("Cannot inspect upload %s: %s", sync_file.absolute_path, ex)
             return False
 
         with open(sync_file.absolute_path, "rb") as f:
             raw_data = f.read()
         compressed_data = gzip.compress(raw_data, compresslevel=6, mtime=0)
 
-        fpath = urllib.parse.quote(sync_file.relative_path)
+        fpath = urllib.parse.quote(relative_path)
         path = f"/v1/{self.user_id}/{self.client_id}/{dir_name}/{fpath}"
 
         headers = {
@@ -297,7 +374,15 @@ class GOGCloudStorageClient:
         Returns:
             True if download succeeded, False otherwise.
         """
-        fpath = urllib.parse.quote(sync_file.relative_path)
+        dir_name = _normalize_cloud_directory_name(dir_name)
+        if dir_name is None:
+            logger.error("Refusing unsafe cloud directory name")
+            return False
+        relative_path = _normalize_cloud_relative_path(sync_file.relative_path)
+        if relative_path is None:
+            logger.error("Refusing unsafe cloud relative path")
+            return False
+        fpath = urllib.parse.quote(relative_path)
         path = f"/v1/{self.user_id}/{self.client_id}/{dir_name}/{fpath}"
 
         logger.info("Downloading %s to %s", sync_file.relative_path, sync_file.absolute_path)
@@ -316,7 +401,13 @@ class GOGCloudStorageClient:
 
         # Decompress the file - GOG stores saves as gzip-compressed
         try:
-            decompressed_data = gzip.decompress(body)
+            inflater = zlib.decompressobj(16 + zlib.MAX_WBITS)
+            decompressed_data = inflater.decompress(body, MAX_SAVE_FILE_BYTES + 1)
+            if len(decompressed_data) > MAX_SAVE_FILE_BYTES or inflater.unconsumed_tail:
+                raise ValueError("decompressed save exceeds the 256 MiB safety limit")
+            decompressed_data += inflater.flush(MAX_SAVE_FILE_BYTES + 1 - len(decompressed_data))
+            if len(decompressed_data) > MAX_SAVE_FILE_BYTES or not inflater.eof:
+                raise ValueError("invalid or oversized gzip save payload")
             logger.info("Decompressed to %d bytes", len(decompressed_data))
         except Exception as ex:
             logger.error("Failed to decompress %s: %s", sync_file.relative_path, ex)
@@ -325,13 +416,25 @@ class GOGCloudStorageClient:
         # Ensure parent directory exists
         os.makedirs(os.path.dirname(sync_file.absolute_path), exist_ok=True)
 
+        temp_path = ""
         try:
-            with open(sync_file.absolute_path, "wb") as f:
+            fd, temp_path = tempfile.mkstemp(prefix=".pythia-cloud-", dir=os.path.dirname(sync_file.absolute_path))
+            with os.fdopen(fd, "wb") as f:
                 f.write(decompressed_data)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, sync_file.absolute_path)
+            temp_path = ""
             logger.info("Successfully wrote %d bytes to %s", len(decompressed_data), sync_file.absolute_path)
         except Exception as ex:
             logger.error("Failed to write file %s: %s", sync_file.absolute_path, ex)
             return False
+        finally:
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
 
         # Restore file modification time from cloud metadata
         last_modified = headers.get("X-Object-Meta-LocalLastModified")
@@ -359,7 +462,15 @@ class GOGCloudStorageClient:
         Returns:
             True if deletion succeeded, False otherwise.
         """
-        fpath = urllib.parse.quote(sync_file.relative_path)
+        dir_name = _normalize_cloud_directory_name(dir_name)
+        if dir_name is None:
+            logger.error("Refusing unsafe cloud directory name")
+            return False
+        relative_path = _normalize_cloud_relative_path(sync_file.relative_path)
+        if relative_path is None:
+            logger.error("Refusing unsafe cloud relative path")
+            return False
+        fpath = urllib.parse.quote(relative_path)
         path = f"/v1/{self.user_id}/{self.client_id}/{dir_name}/{fpath}"
 
         try:
@@ -661,9 +772,11 @@ def resolve_save_path(
     resolved = re.sub(r"<\?(\w+)\?>", replace_var, path_template)
 
     if is_native:
-        # For native Linux games, expand shell variables and normalize
+        # These are Linux game paths even when Pythia is inspecting or
+        # testing them from Windows. Host-os.path.normpath would turn their
+        # separators into backslashes and produce an unusable save root.
         resolved = os.path.expandvars(os.path.expanduser(resolved))
-        return os.path.normpath(resolved)
+        return posixpath.normpath(resolved.replace("\\", "/"))
 
     # For Wine games, resolve Windows paths within the Wine prefix
     if not wine_prefix:
@@ -697,12 +810,20 @@ def create_directory_map(path: str) -> list[str]:
     files = []
     if not os.path.exists(path):
         return files
-    for entry in os.listdir(path):
-        abs_path = os.path.join(path, entry)
-        if os.path.isdir(abs_path):
-            files.extend(create_directory_map(abs_path))
-        else:
-            files.append(abs_path)
+    with os.scandir(path) as entries:
+        for entry in entries:
+            try:
+                stat_result = entry.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            is_reparse = bool(getattr(stat_result, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+            if entry.is_symlink() or is_reparse:
+                logger.warning("Skipping linked/reparse save path: %s", entry.path)
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                files.extend(create_directory_map(entry.path))
+            elif entry.is_file(follow_symlinks=False):
+                files.append(entry.path)
     return files
 
 
@@ -716,9 +837,50 @@ def get_relative_path(root: str, path: str) -> str:
     Returns:
         Relative path using forward slashes.
     """
-    if not root.endswith(os.sep) and not root.endswith("/"):
-        root = root + os.sep
-    return path.replace(root, "").replace("\\", "/")
+    path_module = ntpath if "\\" in root or "\\" in path else posixpath
+    normalized_root = path_module.normpath(root)
+    normalized_path = path_module.normpath(path)
+    try:
+        if path_module.commonpath((normalized_root, normalized_path)) != normalized_root:
+            raise ValueError("save path is outside its declared root")
+    except ValueError as exc:
+        raise ValueError("save path is outside its declared root") from exc
+    relative = path_module.relpath(normalized_path, normalized_root)
+    if relative in ("", ".") or relative == ".." or relative.startswith(f"..{path_module.sep}"):
+        raise ValueError("save path is not a file below its declared root")
+    return relative.replace("\\", "/")
+
+
+def _safe_cloud_destination(root: str, relative_path: object) -> str | None:
+    """Return a contained local destination with no existing linked components."""
+    normalized = _normalize_cloud_relative_path(relative_path)
+    if normalized is None:
+        return None
+    root_path = os.path.abspath(root)
+    target = os.path.abspath(os.path.join(root_path, *normalized.split("/")))
+    try:
+        if os.path.commonpath((root_path, target)) != root_path:
+            return None
+    except ValueError:
+        return None
+
+    current = root_path
+    for component in ("", *normalized.split("/")):
+        if component:
+            current = os.path.join(current, component)
+        if not os.path.lexists(current):
+            continue
+        try:
+            stat_result = os.lstat(current)
+        except OSError:
+            return None
+        is_reparse = bool(
+            getattr(stat_result, "st_file_attributes", 0)
+            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+        )
+        if stat.S_ISLNK(stat_result.st_mode) or is_reparse:
+            return None
+    return target
 
 
 class GOGCloudSync:
@@ -750,20 +912,50 @@ class GOGCloudSync:
         if os.path.exists(ts_path):
             try:
                 with open(ts_path, encoding="utf-8") as f:
-                    self._sync_timestamps = json.load(f)
-            except (json.JSONDecodeError, OSError) as ex:
+                    loaded = json.load(f)
+                if not isinstance(loaded, dict):
+                    raise ValueError("timestamp journal root must be an object")
+                validated: dict[str, dict[str, float]] = {}
+                for game_id, locations in loaded.items():
+                    if not isinstance(game_id, str) or not isinstance(locations, dict):
+                        raise ValueError("timestamp journal contains an invalid game entry")
+                    validated[game_id] = {}
+                    for location, timestamp in locations.items():
+                        if (
+                            not isinstance(location, str)
+                            or isinstance(timestamp, bool)
+                            or not isinstance(timestamp, (int, float))
+                            or not math.isfinite(timestamp)
+                            or timestamp < 0
+                        ):
+                            raise ValueError("timestamp journal contains an invalid timestamp")
+                        validated[game_id][location] = float(timestamp)
+                self._sync_timestamps = validated
+            except (json.JSONDecodeError, OSError, ValueError) as ex:
                 logger.warning("Failed to load sync timestamps: %s", ex)
                 self._sync_timestamps = {}
 
     def _save_sync_timestamps(self) -> None:
         """Save sync timestamps to disk."""
         ts_path = self._get_timestamp_path()
+        temp_path = ""
         try:
             os.makedirs(os.path.dirname(ts_path), exist_ok=True)
-            with open(ts_path, "w", encoding="utf-8") as f:
-                json.dump(self._sync_timestamps, f)
+            fd, temp_path = tempfile.mkstemp(prefix=".pythia-gog-ts-", dir=os.path.dirname(ts_path))
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(self._sync_timestamps, f, sort_keys=True)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, ts_path)
+            temp_path = ""
         except OSError as ex:
             logger.error("Failed to save sync timestamps: %s", ex)
+        finally:
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
 
     def get_sync_timestamp(self, game_id: str, location_name: str) -> float:
         """Get the last sync timestamp for a game's save location.
@@ -872,9 +1064,15 @@ class GOGCloudSync:
 
         # Step 6: Get cloud files
         cloud_files = client.list_files(location_name)
-        # Set absolute paths for cloud files
+        # Set contained absolute paths for cloud files without following an
+        # existing linked/reparse component out of the declared save root.
         for cf in cloud_files:
-            cf.absolute_path = os.path.join(save_path, cf.relative_path.replace("/", os.sep))
+            destination = _safe_cloud_destination(save_path, cf.relative_path)
+            if destination is None:
+                result.error = _("Unsafe cloud save destination: %s") % cf.relative_path
+                logger.error(result.error)
+                return result
+            cf.absolute_path = destination
 
         downloadable_cloud = [f for f in cloud_files if f.md5 != EMPTY_GZIP_MD5]
         logger.info("Cloud files: %d", len(cloud_files))

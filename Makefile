@@ -89,8 +89,9 @@ snap:
 	snapcraft clean pythia -s pull
 	snapcraft
 
-appimage:
-	utils/appimage/build.sh
+# AppImage/rpm/deb are now built via scripts/build_appimage.sh and
+# scripts/build_linux_packages.sh (2026-08-07) -- see those scripts'
+# docstrings; this replaces the old GTK/linuxdeploy-based utils/appimage/.
 
 req-python:
 	pip3 install PyYAML lxml requests Pillow setproctitle python-magic distro dbus-python types-requests \

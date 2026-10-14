@@ -1,0 +1,14 @@
+{
+  "id": "pythia.engine.twine",
+  "display_name": "Twine/HTML",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "twine",
+  "entry_classes": [
+    "TwineEnginePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "engine"
+  ]
+}

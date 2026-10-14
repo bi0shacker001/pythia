@@ -11,20 +11,6 @@ means no restriction, always tried.
 
 from pathlib import Path
 
-from pythia.plugins.engine.august import plugin as august_engine  # noqa: F401
-from pythia.plugins.engine.buriko import plugin as buriko_engine  # noqa: F401
-from pythia.plugins.engine.catsystem2 import plugin as catsystem2_engine  # noqa: F401
-from pythia.plugins.engine.cmvs import plugin as cmvs_engine  # noqa: F401
-from pythia.plugins.engine.flash_air import plugin as flash_air_engine  # noqa: F401
-from pythia.plugins.engine.godot import plugin as godot_engine  # noqa: F401
-from pythia.plugins.engine.kirikiri import plugin as kirikiri_engine  # noqa: F401
-from pythia.plugins.engine.renpy import plugin as renpy_engine  # noqa: F401
-from pythia.plugins.engine.rpgmaker import mv_plugin as rpgmaker_mv_engine  # noqa: F401
-from pythia.plugins.engine.rpgmaker import mz_plugin as rpgmaker_mz_engine  # noqa: F401
-from pythia.plugins.engine.rpgmaker import vxace_plugin as rpgmaker_vxace_engine  # noqa: F401
-from pythia.plugins.engine.twine import plugin as twine_engine  # noqa: F401
-from pythia.plugins.engine.unity import plugin as unity_engine  # noqa: F401
-from pythia.plugins.engine.unreal import plugin as unreal_engine  # noqa: F401
 from pythia.plugins.registry import filter_enabled, for_category
 
 

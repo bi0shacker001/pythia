@@ -1,0 +1,38 @@
+name: Publish plugin index
+
+# Decoupled from the app's own release cycle (2026-08-07) -- runs whenever
+# plugin sources or the built zips change, not tied to a version tag.
+on:
+  push:
+    branches: [master, lutris-core]
+    paths:
+      - "pythia/pythia/plugin_sources/**"
+      - "scripts/build_plugins.py"
+      - "scripts/publish_plugin_index.py"
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build plugin packages
+        run: python3 scripts/build_plugins.py
+
+      - name: Publish index to docs/
+        run: python3 scripts/publish_plugin_index.py
+
+      - name: Commit docs/plugins/
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pythia/pythia/plugins/builtin docs/plugins
+          git diff --staged --quiet || git commit -m "Publish plugin index [skip ci]"
+          git push

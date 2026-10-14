@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <id>net.pythia.Pythia</id>
+  <project_license>GPL-3.0-or-later</project_license>
+  <metadata_license>CC0-1.0</metadata_license>
+  <translation type="gettext">pythia</translation>
+  <developer_name translatable="no">Pythia Team</developer_name>
+  <update_contact>bioshacker001@gmail.com</update_contact>
+  <name translatable="no">Pythia</name>
+  <summary>Video game preservation platform</summary>
+  <description><p>Pythia helps you install and play video games from all eras and from most gaming systems. By leveraging and combining existing emulators, engine re-implementations and compatibility layers, it gives you a central interface to launch all your games.</p></description>
+  <url type="homepage">https://pythia.net/</url>
+  <url type="bugtracker">https://github.com/pythia/pythia/issues</url>
+  <url type="vcs-browser">https://github.com/pythia/pythia</url>
+  <launchable type="desktop-id">net.pythia.Pythia.desktop</launchable>
+  <releases>
+    <release version="0.0.1" date="2026-08-07" urgency="low">
+      <description><p>Real zip-based plugin packaging, cross-platform build system.</p></description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

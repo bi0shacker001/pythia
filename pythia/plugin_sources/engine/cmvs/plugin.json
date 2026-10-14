@@ -1,0 +1,14 @@
+{
+  "id": "pythia.engine.cmvs",
+  "display_name": "CMVS",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "cmvs",
+  "entry_classes": [
+    "CmvsEnginePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "engine"
+  ]
+}

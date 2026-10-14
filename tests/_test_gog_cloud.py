@@ -140,6 +140,17 @@ class TestGOGCloudStorageClient(unittest.TestCase):
             access_token="test_access_token",
         )
 
+    def test_constructor_rejects_request_path_and_header_injection(self):
+        bad_args = [
+            ("../user", "client", "token"),
+            ("user", "bad/client", "token"),
+            ("user", "client", "token\r\nInjected: yes"),
+        ]
+        for user_id, client_id, token in bad_args:
+            with self.subTest(user_id=user_id, client_id=client_id):
+                with self.assertRaises(ValueError):
+                    GOGCloudStorageClient(user_id, client_id, token)
+
     def test_make_request_success(self):
         mock_response = MagicMock()
         mock_response.read.return_value = b'{"test": "data"}'
@@ -182,6 +193,17 @@ class TestGOGCloudStorageClient(unittest.TestCase):
             with self.assertRaises(HTTPError):
                 self.client._make_request("GET", "/v1/test")
 
+    def test_make_request_rejects_oversized_response(self):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b"x" * 9
+        mock_response.getheaders.return_value = []
+        with patch.object(_mod, "MAX_CLOUD_RESPONSE_BYTES", 8), patch.object(
+            urllib.request, "urlopen", return_value=mock_response
+        ):
+            with self.assertRaises(HTTPError):
+                self.client._make_request("GET", "/v1/test")
+        mock_response.read.assert_called_once_with(9)
+
     def test_list_files(self):
         cloud_data = [
             {
@@ -221,6 +243,41 @@ class TestGOGCloudStorageClient(unittest.TestCase):
             files = self.client.list_files("saves")
         self.assertEqual(files, [])
 
+    def test_unsafe_cloud_directory_name_makes_no_request(self):
+        with patch.object(urllib.request, "urlopen") as request:
+            self.assertEqual([], self.client.list_files("../escape"))
+            item = SyncFile(relative_path="slot.sav", absolute_path="missing")
+            self.assertFalse(self.client.upload_file(item, "bad/name"))
+            self.assertFalse(self.client.download_file(item, "bad\\name"))
+            self.assertFalse(self.client.delete_file(item, "C:drive"))
+        request.assert_not_called()
+
+    def test_unsafe_cloud_relative_path_makes_no_request(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            local = os.path.join(tmp, "slot.sav")
+            with open(local, "wb") as stream:
+                stream.write(b"save")
+            with patch.object(self.client, "_make_request") as request:
+                for relative_path in ("../escape.sav", "sub\\escape.sav", "/absolute.sav", "C:slot.sav"):
+                    item = SyncFile(relative_path=relative_path, absolute_path=local)
+                    self.assertFalse(self.client.upload_file(item, "saves"))
+                    self.assertFalse(self.client.download_file(item, "saves"))
+                    self.assertFalse(self.client.delete_file(item, "saves"))
+        request.assert_not_called()
+
+    def test_list_files_rejects_traversal_and_windows_separator(self):
+        cloud_data = [
+            {"name": "saves/../escape.sav", "hash": "a"},
+            {"name": "saves/sub\\..\\escape.sav", "hash": "b"},
+            {"name": "saves/safe/slot.sav", "hash": "c"},
+        ]
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(cloud_data).encode()
+        mock_response.getheaders.return_value = []
+        with patch.object(urllib.request, "urlopen", return_value=mock_response):
+            files = self.client.list_files("saves")
+        self.assertEqual(["safe/slot.sav"], [item.relative_path for item in files])
+
     def test_list_files_bad_json(self):
         mock_response = MagicMock()
         mock_response.read.return_value = b"not json"
@@ -229,6 +286,28 @@ class TestGOGCloudStorageClient(unittest.TestCase):
         with patch.object(urllib.request, "urlopen", return_value=mock_response):
             files = self.client.list_files("saves")
         self.assertEqual(files, [])
+
+    def test_list_files_rejects_wrong_root_shape(self):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"name": "saves/game.sav"}'
+        mock_response.getheaders.return_value = []
+        with patch.object(urllib.request, "urlopen", return_value=mock_response):
+            self.assertEqual([], self.client.list_files("saves"))
+
+    def test_list_files_isolates_bad_entry_and_timestamp(self):
+        cloud_data = [
+            "not-an-object",
+            {"name": "saves/bad-time.sav", "hash": "a", "last_modified": "not-a-time"},
+            {"name": "saves/good.sav", "hash": "b", "last_modified": "2024-01-15T10:30:00+00:00"},
+        ]
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(cloud_data).encode()
+        mock_response.getheaders.return_value = []
+        with patch.object(urllib.request, "urlopen", return_value=mock_response):
+            files = self.client.list_files("saves")
+        self.assertEqual(["bad-time.sav", "good.sav"], [item.relative_path for item in files])
+        self.assertIsNone(files[0].update_ts)
+        self.assertIsInstance(files[1].update_ts, float)
 
     def test_upload_file(self):
         mock_response = MagicMock()
@@ -257,6 +336,30 @@ class TestGOGCloudStorageClient(unittest.TestCase):
             self.assertEqual(req.get_header("Content-encoding"), "gzip")
         finally:
             os.unlink(tmp_path)
+
+    def test_upload_file_rejects_oversized_local_save(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(b"12345")
+            tmp_path = tmp.name
+        try:
+            item = SyncFile(relative_path="large.sav", absolute_path=tmp_path)
+            with patch.object(_mod, "MAX_SAVE_FILE_BYTES", 4):
+                self.assertFalse(self.client.upload_file(item, "saves"))
+        finally:
+            os.unlink(tmp_path)
+
+    def test_download_rejects_decompression_bomb(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            destination = os.path.join(tmpdir, "bomb.sav")
+            item = SyncFile(relative_path="bomb.sav", absolute_path=destination)
+            mock_response = MagicMock()
+            mock_response.read.return_value = gzip.compress(b"12345")
+            mock_response.getheaders.return_value = []
+            with patch.object(_mod, "MAX_SAVE_FILE_BYTES", 4), patch.object(
+                urllib.request, "urlopen", return_value=mock_response
+            ):
+                self.assertFalse(self.client.download_file(item, "saves"))
+            self.assertFalse(os.path.exists(destination))
 
     def test_upload_nonexistent_file(self):
         f = SyncFile(
@@ -304,6 +407,21 @@ class TestGOGCloudStorageClient(unittest.TestCase):
             self.assertTrue(os.path.exists(dest_path))
             with open(dest_path, "rb") as df:
                 self.assertEqual(df.read(), b"save file content")
+
+    def test_download_promotion_failure_preserves_existing_save_and_cleans_stage(self):
+        mock_response = MagicMock()
+        mock_response.read.return_value = gzip.compress(b"replacement")
+        mock_response.getheaders.return_value = []
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest_path = os.path.join(tmpdir, "game.sav")
+            Path(dest_path).write_bytes(b"original")
+            item = SyncFile(relative_path="game.sav", absolute_path=dest_path)
+            with patch.object(urllib.request, "urlopen", return_value=mock_response), patch.object(
+                os, "replace", side_effect=OSError("promotion failed")
+            ):
+                self.assertFalse(self.client.download_file(item, "saves"))
+            self.assertEqual(b"original", Path(dest_path).read_bytes())
+            self.assertEqual([], list(Path(tmpdir).glob(".pythia-cloud-*")))
 
     def test_download_file_empty_response(self):
         mock_response = MagicMock()
@@ -613,13 +731,13 @@ class TestResolveSavePath(unittest.TestCase):
     def test_native_linux_documents_var(self):
         loc = CloudSaveLocation(name="saves", location="<?DOCUMENTS?>/My Games/Test")
         result = resolve_save_path(loc, "/opt/games/mygame", is_native=True)
-        expected = os.path.normpath(str(Path.home() / "Documents" / "My Games" / "Test"))
+        expected = str(Path.home() / "Documents" / "My Games" / "Test").replace("\\", "/")
         self.assertEqual(result, expected)
 
     def test_native_linux_appdata_local(self):
         loc = CloudSaveLocation(name="saves", location="<?APPLICATION_DATA_LOCAL?>/TestGame")
         result = resolve_save_path(loc, "/opt/games/mygame", is_native=True)
-        expected = os.path.normpath(str(Path.home() / ".local" / "share" / "TestGame"))
+        expected = str(Path.home() / ".local" / "share" / "TestGame").replace("\\", "/")
         self.assertEqual(result, expected)
 
     def test_wine_userprofile_documents(self):
@@ -717,6 +835,16 @@ class TestCreateDirectoryMap(unittest.TestCase):
             self.assertEqual(len(files), 2)
             self.assertTrue(any("nested.txt" in f for f in files))
 
+    def test_directory_symlink_is_not_followed(self):
+        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as outside:
+            Path(outside, "secret.sav").write_text("secret", encoding="utf-8")
+            link = Path(tmpdir, "linked")
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except OSError:
+                self.skipTest("directory symlinks are unavailable in this environment")
+            self.assertEqual([], create_directory_map(tmpdir))
+
 
 class TestGetRelativePath(unittest.TestCase):
     """Test the get_relative_path function."""
@@ -732,6 +860,14 @@ class TestGetRelativePath(unittest.TestCase):
     def test_nested(self):
         result = get_relative_path("/saves", "/saves/sub/dir/file.sav")
         self.assertEqual(result, "sub/dir/file.sav")
+
+    def test_similar_prefix_outside_root_is_rejected(self):
+        with self.assertRaises(ValueError):
+            get_relative_path("/saves", "/saves-evil/file.sav")
+
+    def test_parent_escape_is_rejected(self):
+        with self.assertRaises(ValueError):
+            get_relative_path("/saves", "/saves/../outside/file.sav")
 
 
 class TestGOGCloudSync(unittest.TestCase):
@@ -784,6 +920,23 @@ class TestGOGCloudSync(unittest.TestCase):
         with patch.object(GOGCloudSync, "_get_timestamp_path", return_value=ts_path):
             sync = GOGCloudSync(self.mock_service)
         self.assertEqual(sync._sync_timestamps, {})
+
+    def test_valid_json_with_wrong_timestamp_shape_is_rejected(self):
+        ts_path = os.path.join(self.tmpdir, "timestamps.json")
+        Path(ts_path).write_text('{"12345": {"saves": "yesterday"}}', encoding="utf-8")
+        with patch.object(GOGCloudSync, "_get_timestamp_path", return_value=ts_path):
+            sync = GOGCloudSync(self.mock_service)
+        self.assertEqual({}, sync._sync_timestamps)
+
+    def test_timestamp_promotion_failure_preserves_existing_journal(self):
+        ts_path = os.path.join(self.tmpdir, "timestamps.json")
+        Path(ts_path).write_text('{"old": {"saves": 1.0}}', encoding="utf-8")
+        with patch.object(GOGCloudSync, "_get_timestamp_path", return_value=ts_path):
+            sync = GOGCloudSync(self.mock_service)
+            with patch.object(os, "replace", side_effect=OSError("promotion failed")):
+                sync.set_sync_timestamp("new", "saves", 2.0)
+        self.assertEqual('{"old": {"saves": 1.0}}', Path(ts_path).read_text(encoding="utf-8"))
+        self.assertEqual([], list(Path(self.tmpdir).glob(".pythia-gog-ts-*")))
 
     def test_sync_token_load_failure(self):
         ts_path = os.path.join(self.tmpdir, "ts.json")
@@ -890,6 +1043,34 @@ class TestGOGCloudSync(unittest.TestCase):
 
         self.assertEqual(result.action, SyncAction.DOWNLOAD)
         self.assertEqual(len(result.downloaded), 1)
+
+    def test_sync_rejects_download_through_linked_parent(self):
+        outside = Path(tempfile.mkdtemp())
+        save_root = Path(self.tmpdir) / "linked-root"
+        save_root.mkdir()
+        try:
+            (save_root / "linked").symlink_to(outside, target_is_directory=True)
+        except OSError:
+            import shutil
+
+            shutil.rmtree(outside, ignore_errors=True)
+            self.skipTest("directory symlinks are unavailable in this environment")
+
+        cloud_files = [SyncFile("linked/escape.dat", "", md5="abc123", update_ts=100.0)]
+        mock_client = self._create_sync_mocks(cloud_files=cloud_files)
+        try:
+            p1, p2, p3, p4 = self._sync_context(mock_client)
+            with p1, p2, p3, p4:
+                sync = GOGCloudSync(self.mock_service)
+                result = sync.sync_saves("12345", str(save_root), "saves")
+            self.assertIsNotNone(result.error)
+            self.assertIn("Unsafe cloud save destination", result.error)
+            mock_client.download_file.assert_not_called()
+            self.assertFalse((outside / "escape.dat").exists())
+        finally:
+            import shutil
+
+            shutil.rmtree(outside, ignore_errors=True)
 
     def test_sync_creates_save_directory(self):
         """When save path doesn't exist, it gets created."""

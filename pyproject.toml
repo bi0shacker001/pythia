@@ -1,6 +1,6 @@
 [project]
 name = "pythia"
-version = "0.5.23"
+version = "0.0.1"
 authors = [
     {name = "Mathieu Comandon", email = "strider@strycore.com"}
 ]
@@ -21,14 +21,21 @@ dependencies = [
     "setproctitle",
     "python-magic",
     "distro",
-    "dbus-python",
     "types-requests",
     "types-PyYAML",
-    "evdev",
-    "PyGObject",
-    "pypresence",
-    "protobuf",
-    "moddb"
+    "moddb",
+    "PySide6",
+    "cryptography",
+    # Linux/GTK-only (2026-08-07: real audit found these mostly vestigial or
+    # already try/except-guarded at every real call site -- see
+    # pythia/util/display.py, pythia/startup.py, pythia/util/discord/rpc.py,
+    # pythia/util/moddb.py -- so a Windows build environment for
+    # packaging/windows/pythia.spec never needs GTK system libraries at all).
+    "dbus-python; sys_platform == 'linux'",
+    "PyGObject; sys_platform == 'linux'",
+    "evdev; sys_platform == 'linux'",
+    "pypresence; sys_platform == 'linux'",
+    "protobuf; sys_platform == 'linux'",
 ]
 
 [project.urls]
@@ -42,7 +49,8 @@ dev = [
     "mypy==1.16.1",
     "mypy-baseline",
     "nose2",
-    "pygobject-stubs>=2.17.0"
+    "pygobject-stubs>=2.17.0; sys_platform == 'linux'",
+    "pyinstaller>=6.21.0",
 ]
 
 

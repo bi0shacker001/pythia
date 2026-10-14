@@ -1,8 +1,10 @@
 """Cross-platform user directory lookups -- replaces the handful of
 GLib.get_user_*_dir() calls that used to pull PyGObject in just for path
-strings (2026-08-04 GTK removal). Windows has no XDG convention of its own,
-so the nearest real analogs (%APPDATA%/%LOCALAPPDATA%) are used there;
-everything else follows the real XDG base directory spec.
+strings (2026-08-04 GTK removal). Windows has no XDG convention of its own;
+all three functions below resolve to %APPDATA% there (not %LOCALAPPDATA% --
+consolidated 2026-08-05 so config/data/cache and pythia.identity.app_data_dir()
+all land in the same directory tree instead of being split across two).
+Everything else follows the real XDG base directory spec.
 """
 
 import os
@@ -15,14 +17,21 @@ def get_user_config_dir() -> str:
 
 
 def get_user_data_dir() -> str:
+    # Windows: %APPDATA% (Roaming), matching get_user_config_dir() below and
+    # pythia.identity.app_data_dir() -- deliberately NOT %LOCALAPPDATA%. Using a
+    # different base here than identity.py used to split Pythia's own data
+    # across two separate directory trees for no real reason; consolidated
+    # 2026-08-05 per explicit direction ("we don't want things to be in
+    # localappdata").
     if os.name == "nt":
-        return os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        return os.environ.get("APPDATA") or os.path.expanduser("~")
     return os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
 
 
 def get_user_cache_dir() -> str:
+    # See get_user_data_dir() above -- same consolidation, same reasoning.
     if os.name == "nt":
-        return os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        return os.environ.get("APPDATA") or os.path.expanduser("~")
     return os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
 
 

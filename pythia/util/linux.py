@@ -29,6 +29,14 @@ except ImportError:
     logger.warning("Package 'distro' unavailable. Unable to read Linux distribution")
     distro = None
 
+# This whole module is genuinely Linux-specific (ldconfig, /proc, X11 tools,
+# .so shared libraries) -- there is no Windows equivalent implemented yet.
+# Gating on this lets LinuxSystem's constructor skip probing for tools that
+# were never going to be there instead of logging a "not found" warning for
+# every single one, which reads as a pile of real errors rather than what it
+# actually is: expected absence on a platform this code doesn't target yet.
+IS_LINUX = sys.platform.startswith("linux")
+
 # Linux components used by pythia
 SYSTEM_COMPONENTS = {
     "COMMANDS": [
@@ -126,14 +134,22 @@ class LinuxSystem:  # pylint: disable=too-many-public-methods
     def __init__(self) -> None:
         for key in ("COMMANDS", "OPTIONAL_COMMANDS", "TERMINALS"):
             self._cache[key] = {}
-            for command in SYSTEM_COMPONENTS[key]:
-                command_path = shutil.which(command)
-                if not command_path:
-                    command_path = self.get_sbin_path(command)
-                if command_path:
-                    self._cache[key][command] = command_path
-                elif key == "COMMANDS":
-                    logger.warning("Command '%s' not found on your system", command)
+        if not IS_LINUX:
+            logger.info(
+                "Skipping Linux system-tool detection (running on %s); "
+                "these checks don't have a Windows equivalent yet.",
+                sys.platform,
+            )
+        else:
+            for key in ("COMMANDS", "OPTIONAL_COMMANDS", "TERMINALS"):
+                for command in SYSTEM_COMPONENTS[key]:
+                    command_path = shutil.which(command)
+                    if not command_path:
+                        command_path = self.get_sbin_path(command)
+                    if command_path:
+                        self._cache[key][command] = command_path
+                    elif key == "COMMANDS":
+                        logger.warning("Command '%s' not found on your system", command)
 
         # Detect if system is 64bit capable
         self.is_64_bit = sys.maxsize > 2**32
@@ -247,10 +263,15 @@ class LinuxSystem:  # pylint: disable=too-many-public-methods
         """Return the system architecture only if compatible
         with the supported architectures from the Pythia API
         """
-        match platform.machine():
-            case "x86_64":
+        # Real, previously-missing case: Windows' platform.machine() returns
+        # "AMD64"/"ARM64" (uppercase, different spelling), not the Linux-style
+        # strings the cases below expect -- every real Windows x86_64 machine
+        # was silently falling through to "Unsupported architecture AMD64"
+        # and returning None, not just a cosmetic log message.
+        match platform.machine().lower():
+            case "x86_64" | "amd64":
                 return "x86_64"
-            case "i386" | "i686":
+            case "i386" | "i686" | "x86":
                 return "i386"
             case m if "armv7" in m:
                 return "armv7"

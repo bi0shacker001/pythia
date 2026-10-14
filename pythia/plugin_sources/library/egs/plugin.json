@@ -1,0 +1,15 @@
+{
+  "id": "pythia.library.egs",
+  "display_name": "Epic Games Store",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "egs",
+  "entry_classes": [
+    "EgsPlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "library",
+    "manager"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "pythia.engine.buriko",
+  "display_name": "Buriko General Interpreter (BGI/Ethornell)",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "buriko",
+  "entry_classes": [
+    "BurikoEnginePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "engine"
+  ]
+}

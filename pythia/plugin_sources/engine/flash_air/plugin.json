@@ -1,0 +1,14 @@
+{
+  "id": "pythia.engine.flash_air",
+  "display_name": "Flash (Adobe AIR package)",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "flash_air",
+  "entry_classes": [
+    "FlashAirEnginePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "engine"
+  ]
+}

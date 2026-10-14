@@ -21,6 +21,8 @@ Item {
     property var downloaderPlugins: []
     property var accountPlugins: []
     property string uiMode: ""
+    property string accountMessage: ""
+    property string pluginMessage: ""
 
     function reload() {
         root.systemInfo = backend.get_system_info()
@@ -32,7 +34,15 @@ Item {
 
     Connections {
         target: backend
-        function onAccountSyncComplete(pluginId, result) { root.reload() }
+        function onAccountSyncComplete(pluginId, result) {
+            if (result && result.status === "ok")
+                root.accountMessage = "Account sync complete."
+            else if (result && result.status === "partial")
+                root.accountMessage = result.message || "Account sync partially complete."
+            else
+                root.accountMessage = (result && result.message) || "Account sync failed."
+            root.reload()
+        }
     }
 
     ColumnLayout {
@@ -146,6 +156,7 @@ Item {
                         spacing: 12
 
                         Label { text: "Pluggable acquisition backends -- Pythia launches each as its own tool and watches for results."; color: theme.textMuted; font.pixelSize: 14; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        Label { visible: root.pluginMessage.length > 0; text: root.pluginMessage; color: theme.textMuted; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
 
                         Repeater {
                             model: root.downloaderPlugins
@@ -154,7 +165,16 @@ Item {
                                 Label { text: modelData.display_name; color: theme.text; font.pixelSize: 16; Layout.fillWidth: true }
                                 Switch {
                                     checked: modelData.enabled
-                                    onToggled: backend.set_plugin_enabled(modelData.id, checked)
+                                    onToggled: {
+                                        var requested = checked
+                                        var result = backend.set_plugin_enabled(modelData.id, requested)
+                                        if (result && result.status === "ok")
+                                            root.pluginMessage = modelData.display_name + (requested ? " enabled." : " disabled.")
+                                        else {
+                                            root.pluginMessage = (result && result.message) || "Plugin state was not saved."
+                                            root.reload()
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -174,6 +194,7 @@ Item {
                         spacing: 20
 
                         Label { text: "Connect an account to pull your real owned library from it."; color: theme.textMuted; font.pixelSize: 14; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        Label { visible: root.accountMessage.length > 0; text: root.accountMessage; color: theme.textMuted; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
 
                         Repeater {
                             model: root.accountPlugins
@@ -196,7 +217,10 @@ Item {
                                             font.pixelSize: 14
                                             color: theme.text
                                             background: Rectangle { color: theme.surfaceSunken; radius: 8; border.color: theme.border }
-                                            onEditingFinished: backend.set_account_credential(accountDelegate.modelData.id, modelData.key, text)
+                                            onEditingFinished: {
+                                                var result = backend.set_account_credential(accountDelegate.modelData.id, modelData.key, text)
+                                                root.accountMessage = result && result.status === "ok" ? "Credential saved." : ((result && result.message) || "Credential was not saved.")
+                                            }
                                         }
                                     }
                                 }
@@ -208,7 +232,10 @@ Item {
                                         font.pixelSize: 14
                                         contentItem: Label { text: parent.text; color: theme.accentText; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                         background: Rectangle { color: theme.accent; radius: 8 }
-                                        onClicked: backend.sync_account(modelData.id)
+                                        onClicked: {
+                                            root.accountMessage = "Syncing account..."
+                                            backend.sync_account(modelData.id)
+                                        }
                                     }
                                     Label {
                                         text: modelData.connected ? "Connected." : "Not connected."

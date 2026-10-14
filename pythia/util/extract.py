@@ -184,7 +184,10 @@ def _do_extract(archive: str, dest: str, opener, mode: str | None = None, extrac
         _extract_AppImage(archive, dest)
     else:
         handler = opener(archive, mode)
-        handler.extractall(dest)
+        # Every stdlib opener reaching this branch is tarfile.open. Python's
+        # data filter rejects absolute/traversal paths, links escaping the
+        # destination, devices, and other filesystem-specific metadata.
+        handler.extractall(dest, filter="data")
         handler.close()
 
 

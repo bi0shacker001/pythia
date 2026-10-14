@@ -6,6 +6,7 @@ from __future__ import annotations
 import enum
 import os
 import subprocess
+import sys
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
@@ -137,8 +138,13 @@ def get_display_manager() -> MutterDisplayManager | DisplayManager | LegacyDispl
             logger.debug("Mutter DBus service not reachable: %s", ex)
         except Exception as ex:  # pylint: disable=broad-except
             logger.exception("Failed to instantiate MutterDisplayConfig. Please report with exception: %s", ex)
-    else:
+    elif sys.platform.startswith("linux"):
         logger.error("DBus is not available, Pythia was not properly installed.")
+    else:
+        # 2026-08-07, external review: "unnecessary user-facing noise" -- this
+        # is expected on every single Windows launch (there's no DBus/Mutter
+        # there), not something worth surfacing at INFO level every time.
+        logger.debug("DBus/Mutter display management isn't available on %s; using the legacy fallback.", sys.platform)
 
     if LIB_GNOME_DESKTOP_AVAILABLE:
         try:
@@ -262,6 +268,14 @@ def is_compositing_enabled() -> bool:
     Returns True for enabled, False for disabled or if we didn't recognize
     the compositor.
     """
+    # 2026-08-07, external review: this whole check is X11/Linux-compositor
+    # specific (pgrep/compton/picom/dbus-send) -- called unconditionally at
+    # pythia.sysoptions import time, so unguarded this was a real, unconditional
+    # attempt to run `pgrep` on Windows (logged as a startup ERROR every launch;
+    # "attempting pgrep on Windows is an actual platform-guard defect"). None of
+    # the concepts here exist outside Linux/X11.
+    if not sys.platform.startswith("linux"):
+        return False
 
     desktop_environment = get_desktop_environment()
     if desktop_environment in _compositor_commands_by_de:

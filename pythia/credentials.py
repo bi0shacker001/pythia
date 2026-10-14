@@ -36,8 +36,15 @@ misparsed as a game entry.
 """
 
 import json
+import os
+import tempfile
+import threading
 
 from pythia.identity import datadir_path, get_system_uuid
+
+
+_WRITE_LOCK = threading.RLock()
+MAX_CREDENTIAL_FILE_BYTES = 1024 * 1024
 
 
 def _credentials_dir():
@@ -54,9 +61,20 @@ def _read(path) -> dict:
     if not path.is_file():
         return {}
     try:
+        if path.stat().st_size > MAX_CREDENTIAL_FILE_BYTES:
+            return {}
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
+        if not isinstance(data, dict):
+            return {}
+        # Synced files are peer-controlled input.  Keep only the schema this
+        # module writes so malformed values cannot make get_credential() call
+        # `.get()` on a string/list or propagate non-string secrets.
+        return {
+            plugin_id: {key: value for key, value in fields.items() if isinstance(key, str) and isinstance(value, str)}
+            for plugin_id, fields in data.items()
+            if isinstance(plugin_id, str) and isinstance(fields, dict)
+        }
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return {}
 
 
@@ -64,23 +82,55 @@ def get_credential(plugin_id: str, key: str) -> str | None:
     """This system's own value if it has one, else the first other system's synced
     value that has it (see module docstring for why this isn't a real merge)."""
     own = _read(_own_path())
-    value = (own.get(plugin_id) or {}).get(key)
-    if value:
-        return value
+    own_fields = own.get(plugin_id) or {}
+    if key in own_fields:
+        return own_fields[key] or None
 
     this_uuid = get_system_uuid()
     for path in sorted(_credentials_dir().glob("*.json")):
         if path.stem == this_uuid:
             continue
         other = _read(path)
-        value = (other.get(plugin_id) or {}).get(key)
-        if value:
-            return value
+        other_fields = other.get(plugin_id) or {}
+        if key in other_fields:
+            return other_fields[key] or None
     return None
 
 
 def set_credential(plugin_id: str, key: str, value: str):
+    """Persist one credential without exposing a partially-written JSON file.
+
+    The file may be observed by a sync engine at any moment, so write a complete
+    sibling file, flush it, and atomically replace the prior version.  The lock
+    also prevents two in-process login callbacks from losing each other's update.
+    """
+    if not all(isinstance(item, str) for item in (plugin_id, key, value)):
+        raise TypeError("credential plugin id, key, and value must be strings")
     path = _own_path()
-    data = _read(path)
-    data.setdefault(plugin_id, {})[key] = value
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    with _WRITE_LOCK:
+        data = _read(path)
+        data.setdefault(plugin_id, {})[key] = value
+        serialized = json.dumps(data, indent=2)
+        if len(serialized.encode("utf-8")) > MAX_CREDENTIAL_FILE_BYTES:
+            raise ValueError("credential store exceeds the maximum file size")
+        temporary_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                temporary_name = temporary.name
+                temporary.write(serialized)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+            os.replace(temporary_name, path)
+        finally:
+            if temporary_name:
+                try:
+                    os.unlink(temporary_name)
+                except FileNotFoundError:
+                    pass

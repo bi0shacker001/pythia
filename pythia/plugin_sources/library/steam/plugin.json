@@ -1,0 +1,16 @@
+{
+  "id": "pythia.library.steam",
+  "display_name": "Steam",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "steam",
+  "entry_classes": [
+    "SteamPlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "library",
+    "manager",
+    "metadata"
+  ]
+}

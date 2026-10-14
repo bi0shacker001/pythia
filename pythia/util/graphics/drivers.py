@@ -178,7 +178,10 @@ def is_nvidia() -> bool:
 def get_gpu_cards() -> Iterable[str]:
     """Return GPUs connected to the system"""
     if not os.path.exists("/sys/class/drm"):
-        logger.error("No GPU available on this system!")
+        # /sys/class/drm is a real Linux sysfs path; its absence on a
+        # non-Linux host isn't a fault to report, just the expected reality
+        # -- there's no Windows GPU enumeration implemented here yet.
+        logger.debug("No /sys/class/drm on this system (not Linux?); skipping GPU detection")
         return
 
     try:

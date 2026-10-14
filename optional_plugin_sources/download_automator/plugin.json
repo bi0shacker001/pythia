@@ -1,0 +1,7 @@
+{
+  "id": "pythia.downloader.automator",
+  "display_name": "Download Automator",
+  "version": "1.0.0",
+  "author": "pythia",
+  "categories": ["downloader"]
+}

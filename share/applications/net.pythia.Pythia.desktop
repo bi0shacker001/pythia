@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Pythia
+StartupWMClass=net.pythia.Pythia
+Comment=Video Game Preservation Platform
+Categories=Game;PackageManager;
+Keywords=gaming;emulator;renpy;
+Exec=pythia %U
+Icon=net.pythia.Pythia
+Terminal=false
+Type=Application
+StartupNotify=true
+MimeType=x-scheme-handler/pythia;application/x-pythia;

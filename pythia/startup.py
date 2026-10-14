@@ -14,7 +14,7 @@ from pythia.runners.json import load_json_runners
 from pythia.services import DEFAULT_SERVICES
 from pythia.util.graphics import vkquery
 from pythia.util.graphics.gpu import preload_gpus
-from pythia.util.linux import LINUX_SYSTEM
+from pythia.util.linux import IS_LINUX, LINUX_SYSTEM
 from pythia.util.log import logger
 from pythia.util.path_cache import build_path_cache
 from pythia.util.system import create_folder
@@ -70,7 +70,14 @@ def check_libs(all_components=False):
 
     This is purely diagnostic logging and is run on a background thread
     at startup so the expensive ldconfig parse doesn't block the UI.
+
+    Genuinely Linux-specific (walks ldconfig's .so listing) -- there's no
+    Windows equivalent implemented yet, so this is a no-op there rather than
+    logging a pile of "missing" errors for libraries that were never going
+    to exist under that name on this platform.
     """
+    if not IS_LINUX:
+        return
     try:
         missing_libs = LINUX_SYSTEM.get_missing_libs()
         if all_components:

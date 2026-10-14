@@ -42,16 +42,60 @@ import gzip
 import json
 import os
 import platform
+import re
 import shutil
 import stat
 import tarfile
+import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
+
+from pythia.util.safe_archive import safe_extract_zip
 from pathlib import Path
 
 from pythia import settings as core_settings  # real Lutris-derived settings module, not a second parallel one
 from pythia.identity import app_data_dir
+
+MAX_TAR_MEMBERS = 100_000
+MAX_TAR_TOTAL_SIZE = 32 * 1024**3
+MAX_TAR_MEMBER_SIZE = 16 * 1024**3
+MAX_TOOL_DOWNLOAD_BYTES = 8 * 1024**3
+MAX_GZIP_EXPANDED_BYTES = 16 * 1024**3
+MAX_RUNNER_CATALOG_BYTES = 2 * 1024**2
+MAX_RUNNER_CATALOG_ENTRIES = 10_000
+_RUNNER_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+
+
+class _HTTPSOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target = urllib.parse.urlparse(newurl)
+        if target.scheme != "https":
+            raise urllib.error.HTTPError(newurl, code, "Refusing a non-HTTPS tool redirect", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _tool_download_filename(url: str) -> str:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname
+        parsed.port
+    except ValueError as exc:
+        raise ValueError("tool URL has an invalid host or port") from exc
+    if parsed.scheme != "https" or not host or parsed.username is not None or parsed.password is not None:
+        raise ValueError("tool downloads require an HTTPS URL without embedded credentials")
+    filename = urllib.parse.unquote(parsed.path.rsplit("/", 1)[-1])
+    if (
+        not filename
+        or filename in {".", ".."}
+        or len(filename) > 240
+        or "/" in filename
+        or "\\" in filename
+        or any(ord(char) < 32 or ord(char) == 127 for char in filename)
+    ):
+        raise ValueError("tool URL does not contain a safe filename")
+    return filename
 
 # Static, non-Lutris-hosted tool catalogs -- same {"version", "architecture", "url",
 # "default"} shape as a Lutris /api/runners/<name> response, so resolve_version()
@@ -125,13 +169,44 @@ def fetch_lutris_catalog(runner_name: str, log=lambda *_: None) -> list[dict]:
     """Real, live query against Lutris's own runner catalog API -- the actual
     infrastructure Wine/Proton-GE/DXVK/etc. builds are hosted on
     (ported from lutris/api.py's download_runner_versions())."""
-    url = f"{core_settings.SITE_URL}/api/runners/{runner_name}"
+    if not _RUNNER_ID_RE.fullmatch(runner_name):
+        log("tools: refused an invalid runner catalog identifier")
+        return []
+    url = f"{core_settings.SITE_URL.rstrip('/')}/api/runners/{runner_name}"
     try:
+        _tool_download_filename(f"{url}/catalog.json")  # validates HTTPS host/port/credentials
         req = urllib.request.Request(url, headers={"User-Agent": core_settings.DEFAULT_USER_AGENT})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        return data.get("versions") or []
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError) as e:
+        opener = urllib.request.build_opener(_HTTPSOnlyRedirectHandler())
+        with opener.open(req, timeout=15) as resp:
+            try:
+                declared_size = int(resp.headers.get("Content-Length") or 0)
+            except (TypeError, ValueError):
+                raise ValueError("catalog server returned an invalid Content-Length")
+            if declared_size > MAX_RUNNER_CATALOG_BYTES:
+                raise ValueError("runner catalog exceeds the response-size limit")
+            payload = resp.read(MAX_RUNNER_CATALOG_BYTES + 1)
+            if len(payload) > MAX_RUNNER_CATALOG_BYTES:
+                raise ValueError("runner catalog exceeds the response-size limit")
+            data = json.loads(payload.decode("utf-8"))
+        versions = data.get("versions") if isinstance(data, dict) else None
+        if not isinstance(versions, list) or len(versions) > MAX_RUNNER_CATALOG_ENTRIES:
+            raise ValueError("runner catalog has an invalid versions list")
+        return [
+            entry
+            for entry in versions
+            if isinstance(entry, dict)
+            and isinstance(entry.get("version"), str)
+            and isinstance(entry.get("architecture"), str)
+            and isinstance(entry.get("url"), str)
+        ]
+    except (
+        urllib.error.URLError,
+        urllib.error.HTTPError,
+        TimeoutError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        ValueError,
+    ) as e:
         log(f"tools: failed to query Lutris runner catalog for '{runner_name}': {e}")
         return []
 
@@ -185,6 +260,80 @@ def _cache_dir() -> Path:
     return d
 
 
+def _safe_extract_tar(
+    archive: tarfile.TarFile,
+    destination: Path,
+    *,
+    max_members: int = MAX_TAR_MEMBERS,
+    max_total_size: int = MAX_TAR_TOTAL_SIZE,
+    max_member_size: int = MAX_TAR_MEMBER_SIZE,
+):
+    """Preflight a runner TAR completely before extracting any member."""
+    members = archive.getmembers()
+    if len(members) > max_members:
+        raise tarfile.TarError(f"archive has {len(members)} members; limit is {max_members}")
+    total = 0
+    seen: set[str] = set()
+    checked = []
+    for member in members:
+        key = member.name.replace("\\", "/").rstrip("/").casefold()
+        if not key or key in seen:
+            raise tarfile.TarError(f"archive contains a duplicate or empty destination: {member.name!r}")
+        seen.add(key)
+        if member.size < 0 or member.size > max_member_size:
+            raise tarfile.TarError(f"archive member exceeds the size limit: {member.name!r}")
+        total += member.size
+        if total > max_total_size:
+            raise tarfile.TarError(f"archive expands beyond the {max_total_size}-byte total limit")
+        # Python's data filter rejects traversal, absolute paths, devices and
+        # unsafe link targets. Calling it here keeps that validation atomic.
+        filtered = tarfile.data_filter(member, destination)
+        if filtered is not None:
+            checked.append(filtered)
+    archive.extractall(destination, members=checked, filter="data")
+
+
+def _safe_extract_gzip(archive_path: Path, target: Path, *, max_size: int = MAX_GZIP_EXPANDED_BYTES):
+    if target.exists():
+        raise FileExistsError(f"refusing to replace existing extracted tool: {target}")
+    temporary = target.with_name(f".{target.name}.part")
+    written = 0
+    try:
+        with gzip.open(archive_path, "rb") as src, temporary.open("xb") as dst:
+            while chunk := src.read(1024 * 1024):
+                written += len(chunk)
+                if written > max_size:
+                    raise ValueError(f"gzip expands beyond the {max_size}-byte limit")
+                dst.write(chunk)
+        os.replace(temporary, target)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _promote_file_no_replace(source: Path, target: Path):
+    """Atomically publish a direct tool binary without replacing a race winner."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary_name = None
+    try:
+        with source.open("rb") as input_file, tempfile.NamedTemporaryFile(
+            mode="wb", dir=target.parent, prefix=f".{target.name}-install-", suffix=".tmp", delete=False
+        ) as temporary:
+            temporary_name = temporary.name
+            shutil.copyfileobj(input_file, temporary, length=1024 * 1024)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        temporary_path = Path(temporary_name)
+        if os.name == "nt":
+            os.rename(temporary_path, target)  # Windows rename refuses an existing target.
+        else:
+            os.link(temporary_path, target)  # Atomic create-if-absent on POSIX.
+            temporary_path.unlink()
+        source.unlink()
+    finally:
+        if temporary_name:
+            Path(temporary_name).unlink(missing_ok=True)
+
+
 def _extract_archive(archive_path: Path, dest_dir: Path, merge_single: bool = True):
     """Stdlib-only archive extraction, ported (simplified) from
     lutris/util/extract.py's extract_archive() -- tar/tgz/txz/zip only (no 7zip
@@ -195,14 +344,13 @@ def _extract_archive(archive_path: Path, dest_dir: Path, merge_single: bool = Tr
 
     if name.endswith((".tar.gz", ".tgz", ".tar.xz", ".tar.bz2", ".tar")) or tarfile.is_tarfile(archive_path):
         with tarfile.open(archive_path) as tf:
-            tf.extractall(dest_dir, filter="data")
+            _safe_extract_tar(tf, dest_dir)
     elif name.endswith(".zip") or zipfile.is_zipfile(archive_path):
         with zipfile.ZipFile(archive_path) as zf:
-            zf.extractall(dest_dir)
+            safe_extract_zip(zf, dest_dir)
     elif name.endswith(".gz"):
         target = dest_dir / archive_path.stem
-        with gzip.open(archive_path, "rb") as src, open(target, "wb") as dst:
-            shutil.copyfileobj(src, dst)
+        _safe_extract_gzip(archive_path, target)
     else:
         raise ValueError(f"unrecognized archive format: {archive_path.name}")
 
@@ -222,22 +370,51 @@ def download_and_install(url: str, dest_dir: Path, is_archive: bool = False, mer
     directly as `dest_dir`'s one file (single-binary case, e.g. legendary.exe).
     Marks the result executable on POSIX. Raises on failure -- callers decide how to
     degrade (see ensure_tool(), which catches and returns None)."""
-    filename = os.path.basename(url.split("?")[0])
+    filename = _tool_download_filename(url)
     cache_path = _cache_dir() / filename
     log(f"tools: downloading {url} ...")
     temp_path = cache_path.with_suffix(cache_path.suffix + ".part")
-    with urllib.request.urlopen(url, timeout=60) as resp, open(temp_path, "wb") as f:
-        while chunk := resp.read(1024 * 256):
-            f.write(chunk)
-    temp_path.rename(cache_path)
+    temp_path.unlink(missing_ok=True)
+    try:
+        opener = urllib.request.build_opener(_HTTPSOnlyRedirectHandler())
+        with opener.open(url, timeout=60) as resp:
+            try:
+                declared_size = int(resp.headers.get("Content-Length") or 0)
+            except (TypeError, ValueError):
+                raise ValueError("tool server returned an invalid Content-Length")
+            if declared_size > MAX_TOOL_DOWNLOAD_BYTES:
+                raise ValueError(f"tool download exceeds the {MAX_TOOL_DOWNLOAD_BYTES}-byte limit")
+            received = 0
+            with temp_path.open("xb") as f:
+                while chunk := resp.read(1024 * 256):
+                    received += len(chunk)
+                    if received > MAX_TOOL_DOWNLOAD_BYTES:
+                        raise ValueError(f"tool download exceeds the {MAX_TOOL_DOWNLOAD_BYTES}-byte limit")
+                    f.write(chunk)
+            if declared_size and received != declared_size:
+                raise ValueError("tool download ended before the declared size was received")
+        os.replace(temp_path, cache_path)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
     if is_archive:
-        _extract_archive(cache_path, dest_dir, merge_single=merge_single)
-        cache_path.unlink(missing_ok=True)
+        dest_dir.parent.mkdir(parents=True, exist_ok=True)
+        staging_dir = Path(tempfile.mkdtemp(prefix=f".{dest_dir.name}-install-", dir=dest_dir.parent))
+        try:
+            _extract_archive(cache_path, staging_dir, merge_single=merge_single)
+            if dest_dir.exists():
+                if dest_dir.is_dir() and not any(dest_dir.iterdir()):
+                    dest_dir.rmdir()
+                else:
+                    raise FileExistsError(f"refusing to replace existing tool directory: {dest_dir}")
+            os.replace(staging_dir, dest_dir)
+            cache_path.unlink(missing_ok=True)
+        finally:
+            if staging_dir.exists():
+                shutil.rmtree(staging_dir, ignore_errors=True)
         result = dest_dir
     else:
-        dest_dir.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(cache_path), str(dest_dir))
+        _promote_file_no_replace(cache_path, dest_dir)
         result = dest_dir
 
     if os.name != "nt":

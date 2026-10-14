@@ -1,0 +1,14 @@
+{
+  "id": "pythia.library.itch",
+  "display_name": "itch.io",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "itch",
+  "entry_classes": [
+    "ItchLibraryPlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "library"
+  ]
+}

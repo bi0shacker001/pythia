@@ -1,0 +1,14 @@
+{
+  "id": "pythia.source.local_path",
+  "display_name": "Local/mounted path",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "local_path",
+  "entry_classes": [
+    "LocalPathSourcePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "source"
+  ]
+}

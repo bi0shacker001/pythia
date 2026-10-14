@@ -8,6 +8,7 @@
 """Query Vulkan capabilities"""
 
 # Standard Library
+import sys
 from collections.abc import Sequence
 from ctypes import (
     CDLL,
@@ -385,7 +386,17 @@ def _get_vk_instance() -> VkInstance | None:
 
 
 def _get_vulkan() -> CDLL:
-    vulkan = CDLL("libvulkan.so.1")
+    # The Vulkan loader ships under a different name per platform; the function
+    # signatures below are the same C ABI everywhere (VKAPI_CALL is a plain
+    # cdecl-compatible call on 64-bit, which is all we target -- see
+    # pythia.util.linux.LinuxSystem.get_arch), so CDLL works unchanged.
+    if sys.platform == "win32":
+        lib_name = "vulkan-1.dll"
+    elif sys.platform == "darwin":
+        lib_name = "libvulkan.1.dylib"
+    else:
+        lib_name = "libvulkan.so.1"
+    vulkan = CDLL(lib_name)
 
     # Provide function signatures; this is required on platforms where var-args are
     # passed in some other way than normal args, and is safer in general.

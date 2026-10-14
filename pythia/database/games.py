@@ -346,12 +346,10 @@ def _get_games_via_variant_filter(searches, filters, excludes, sorts) -> list[Db
 def get_games_where(**conditions: Any) -> list[DbGameDict]:
     """Same field__lessthan / __isnull / __not / __in conditions as before,
     against the merged games+primary-variant view (or per-variant rows, for
-    variant-scoped fields -- see get_games())."""
-    filters: dict[str, Any] = {}
-    for field, value in conditions.items():
-        base_field = field.split("__")[0]
-        filters[field] = value
-    return get_games(filters=filters)
+    variant-scoped fields -- see get_games()). The field__suffix parsing
+    itself lives in sql._condition_filter_sql(), reached via
+    sql.filtered_query() -- this just forwards the raw suffixed keys."""
+    return get_games(filters=dict(conditions))
 
 
 def get_games_by_ids(game_ids) -> list[DbGameDict]:

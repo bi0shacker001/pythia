@@ -1,0 +1,14 @@
+{
+  "id": "pythia.engine.august",
+  "display_name": "AUGUST engine",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "august",
+  "entry_classes": [
+    "AugustEnginePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "engine"
+  ]
+}

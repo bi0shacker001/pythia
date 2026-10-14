@@ -332,6 +332,16 @@ def onboard(path: Path, decision: dict | None = None):
     )
 
     action = (decision or {}).get("action")
+    if action == "cancel":
+        # A real "the user explicitly declined" outcome (2026-08-08, native UI
+        # correctness pass -- see aisync/WORKLOG.md): `decision=None` was NOT
+        # a safe stand-in for this, since the branch below treats a None
+        # action as "auto-resolve automatically" (certain match -> link,
+        # otherwise mint a new game) -- exactly the silent-default behavior
+        # a cancel must NOT produce. Nothing is minted or linked; the caller
+        # (still blocked on `_ask_live`'s wait, for a live onboard) is
+        # unblocked with a real "cancelled" status instead.
+        return {"status": "cancelled", "message": "Onboarding was cancelled.", "path": str(path)}
     import_to_location = (decision or {}).get("import_to_location", False)
     this_uuid = get_system_uuid()
     # A match `find_candidates()`/a `link` decision points at may belong to a

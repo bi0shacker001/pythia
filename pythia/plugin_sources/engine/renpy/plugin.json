@@ -1,0 +1,14 @@
+{
+  "id": "pythia.engine.renpy",
+  "display_name": "Ren'Py",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "renpy",
+  "entry_classes": [
+    "RenpyEnginePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "engine"
+  ]
+}

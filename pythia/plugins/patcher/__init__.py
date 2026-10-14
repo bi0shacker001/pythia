@@ -10,7 +10,6 @@ researched yet.
 
 from pathlib import Path
 
-from pythia.plugins.patcher.bundled import plugin as bundled_patcher_plugin  # noqa: F401
 from pythia.plugins.registry import filter_enabled, for_category
 
 

@@ -1,0 +1,14 @@
+{
+  "id": "pythia.engine.unreal",
+  "display_name": "Unreal Engine",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "unreal",
+  "entry_classes": [
+    "UnrealEnginePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "engine"
+  ]
+}

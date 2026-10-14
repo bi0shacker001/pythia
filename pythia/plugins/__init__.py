@@ -15,13 +15,23 @@ separately-distributable extension points, not an internal implementation detail
   avoiding duplicate work: a multi-category plugin plausibly holds shared state (an
   authenticated session, a connection to one service) that must not be split across
   independent instances per category.
-- **Dynamic discovery**: built-in plugins ship inside pythia itself (each plugin
-  module self-registers via `registry.register_builtin()` at import time); third-
-  party plugins are their own installable Python packages that declare an
-  `importlib.metadata` entry point under the single `pythia.plugins` group -- one
-  entry point per plugin, however many categories it spans, not one per category. A
-  broken or incompatible third-party plugin must never take the whole app down:
-  discovery swallows and logs load errors per-plugin, it doesn't propagate them.
+- **Dynamic discovery, built-ins included** (2026-08-06, adapted directly from
+  Lutris's real runner loader, `lutris/runners/__init__.py`'s `__all__` +
+  `import_runner()`): built-in plugins are not a separate, eagerly-imported path --
+  `pythia.plugins.registry.BUILTIN_PLUGIN_MODULES` lists their module paths the same
+  way Lutris's `__all__` lists runner names, and nothing is imported or instantiated
+  until something actually asks for it. Third-party plugins are their own
+  installable Python packages that declare an `importlib.metadata` entry point under
+  the single `pythia.plugins` group -- one entry point per plugin, however many
+  categories it spans, not one per category -- or a drop-in folder manifest under
+  `app_data_dir()/plugins/`. All three paths converge on the same lazy class
+  registry: a disabled plugin, built-in or third-party, is never instantiated at
+  all -- "disabled" means "not loaded," not just "hidden" from a list. A broken or
+  incompatible third-party plugin must never take the whole app down: discovery
+  swallows and logs load errors per-plugin, it doesn't propagate them. The *only*
+  thing that distinguishes a built-in from any other plugin is
+  `registry.is_protected()`: its id can't be removed from the Plugins page (there's
+  no install record to delete), but it can be disabled like anything else.
 - **Opt-in enablement, not a blocklist**: `local.db` stores an `enabled_plugins`
   *allowlist* of plugin ids, not a disabled-list. An empty/unset allowlist means "no
   restriction -- everything discovered is enabled," which is both the sensible
@@ -116,6 +126,58 @@ class PluginMeta:
 
     def set_credential(self, key: str, value: str):
         credentials.set_credential(self.id, key, value)
+
+    def get_config(self, key: str, default=None):
+        """A stored value from this plugin's own generic per-plugin config
+        (the same `plugin_config:<id>` storage backend.py's Configure UI
+        already reads/writes for every config_schema field) -- how a
+        plugin gets a value that may have been overridden by the user,
+        without importing pythia.identity itself (2026-08-07: "Plugins
+        need to be completely self-contained... They have their own
+        configurations to give them what they need")."""
+        import json
+
+        from pythia.identity import get_setting
+
+        raw = get_setting(f"plugin_config:{self.id}", None)
+        if not raw:
+            return default
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            return default
+        return data.get(key, default) if isinstance(data, dict) else default
+
+    def set_config(self, key: str, value) -> None:
+        import json
+
+        from pythia.identity import get_setting, set_setting
+
+        raw = get_setting(f"plugin_config:{self.id}", None)
+        try:
+            data = json.loads(raw) if raw else {}
+        except (ValueError, TypeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        data[key] = value
+        set_setting(f"plugin_config:{self.id}", json.dumps(data))
+
+    def data_dir(self) -> Path:
+        """A private, writable directory this plugin may use for its own
+        on-disk state (a downloaded tool binary, extracted assets, a local
+        session file) -- Pythia computes a real default; a `"data_dir"`
+        entry in this plugin's own stored config overrides it through the
+        exact same channel as any other config field, via the Configure
+        UI. The plugin calls this and never knows (or needs to know) which
+        case applied -- "the plugin will see that information... without
+        knowing where it came from, because it doesn't matter" (2026-08-07)."""
+        from pythia.identity import app_data_dir
+
+        override = self.get_config("data_dir")
+        d = Path(override) if override else app_data_dir() / "plugins" / "_data" / self.id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
 
     def is_connected(self) -> bool:
         """True once every declared credential field has a value. A plugin with no
@@ -421,7 +483,26 @@ class ModPlugin(PluginMeta):
     """Mod identification/acquisition -- same enablement-only boundary as
     EnginePlugin: identifies and fetches mod files, never applies or launches them.
     Exists because variants[].mods[] entries carry a nullable `version` field
-    (Milestone 3) that nothing populates without a plugin like this."""
+    (Milestone 3) that nothing populates without a plugin like this.
+
+    This is specifically an **installation** mod manager: it identifies and
+    fetches files that get installed INTO the game's own folder on disk.
+    See RuntimeModPlugin below for the other real shape "mod manager" takes
+    in this project -- a tool that only modifies a running game in memory,
+    never touching its files (2026-08-07, from an earlier, not-yet-coded
+    plan: "while mod managers manage mods installed into the game
+    (installation mods), these tools manage mods that exist only in memory
+    (so, in runtime)"). `is_runtime` is how the two are told apart --
+    checked, not just documented, because the two have a real different
+    multiplicity rule: a game should have at most ONE installation mod
+    manager active (two managers both writing into the same game folder
+    could conflict), but as many runtime ones as it wishes (independent
+    process-time wrappers don't share that conflict)."""
+
+    #: False for a plain ModPlugin (installation-style); RuntimeModPlugin
+    #: below overrides this to True. Checked by whatever enforces the
+    #: at-most-one-installation-manager rule -- not just documentation.
+    is_runtime: bool = False
 
     def detect(self, variant: dict) -> list:
         raise NotImplementedError
@@ -443,4 +524,34 @@ class ModPlugin(PluginMeta):
         able to actually download, is legitimate) -- callers must check for
         NotImplementedError or a documented sentinel, same as any optional method
         here that still needs a real implementation to be useful."""
+        raise NotImplementedError
+
+
+class RuntimeModPlugin(ModPlugin):
+    """A mod manager that only modifies a game while it's running, in
+    memory -- never writes to the game's own files (e.g. locale emulation,
+    or a Wand-style runtime patcher). A real subclass of ModPlugin, not a
+    sibling: `categories_of_class()`'s issubclass check against
+    CATEGORY_CLASSES["mod"] picks these up automatically, so they show up
+    in the Mods capability pane like any other mod plugin, no registry
+    changes needed -- `is_runtime` is what lets a caller tell the two
+    shapes apart when the multiplicity rule (at most one installation
+    manager, any number of runtime ones) actually matters.
+
+    detect()/check_updates()/list_available()/fetch() from ModPlugin still
+    apply if a runtime mod has real files of its own to identify/acquire
+    (e.g. a locale profile database); wrap_launch() is the part that's
+    actually new -- taking over how the game process gets created, instead
+    of just tracking mod files."""
+
+    is_runtime = True
+
+    def wrap_launch(self, exe_path: Path, args: list, working_dir: Path, ctx):
+        """Create (or take over creating) the game's own process, applying
+        this runtime mod's real effect (e.g. injecting a locale-emulation
+        hook DLL before the process's first instruction runs). Returns
+        whatever real process handle/PID the caller needs to track the
+        launched game. Multiple enabled runtime mods for the same instance
+        are expected to chain -- exactly how isn't decided yet (real,
+        not-yet-designed follow-up, not something to guess at here)."""
         raise NotImplementedError

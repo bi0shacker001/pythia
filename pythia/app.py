@@ -14,7 +14,6 @@ try to fake it.
 
 import argparse
 import json
-import logging
 import os
 import sys
 import tempfile
@@ -35,7 +34,7 @@ from pythia.services import get_enabled_services
 from pythia.startup import init_pythia, run_all_checks
 from pythia.util import resources, system
 from pythia.util.http import HTTPError, Request
-from pythia.util.log import logger
+from pythia.util.log import logger, set_debug_logging
 from pythia.util.standalone_scripts import generate_script
 from pythia.util.steam.appmanifest import AppManifest, get_appmanifests
 from pythia.util.steam.config import get_steamapps_dirs
@@ -68,6 +67,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dest", metavar="PATH", help="Destination path for export/import")
     parser.add_argument("-j", "--json", action="store_true", help="Display the list of games in JSON format")
     parser.add_argument("--reinstall", action="store_true", help="Reinstall game")
+    parser.add_argument(
+        "--xdg-install",
+        action="store_true",
+        help="Register this install's .desktop file, icons, and MIME type under ~/.local/share "
+        "(Linux only -- the self-integration step an AppImage needs since it isn't a system package)",
+    )
     parser.add_argument(
         "uri",
         nargs="?",
@@ -225,7 +230,22 @@ def _execute_command(command: str) -> None:
         monitored_command.stop()
 
 
+def _install_excepthook() -> None:
+    """See pythia.ui.app's own copy of this -- same reasoning, the headless
+    CLI path deserves the same guarantee that an uncaught exception is
+    actually logged somewhere durable, not just printed to a console that
+    may not exist (e.g. invoked from a Windows shortcut with no console
+    attached) (2026-08-07)."""
+
+    def _hook(exc_type, exc_value, exc_tb):
+        logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _hook
+
+
 def run(argv: list[str] | None = None) -> int:
+    _install_excepthook()
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -233,8 +253,15 @@ def run(argv: list[str] | None = None) -> int:
         print(f"pythia-{settings.VERSION}")
         return 0
 
-    if args.debug:
-        logger.setLevel(logging.DEBUG)
+    from pythia.util.local_config import load_local_config  # noqa: PLC0415
+
+    if args.debug or load_local_config()["debug"]:
+        set_debug_logging(True)
+
+    if args.xdg_install:
+        from pythia.util.xdg_install import xdg_install  # noqa: PLC0415
+
+        return 0 if xdg_install(log=print) else 1
 
     logger.info("Starting Pythia %s", settings.VERSION)
     init_pythia()

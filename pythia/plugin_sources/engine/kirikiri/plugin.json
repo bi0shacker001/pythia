@@ -1,0 +1,14 @@
+{
+  "id": "pythia.engine.kirikiri",
+  "display_name": "Kirikiri/KAG3",
+  "version": "1.0.0",
+  "author": "pythia",
+  "entry_module": "kirikiri",
+  "entry_classes": [
+    "KirikiriEnginePlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "engine"
+  ]
+}

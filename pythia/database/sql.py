@@ -199,6 +199,38 @@ def _create_filter(field: str, value: Any, params: list[Any], negate: bool = Fal
         return sql
 
 
+# field__suffix condition support (2026-08-07 real fix -- external review
+# against a genuinely clean install found this: get_games_where()'s own
+# docstring claims "Same field__lessthan / __isnull / __not / __in
+# conditions as before," but nothing here ever actually parsed the suffix --
+# a raw "discord_id__isnull" was passed straight through as a literal SQL
+# column name, crashing pythia/migrations/retrieve_discord_appids.py with
+# "no such column: discord_id__isnull" on the very first real, un-migrated
+# run. pythia/services/itchio.py's `installed_at__lessthan=...` was the same
+# latent, never-yet-exercised bug -- both real call sites are fixed by this,
+# not just the one that happened to crash first.
+_COMPARISON_SUFFIXES = {"__lessthan": "<", "__greaterthan": ">"}
+
+
+def _condition_filter_sql(field: str, value: Any, params: list[Any], negate: bool = False) -> str:
+    if field.endswith("__isnull"):
+        base = field[: -len("__isnull")]
+        # isnull=True -> IS NULL; isnull=False -> IS NOT NULL -- `negate` XORed
+        # with the caller's own (e.g. an `excludes={"x__isnull": True}` entry
+        # correctly becomes NOT NULL, not double-negated back to NULL).
+        return _create_filter(base, None, params, negate=(negate != (not value)))
+    if field.endswith("__not"):
+        return _create_filter(field[: -len("__not")], value, params, negate=not negate)
+    if field.endswith("__in"):
+        return _create_filter(field[: -len("__in")], value, params, negate=negate)
+    for suffix, op in _COMPARISON_SUFFIXES.items():
+        if field.endswith(suffix):
+            base = field[: -len(suffix)]
+            params.append(value)
+            return f"{base} {'<=' if negate and op == '>' else '>=' if negate and op == '<' else op} ?"
+    return _create_filter(field, value, params, negate=negate)
+
+
 def filtered_query(
     db_path: str,
     table: str,
@@ -217,9 +249,9 @@ def filtered_query(
         sql_filters.append("%s LIKE ?" % field)
         params.append("%" + searches[field] + "%")
     for field in filters:
-        sql_filters.append(_create_filter(field, filters[field], params))
+        sql_filters.append(_condition_filter_sql(field, filters[field], params))
     for field in excludes or {}:
-        sql_filters.append(_create_filter(field, excludes[field], params, negate=True))
+        sql_filters.append(_condition_filter_sql(field, excludes[field], params, negate=True))
     if sql_filters:
         query += " WHERE " + " AND ".join(sql_filters)
     if sorts:

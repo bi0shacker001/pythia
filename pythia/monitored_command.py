@@ -23,8 +23,18 @@ if TYPE_CHECKING:
     from pythia.util.log_buffer import SimpleLogBuffer
 
 
-def get_wrapper_script_location() -> str:
-    """Return absolute path of pythia-wrapper script"""
+def get_wrapper_script_location() -> str | None:
+    """Absolute path of the (POSIX-shell) pythia-wrapper script, or None if
+    it isn't found -- real gap, not fabricated: pythia-wrapper is a bash
+    script (process-tracking for a monitored terminal command), meaningless
+    on Windows and not something a Windows build ships. 2026-08-07 fix:
+    this used to raise unconditionally at *module import time*
+    (`WRAPPER_SCRIPT = get_wrapper_script_location()` below), which crashed
+    the entire app on any platform/build where the script isn't found --
+    including the real Windows PyInstaller build, which never imported
+    anything Windows-specific to notice the problem before this line ran.
+    Only actually raise when a caller tries to use a monitored terminal
+    command without it (see MonitoredCommand.get_wrapped_command below)."""
     wrapper_relpath = "share/pythia/bin/pythia-wrapper"
     candidates = [
         os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "..")),
@@ -36,7 +46,7 @@ def get_wrapper_script_location() -> str:
         wrapper_abspath = os.path.join(candidate, wrapper_relpath)
         if os.path.isfile(wrapper_abspath):
             return wrapper_abspath
-    raise FileNotFoundError("Couldn't find pythia-wrapper script in any of the expected locations")
+    return None
 
 
 WRAPPER_SCRIPT = get_wrapper_script_location()
@@ -95,6 +105,11 @@ class MonitoredCommand:
 
     def get_wrapper_command(self) -> list[str]:
         """Return launch arguments for the wrapper script"""
+        if WRAPPER_SCRIPT is None:
+            raise FileNotFoundError(
+                "Couldn't find the pythia-wrapper script in any of the expected locations "
+                "-- process-tracking for a monitored terminal command isn't available in this build."
+            )
         # Invoke the wrapper via the current Python explicitly rather than
         # relying on its `#!/usr/bin/env python3` shebang. The shebang
         # resolves through PATH at exec time, which silently picks up a

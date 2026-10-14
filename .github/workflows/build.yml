@@ -1,0 +1,259 @@
+name: Build
+
+# Real release-channel system (2026-08-07): "we also need channels. Latest,
+# Nightly, Unstable, and Stable builds." Every run on every channel gets its
+# own permanently-archived, uniquely-tagged GitHub Release -- "we must never
+# delete old builds. We keep the whole history." Only the small per-channel
+# manifest at docs/app/<channel>.json (what pythia.util.update_check reads)
+# gets overwritten each time, to point at the newest release on that
+# channel; every actual build stays reachable from the repo's Releases page.
+#
+#   latest:   every push to the dev branch      -- tag build-<UTC timestamp>-<short sha>
+#   nightly:  once a day (cron)                 -- tag nightly-<UTC date>
+#   unstable: a pre-release tag (v1.2.3-rc.1)   -- tag is the pushed tag itself
+#   stable:   a real tag (v1.2.3)                -- tag is the pushed tag itself
+#
+# Each of windows/linux builds a real x64/arm64 (Windows) or x86_64/aarch64
+# (Linux) matrix -- PyInstaller doesn't cross-compile, so each leg runs on a
+# real machine of its own architecture (2026-08-07: "do we have a build
+# system that builds both arm and x86 versions for windows and linux?").
+# Windows arm64 is allowed to fail without blocking anything else (see that
+# job's own comment) -- PySide6/QtWebEngine's ARM64 Windows wheel support is
+# a real, flagged risk, not a guarantee.
+
+on:
+  push:
+    branches: [lutris-core]
+    tags: ["v*"]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  setup:
+    name: Determine channel
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.compute.outputs.channel }}
+      tag: ${{ steps.compute.outputs.tag }}
+      version: ${{ steps.compute.outputs.version }}
+      prerelease: ${{ steps.compute.outputs.prerelease }}
+      commit: ${{ steps.compute.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: compute
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMMIT="$(git rev-parse HEAD)"
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          BASE_VERSION="$(python3 -c 'import sys; sys.path.insert(0, "pythia"); from pythia import __version__; print(__version__)')"
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            CHANNEL=nightly
+            TAG="nightly-$(date -u +%Y-%m-%d)"
+            VERSION="${BASE_VERSION}-nightly.$(date -u +%Y%m%d)"
+            PRERELEASE=true
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            RAW_TAG="${GITHUB_REF_NAME}"
+            if [[ "$RAW_TAG" == *-* ]]; then
+              CHANNEL=unstable
+              PRERELEASE=true
+            else
+              CHANNEL=stable
+              PRERELEASE=false
+            fi
+            TAG="$RAW_TAG"
+            VERSION="${RAW_TAG#v}"
+          else
+            CHANNEL=latest
+            TAG="build-$(date -u +%Y%m%d%H%M%S)-${SHORT_SHA}"
+            VERSION="${BASE_VERSION}-latest.${SHORT_SHA}"
+            PRERELEASE=true
+          fi
+
+          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "Channel: ${CHANNEL}  Tag: ${TAG}  Version: ${VERSION}"
+
+  windows:
+    name: Windows (${{ matrix.arch }})
+    needs: setup
+    runs-on: ${{ matrix.runner }}
+    # arm64 is allowed to fail without blocking the x64/Linux legs or the
+    # publish job (2026-08-07: real, flagged risk -- PySide6/QtWebEngine's
+    # ARM64 Windows wheel support is genuinely less mature than x64 or Linux
+    # ARM64; this may fail at `pip install .` if no matching wheel exists
+    # yet). `needs: [setup, windows, linux]` on the publish job below would
+    # otherwise skip publishing EVERYTHING just because this one leg failed.
+    continue-on-error: ${{ matrix.arch == 'arm64' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pyinstaller
+
+      - name: Stamp build info
+        shell: bash
+        run: |
+          cat > pythia/pythia/build_info.py <<EOF
+          BUILD_CHANNEL = "${{ needs.setup.outputs.channel }}"
+          BUILD_COMMIT = "${{ needs.setup.outputs.commit }}"
+          EOF
+
+      - name: Build portable app (PyInstaller)
+        run: python scripts/build_windows.py
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: cmd
+        run: '"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppArch=${{ matrix.arch }} packaging\windows\pythia.iss'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-${{ matrix.arch }}
+          path: |
+            dist/windows/*.zip
+            dist/windows/*.exe
+
+  linux:
+    name: Linux (${{ matrix.arch }})
+    needs: setup
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pyinstaller
+
+      - name: Stamp build info
+        run: |
+          cat > pythia/pythia/build_info.py <<EOF
+          BUILD_CHANNEL = "${{ needs.setup.outputs.channel }}"
+          BUILD_COMMIT = "${{ needs.setup.outputs.commit }}"
+          EOF
+
+      - name: Install fpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential rpm
+          sudo gem install --no-document fpm
+
+      - name: Install appimagetool
+        run: |
+          curl -L -o /usr/local/bin/appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-${{ matrix.arch }}.AppImage"
+          chmod +x /usr/local/bin/appimagetool
+          # Running an AppImage inside a container needs --appimage-extract-and-run
+          # (no FUSE available on most GitHub-hosted runners).
+          sudo bash -c 'printf "#!/usr/bin/env bash\nexec /usr/local/bin/appimagetool.real --appimage-extract-and-run \"\$@\"\n" > /usr/local/bin/appimagetool-wrapper'
+          sudo mv /usr/local/bin/appimagetool /usr/local/bin/appimagetool.real
+          sudo mv /usr/local/bin/appimagetool-wrapper /usr/local/bin/appimagetool
+          sudo chmod +x /usr/local/bin/appimagetool
+
+      - name: Build AppImage
+        run: bash scripts/build_appimage.sh
+
+      - name: Build rpm + deb
+        run: bash scripts/build_linux_packages.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-build-${{ matrix.arch }}
+          path: |
+            dist/linux/*.AppImage
+            dist/linux/*.deb
+            dist/linux/*.rpm
+
+  publish:
+    name: Publish release + update manifest
+    needs: [setup, windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release (never overwrites -- every tag here is unique)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.setup.outputs.tag }}
+          name: "${{ needs.setup.outputs.channel }} — ${{ needs.setup.outputs.version }}"
+          prerelease: ${{ needs.setup.outputs.prerelease }}
+          files: |
+            artifacts/windows-build-*/*
+            artifacts/linux-build-*/*
+          generate_release_notes: true
+
+      - name: Publish update manifest (docs/app/<channel>.json)
+        # Only this small pointer file gets overwritten -- what
+        # pythia.util.update_check actually reads. The release created above
+        # is permanent; this just points at whichever one is newest on this
+        # channel. Committed onto the real tip of the default branch, NOT
+        # whatever ref triggered this run (a tag build leaves HEAD detached
+        # at the tagged commit, which could be behind the branch's actual
+        # tip) -- fetch+checkout the branch fresh right before committing.
+        run: |
+          set -euo pipefail
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          git fetch origin "$DEFAULT_BRANCH"
+          git checkout "$DEFAULT_BRANCH"
+          git pull --ff-only origin "$DEFAULT_BRANCH"
+
+          mkdir -p docs/app
+          cat > "docs/app/${{ needs.setup.outputs.channel }}.json" <<EOF
+          {
+            "channel": "${{ needs.setup.outputs.channel }}",
+            "version": "${{ needs.setup.outputs.version }}",
+            "commit": "${{ needs.setup.outputs.commit }}",
+            "download_url": "https://github.com/${{ github.repository }}/releases/tag/${{ needs.setup.outputs.tag }}",
+            "release_notes_url": "https://github.com/${{ github.repository }}/releases/tag/${{ needs.setup.outputs.tag }}"
+          }
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "docs/app/${{ needs.setup.outputs.channel }}.json"
+          git diff --staged --quiet || git commit -m "Publish ${{ needs.setup.outputs.channel }} manifest for ${{ needs.setup.outputs.tag }} [skip ci]"
+          git push origin "HEAD:${DEFAULT_BRANCH}"

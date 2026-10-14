@@ -1,0 +1,23 @@
+{
+  "id": "pythia.library.f95",
+  "display_name": "F95Checker",
+  "version": "1.1.0",
+  "author": "pythia",
+  "entry_module": "f95",
+  "entry_classes": [
+    "F95LibraryPlugin",
+    "F95DownloaderPlugin"
+  ],
+  "builtin": true,
+  "categories": [
+    "library",
+    "downloader"
+  ],
+  "optional_dependencies": [
+    {
+      "id": "pythia.downloader.automator",
+      "min_version": "1.0.0",
+      "reason": "Detect download hosts, use authenticated sessions, and enqueue supported links automatically."
+    }
+  ]
+}

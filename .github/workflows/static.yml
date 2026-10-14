@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Check syntax compatibility
-        run: python -m compileall -q lutris/
+        run: python -m compileall -q pythia/
 
   mypy-checker:
     name: Mypy

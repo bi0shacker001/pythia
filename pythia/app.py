@@ -179,8 +179,8 @@ def _install_runner(runner_name: str) -> None:
             print(f"Wine version '{runner_name}' is already installed.")
             return
         try:
-            runner = import_runner("wine")
-            runner().install(InstallUIDelegate(), version=runner_name)
+            wine_runner = import_runner("wine")()
+            wine_runner.install(InstallUIDelegate(), version=runner_name)
             print(f"Wine version '{runner_name}' has been installed.")
         except (InvalidRunnerError, RunnerInstallationError) as ex:
             print(ex.message)
@@ -320,17 +320,17 @@ def run(argv: list[str] | None = None) -> int:
         return _run_droidtop_command(args)
 
     if args.output_script:
-        game = (
+        script_game = (
             games_db.get_game_by_field(args.output_script, "id")
             or games_db.get_game_by_field(args.output_script, "slug")
             or games_db.get_game_by_field(args.output_script, "installer_slug")
         )
-        if not game or not game["id"]:
+        if not script_game or not script_game["id"]:
             logger.warning(
                 "No valid game (%s) provided to generate the script. Use -l to find suitable games!", args.output_script
             )
             return 1
-        generate_script(logger, CommandLineUIDelegate(None), game, f"{game['slug']}.sh")
+        generate_script(logger, CommandLineUIDelegate(None), script_game, f"{script_game['slug']}.sh")
         return 0
 
     if args.list_games:

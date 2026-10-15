@@ -128,7 +128,7 @@ def _migrate_v2_to_v3(entry: dict) -> dict:
             variant.setdefault("source", {"kind": kind, "extra": extra})
 
     platform_ids = entry.setdefault("platform_ids", [])
-    id_key = PLATFORM_ID_KINDS.get(kind)
+    id_key = PLATFORM_ID_KINDS.get(kind) if kind else None
     if id_key and extra.get(id_key) and not any(p.get("platform") == kind for p in platform_ids):
         platform_ids.append({"platform": kind, "id": extra[id_key]})
 
@@ -233,10 +233,10 @@ def list_all_entries() -> list[dict]:
     return entries
 
 
-def list_known_games() -> dict[int, list[dict]]:
+def list_known_games() -> dict[str, list[dict]]:
     """Group every datadir entry by game_id -- the merged, cross-system view of the
     whole library: which systems have which versions of which games, where."""
-    games: dict[int, list[dict]] = {}
+    games: dict[str, list[dict]] = {}
     for entry in list_all_entries():
         games.setdefault(entry["game_id"], []).append(entry)
     return games

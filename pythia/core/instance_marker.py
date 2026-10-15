@@ -22,7 +22,7 @@ read manually if something needs debugging.
 import ctypes
 import datetime
 import json
-import os
+import sys
 import uuid
 from pathlib import Path
 
@@ -76,7 +76,7 @@ def _set_hidden(path: Path) -> None:
     confirmed limitation (see Milestone 9 §D): this attribute is local-only,
     it doesn't travel through an external sync tool the way the dotfile
     convention itself does."""
-    if os.name != "nt":
+    if sys.platform != "win32":
         return
     try:
         FILE_ATTRIBUTE_HIDDEN = 0x02

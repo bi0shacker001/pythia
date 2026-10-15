@@ -157,7 +157,8 @@ def run_update_check(log=None) -> dict:
     changed since the last full check recorded here (`f95_last_full_check`,
     a new, additive top-level entry field) -- same optimization the real
     client makes, avoiding a full_check call per game on every run."""
-    from pythia import cache, datadir
+    from pythia import datadir
+    from pythia.database.games import save_entry_and_sync_cache
     from pythia.identity import get_system_uuid
 
     log = log or (lambda msg: None)
@@ -205,8 +206,7 @@ def run_update_check(log=None) -> dict:
         entry["f95_last_full_check"] = last_changed
         if result is None:
             log(f"  -> thread {thread_id} not found (privated/moved/deleted).")
-            saved_path = datadir.save_entry(entry)
-            cache.upsert_entry(entry, saved_path.name)
+            save_entry_and_sync_cache(entry)
             continue
 
         installed_version = None
@@ -230,13 +230,12 @@ def run_update_check(log=None) -> dict:
             datadir.add_timeline_event(entry, "f95_update_detected", f"{installed_version} -> {result['version']}")
         entry["available_updates"] = available_updates
 
-        saved_path = datadir.save_entry(entry)
-        cache.upsert_entry(entry, saved_path.name)
+        save_entry_and_sync_cache(entry)
 
     return {"checked": checked, "updated": updated, "errors": errors}
 
 
-def full_check(thread_id: int, last_changed: int) -> dict:
+def full_check(thread_id: int, last_changed: int) -> dict | None:
     """Full, real thread data for one game -- name/version/developer/type/status/
     tags/changelog/downloads/etc, straight from the real cache API. Returns None
     if the thread is gone (403/404 -- privated, moved, or deleted, same cases

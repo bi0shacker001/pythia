@@ -99,7 +99,7 @@ def _discover_roots(scan_root: Path, plugins, generic):
             yield from _generic_roots(child, generic)
 
 
-def scan_library(root: Path):
+def scan_library(root: Path | str):
     """Discover and onboard every game root under `root`. Returns the list of
     onboarding result dicts (see onboarding.onboard)."""
     root = Path(root).resolve()

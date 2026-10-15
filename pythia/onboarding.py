@@ -261,7 +261,7 @@ def entry_id_source(entry: dict) -> str:
     return entry.get("game_id_source", "local")
 
 
-def preview(path: Path):
+def preview(path: Path | str):
     """Identify `path` and find candidate existing games, without writing anything.
     This is what cli.py/the Qt UI's backend.py call before asking the user for a
     decision. Returns {"status": "ok", "path", "detection", "name", "version_label",
@@ -341,7 +341,7 @@ def preview(path: Path):
     }
 
 
-def onboard(path: Path, decision: dict | None = None):
+def onboard(path: Path | str, decision: dict | None = None):
     """Identify `path` and record it in this system's datadir. See the plan's
     Onboarding flow section for what `decision` accepts. Returns a result dict:
     {"status": "ok", "game_id": N, "candidates": {...}} or {"status": "error", "message": ...}
@@ -375,6 +375,7 @@ def onboard(path: Path, decision: dict | None = None):
     if action == "new":
         game_id, id_source, existing_entry = _mint_new(detection)
     elif action == "link":
+        assert decision is not None  # action is "link" only when a decision says so
         game_id = decision["game_id"]
         id_source = "linked"
         existing_entry = _find_own_entry_by_game_id(game_id)
@@ -536,7 +537,7 @@ def _resolve_name_via_metadata(kind: str, detection: dict):
     a real, previously-stated fidelity gap). Best-effort: returns None (falls
     through to the existing "Unknown (...)" placeholder) if no metadata plugin has
     an answer, never raises."""
-    id_key = datadir.PLATFORM_ID_KINDS.get(kind)
+    id_key = datadir.PLATFORM_ID_KINDS.get(kind) if kind else None
     platform_id_value = detection.get("extra", {}).get(id_key) if id_key else None
     if platform_id_value is None:
         return None
@@ -574,7 +575,7 @@ def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[di
     # caught before it could duplicate every EGS game on every re-sync: the
     # platform_ids fallback below used to be gated on `external_id is not None`,
     # which a string-identified service can never satisfy).
-    id_key = datadir.PLATFORM_ID_KINDS.get(kind)
+    id_key = datadir.PLATFORM_ID_KINDS.get(kind) if kind else None
     string_id = detection.get("extra", {}).get(id_key) if id_key else None
 
     # 2026-08-04: game_id is never a reused platform ID anymore, so matching an
@@ -660,7 +661,7 @@ def _update_platform_ids_and_ownership(entry: dict, detection: dict):
     Steam stays so even after also onboarding an Epic install of the same game_id."""
     kind = detection.get("kind")
     extra = detection.get("extra") or {}
-    id_key = datadir.PLATFORM_ID_KINDS.get(kind)
+    id_key = datadir.PLATFORM_ID_KINDS.get(kind) if kind else None
 
     platform_ids = entry.setdefault("platform_ids", [])
     if id_key and extra.get(id_key) and not any(p.get("platform") == kind for p in platform_ids):

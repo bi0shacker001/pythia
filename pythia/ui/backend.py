@@ -31,6 +31,7 @@ import json
 import logging
 import threading
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
@@ -145,7 +146,7 @@ class Backend(QObject):
         self._decision_result = None
         self._awaiting_live_decision = False
         self._watch_stop_event = None
-        self._watcher = None
+        self._watcher: dict[str, Any] | None = None
         self._games = []
         self._lock = threading.Lock()
         self._ui_log: list[dict] = []
@@ -198,7 +199,7 @@ class Backend(QObject):
             self._jobs.insert(0, job)
             del self._jobs[_JOB_LIMIT:]
         self.jobsChanged.emit(_jsonable(self._jobs))
-        return job["id"]
+        return str(job["id"])
 
     def _job_log(self, job_id: str, line: str):
         with self._lock:

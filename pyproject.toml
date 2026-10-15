@@ -95,7 +95,6 @@ module = [
     "pythia.database.*",
     "pythia.exception_backstops",
     "pythia.exceptions",
-    "pythia.gui.dialogs",
     "pythia.monitored_command",
     "pythia.runners",
     "pythia.scanners.default_installers",
@@ -124,7 +123,6 @@ module = [
     "pythia.util.wine.dgvoodoo2",
     "pythia.util.xdgshortcuts",
     "pythia.util.yaml",
-    "setup",
     "utils.bios_format",
     "utils.meson_post_install",
 ]

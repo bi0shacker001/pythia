@@ -10,6 +10,7 @@ that gap is the whole reason renpy_patch exists.
 
 import re
 from pathlib import Path
+from typing import Any
 
 from pythia.plugins import EnginePlugin
 from pythia.plugins.registry import register_builtin
@@ -19,7 +20,7 @@ from pythia.renpy_patch import patch
 # folders are never added by renpy_patch (see patch.py's module docstring -- purely
 # additive to Linux support, existing Windows folders are left alone), so Windows
 # is reported as supported-if-present but never fixable.
-_KNOWN_PLATFORMS = {
+_KNOWN_PLATFORMS: dict[str, dict[str, Any]] = {
     "linux-x86_64": {"kind": "sdk", "fixable": True},
     "linux-aarch64": {"kind": "sdkarm", "fixable": True},
     "windows-x86_64": {"kind": None, "fixable": False},

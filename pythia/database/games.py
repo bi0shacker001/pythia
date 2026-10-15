@@ -127,6 +127,15 @@ def _iter_variants(entry: dict[str, Any]) -> Iterator[dict[str, Any]]:
         for variant in group.get("variants") or []:
             flat = dict(variant)
             flat["version_label"] = group.get("version")
+            # Pythia's onboarding records an install as `path` and `platforms`;
+            # the Lutris-shaped fields every query reads (directory, installed,
+            # platform) are filled from them where the variant has none, or a
+            # folder-tracked game reads as not installed with no directory.
+            if flat.get("path"):
+                flat.setdefault("directory", flat["path"])
+                flat.setdefault("installed", True)
+            if flat.get("platforms") and not flat.get("platform"):
+                flat["platform"] = flat["platforms"][0]
             yield flat
 
 
@@ -277,7 +286,7 @@ def _merged_row(entry: dict[str, Any], variant: dict[str, Any] | None) -> DbGame
         "system_uuid": entry["system_uuid"],
         "name": entry.get("canonical_name"),
         "sortname": entry.get("sortname") or "",
-        "slug": entry.get("slug") or "",
+        "slug": entry.get("slug") or (slugify(entry["canonical_name"]) if entry.get("canonical_name") else ""),
         "installer_slug": entry.get("installer_slug") or "",
         "parent_slug": entry.get("parent_slug") or "",
         "notes": entry.get("notes") or "",

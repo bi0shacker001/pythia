@@ -54,7 +54,10 @@ if TYPE_CHECKING:
 
 def get_default_dpi() -> int:
     """Computes the DPI to use for the primary monitor
-    which we pass to WINE."""
+    which we pass to WINE. Without GTK (Windows, or no GObject-introspection)
+    it is the standard 96: pythia.runners.wine asks for it while importing."""
+    if not HAS_GTK:
+        return 96
     display = Gdk.Display.get_default()
     if display:
         monitor = display.get_primary_monitor()

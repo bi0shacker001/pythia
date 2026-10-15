@@ -5,6 +5,7 @@ from __future__ import annotations
 # isort:skip_file
 import enum
 import os
+import sys
 import subprocess
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
@@ -137,7 +138,7 @@ def get_display_manager() -> MutterDisplayManager | DisplayManager | LegacyDispl
             logger.debug("Mutter DBus service not reachable: %s", ex)
         except Exception as ex:  # pylint: disable=broad-except
             logger.exception("Failed to instantiate MutterDisplayConfig. Please report with exception: %s", ex)
-    else:
+    elif sys.platform.startswith("linux"):  # DBus is a Linux desktop's; elsewhere it is not expected
         logger.error("DBus is not available, Pythia was not properly installed.")
 
     if LIB_GNOME_DESKTOP_AVAILABLE:

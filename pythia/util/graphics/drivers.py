@@ -6,6 +6,7 @@ Everything in this module should rely on /proc or /sys only, no executable calls
 
 import os
 import re
+import sys
 from collections.abc import Iterable
 from typing import TypeAlias
 
@@ -178,7 +179,9 @@ def is_nvidia() -> bool:
 def get_gpu_cards() -> Iterable[str]:
     """Return GPUs connected to the system"""
     if not os.path.exists("/sys/class/drm"):
-        logger.error("No GPU available on this system!")
+        # /sys/class/drm is Linux's list of GPUs; elsewhere none are listed here.
+        if sys.platform.startswith("linux"):
+            logger.error("No GPU available on this system!")
         return
 
     try:

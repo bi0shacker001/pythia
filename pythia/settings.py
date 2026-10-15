@@ -20,8 +20,10 @@ AUTHORS = [_("The Pythia team")]
 # Paths
 CONFIG_DIR = os.path.join(get_user_config_dir(), "pythia")
 DATA_DIR = os.path.join(get_user_data_dir(), "pythia")
-if not os.path.exists(CONFIG_DIR):
-    # Set the config dir to ~/.local/share/pythia as we're deprecating ~/.config/pythia
+if os.name != "nt" and not os.path.exists(CONFIG_DIR):
+    # Set the config dir to ~/.local/share/pythia as we're deprecating ~/.config/pythia.
+    # Not on Windows: there %APPDATA%\pythia is Pythia's app-data folder (identity.app_data_dir),
+    # created on the first run, so falling back to %LOCALAPPDATA% split pythia.conf in two.
     CONFIG_DIR = DATA_DIR
 CONFIG_FILE = os.path.join(CONFIG_DIR, "pythia.conf")
 sio = SettingsIO(CONFIG_FILE)

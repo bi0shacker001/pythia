@@ -3,6 +3,7 @@
 import os
 import shutil
 import sqlite3
+import sys
 import threading
 from gettext import gettext as _
 
@@ -157,10 +158,12 @@ def run_all_checks(async_ops: bool = True) -> None:
     everything runs synchronously on the calling thread so that log output
     stays predictable (useful for CLI paths with no main loop)."""
     preload_gpus(async_ops=async_ops)
-    if async_ops:
-        threading.Thread(target=check_libs, daemon=True).start()
-    else:
-        check_libs()
+    # ldconfig and the i386/x86_64 Linux libraries: nothing to check elsewhere.
+    if sys.platform.startswith("linux"):
+        if async_ops:
+            threading.Thread(target=check_libs, daemon=True).start()
+        else:
+            check_libs()
     check_vulkan()
     check_gnome()
     fill_missing_platforms()

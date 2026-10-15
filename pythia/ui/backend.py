@@ -176,11 +176,15 @@ class Backend(QObject):
         self.logLine.emit(message)
         self._record("info", "pythia", message)
 
-    def _unavailable(self, slot: str, message: str) -> dict:
+    def _unavailable(self, slot: str, message: str, title: str | None = None) -> dict:
         """A feature with no backend yet answers honestly, and the attempt is logged
-        so a run's console shows what the page asked for."""
+        so a run's console shows what the page asked for. `title` names a different
+        reason than "not built yet" (a missing optional module, say)."""
         self._record("warn", "python", f"{slot}: not available ({message})", slot)
-        return {"status": "unavailable", "slot": slot, "message": message}
+        result = {"status": "unavailable", "slot": slot, "message": message}
+        if title:
+            result["title"] = title
+        return result
 
     # ---- jobs: the backend's own operations, start to finish -------------------
     def _job_start(self, kind: str, title: str, detail: str = "") -> str:
@@ -1110,7 +1114,11 @@ class Backend(QObject):
     def _agent_unavailable(self, slot: str) -> dict:
         from pythia.droidtop import why_unavailable
 
-        return self._unavailable(slot, why_unavailable() or "droidtop's agent module is not installed.")
+        return self._unavailable(
+            slot,
+            why_unavailable() or "droidtop's agent module is not installed.",
+            title="The droidtop agent module is not installed",
+        )
 
     @Slot(result="QVariant")
     @_guarded

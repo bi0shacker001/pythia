@@ -208,7 +208,7 @@
   // `retry` draws Retry on an error; `what` names the thing ("Save backups").
   function fromResult(result, { what = 'This', retry, actions = [] } = {}) {
     if (!result || typeof result !== 'object') return stateBlock({ kind: 'error', title: `${what} did not answer`, body: 'Pythia returned nothing for this page.', actions: retry ? [{ label: 'Retry', run: retry }] : [] });
-    if (result.status === 'unavailable') return stateBlock({ kind: 'unavailable', title: 'Not built yet', body: result.message, actions });
+    if (result.status === 'unavailable') return stateBlock({ kind: 'unavailable', title: result.title || 'Not built yet', body: result.message, actions });
     const acts = retry ? [{ label: 'Retry', primary: true, run: retry }, ...actions] : actions;
     return stateBlock({ kind: 'error', title: `${what} could not be loaded`, body: result.message || 'No reason was given.', actions: acts, details: result.slot ? `${result.slot}: ${result.message}` : undefined });
   }

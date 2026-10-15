@@ -455,9 +455,9 @@ function renderSaves() {
   $('#savesSummary').textContent = ''; $('#saveRows').innerHTML = '';
   loadInto($('#savesState'), 'get_save_backups', [], (r) => {
     const backups = r.backups || [];
-    $('#savesSummary').textContent = `${fmt.n(backups.length, 'tracked game')}`;
+    $('#savesSummary').textContent = `${fmt.n(backups.length, 'kept copy', 'kept copies')}`;
     $('#saveRows').innerHTML = backups.map((b) => `<tr><td class="primary-cell"><strong>${esc(b.game)}</strong><small>${esc(b.system || '')}</small></td><td>${esc(fmt.dateTime(b.last_snapshot))}</td><td>${esc(b.state)}</td><td>${esc(b.size || '—')}</td><td></td></tr>`).join('');
-    if (!backups.length) $('#savesState').appendChild(stateBlock({ title: 'No save backups yet' }));
+    if (!backups.length) $('#savesState').appendChild(stateBlock({ title: 'No copies of saves kept', body: 'A copy is kept here when a sync with a handheld would overwrite saves that differ.' }));
   }, { what: 'Save backups' });
 }
 

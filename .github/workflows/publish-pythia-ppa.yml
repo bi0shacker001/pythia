@@ -1,9 +1,9 @@
-# Handles publishing Lutris builds to the Lutris Ubuntu PPAs.  This
+# Handles publishing Pythia builds to its Ubuntu PPAs.  This
 # workflow is triggered when a release or prerelease is published,
 # checks out the tag associated with that release, builds a debian
 # source package, and then pushes that to the Ubuntu Launchpad.net PPA
 # where it is then built & published on their servers.
-name: Publish Lutris PPA
+name: Publish Pythia PPA
 
 on:
   # See below for details about the 'release' event.
@@ -18,8 +18,8 @@ on:
 # be defined as repository variables.
 # Ex. PPA_GPG_PRIVATE_KEY: (( output of `gpg -a --export-secret-key <key_id>` ))
 # Ex. PPA_GPG_PASSPHRASE: (( password used to export the above key ))
-# Ex. PPA_STAGING_URI: ppa:lutris-team/lutris-staging
-# Ex. PPA_RELEASE_URI: ppa:lutris-team/lutris
+# Ex. PPA_STAGING_URI: ppa:<owner>/pythia-staging
+# Ex. PPA_RELEASE_URI: ppa:<owner>/pythia
 #
 # The only thing that really differs between the release and staging
 # builds is the target PPA_URI.

@@ -16,7 +16,7 @@
 #
 #   PPA_URI
 #       The URI of the PPA to push updates to.
-#       Ex. ppa:lutris-team/lutris
+#       Ex. ppa:<owner>/pythia
 #
 # The following environment variables are optional and will override
 # default values.
@@ -24,22 +24,22 @@
 #   CODEBASE_ROOT
 #       The absolute real path to the git repository root directory.
 #
-#   LUTRIS_VERSION
-#       The version of Lutris being built, in semver format.
+#   PYTHIA_VERSION
+#       The version of Pythia being built, in semver format.
 #       Ex. "0.5.12-1" or "0.5.12"
 #
 #   OS_CODENAME
 #       The Ubuntu codename the package is being built for.
 #       Ex. "jammy" or "kinetic"
 #
-#   LUTRIS_DEBIAN_VERSION
+#   PYTHIA_DEBIAN_VERSION
 #       The Debian-specific version which follows the guidelines
 #       specified here: https://help.launchpad.net/Packaging/PPA/BuildingASourcePackage#Versioning
 #       Ex. "0.5.12-0ubuntu1"
 #
 #   PPA_VERSION
 #       The PPA release version which follows the same guide as mentioned
-#       in the LUTRIS_DEBIAN_VERSION variable.
+#       in the PYTHIA_DEBIAN_VERSION variable.
 #       Ex. "ppa1~ubuntu22.04" or "ppa3~ubuntu22.04"
 #
 #   PPA_GPG_KEY_ID
@@ -63,9 +63,9 @@ fi
 # Get the OS version associated with OS_CODENAME.
 OS_VERSION="$(distro-info --series "${OS_CODENAME}" -r | cut -f1 -d' ')"
 
-# Get the base Lutris version in the same way that the Makefile does.
-if [[ -z $LUTRIS_VERSION ]]; then
-    LUTRIS_VERSION="$(grep "__version__" "${CODEBASE_ROOT}/lutris/__init__.py" | cut -d" " -f 3 | sed 's|"\(.*\)"|\1|')"
+# Get the base Pythia version in the same way that the Makefile does.
+if [[ -z $PYTHIA_VERSION ]]; then
+    PYTHIA_VERSION="$(grep "__version__" "${CODEBASE_ROOT}/pythia/__init__.py" | cut -d" " -f 3 | sed 's|"\(.*\)"|\1|')"
 fi
 
 # Creates a GPG keyring using the key passed from the GitHub workflow.
@@ -85,8 +85,8 @@ fi
 if ! grep -qi "${PPA_URI//ppa:/}" /etc/apt/sources.list.d/*.list; then
     sudo apt-add-repository -y "${PPA_URI}"
 fi
-# Get the current version of Lutris on the PPA.
-if APT_VERSION="$(apt show lutris | grep 'Version: ' | cut -f2 -d' ')"; then
+# Get the current version of Pythia on the PPA.
+if APT_VERSION="$(apt show pythia | grep 'Version: ' | cut -f2 -d' ')"; then
     echo "Latest version on '${PPA_URI}' is '${APT_VERSION}'"
 else
     echo "Pushing first package to '${PPA_URI}'"
@@ -96,7 +96,7 @@ fi
 # https://help.launchpad.net/Packaging/PPA/BuildingASourcePackage#Versioning
 #
 # The basic format is:
-# <lutris_version>-<lutris_revision>ubuntu<ubuntu_specific_revision>ppa<ppa_revision>~ubuntu<ubuntu_version>
+# <pythia_version>-<pythia_revision>ubuntu<ubuntu_specific_revision>ppa<ppa_revision>~ubuntu<ubuntu_version>
 #
 # ex. 0.5.12-0ubuntu1 (for just the package version)
 # ex. 0.5.12-0ubuntu1ppa1~ubuntu22.04 (for a package version meant for jammy)
@@ -105,23 +105,23 @@ fi
 #
 PPA_VERSION="ppa1~ubuntu${OS_VERSION}"
 
-# If the Lutris version doesn't have a revision, we add revision 0.
-LUTRIS_DEBIAN_VERSION="${LUTRIS_VERSION}"
-if [[ "${LUTRIS_VERSION}" = "${LUTRIS_VERSION/-*/}" ]]; then
-    LUTRIS_DEBIAN_VERSION="${LUTRIS_DEBIAN_VERSION}-0"
+# If the Pythia version doesn't have a revision, we add revision 0.
+PYTHIA_DEBIAN_VERSION="${PYTHIA_VERSION}"
+if [[ "${PYTHIA_VERSION}" = "${PYTHIA_VERSION/-*/}" ]]; then
+    PYTHIA_DEBIAN_VERSION="${PYTHIA_DEBIAN_VERSION}-0"
 fi
 
 # Finally, add an ubuntu revision, so that other packages can override ours
 # without bumping the actual version number.
-LUTRIS_DEBIAN_VERSION="${LUTRIS_DEBIAN_VERSION}ubuntu1"
+PYTHIA_DEBIAN_VERSION="${PYTHIA_DEBIAN_VERSION}ubuntu1"
 
 # If the version we're currently building exists on the PPA, increment
 # the PPA version number so that we supersede it.  Assuming a version
 # scheme like 0.5.12-0ubuntu1ppa1~ubuntu22.04, we trim everything up to
 # and including 'ppa' and everything after and including '~' to get the
 # PPA version number.
-if [[ "${APT_VERSION//ppa*/}" = "${LUTRIS_DEBIAN_VERSION}" ]]; then
-    echo "PPA (${PPA_URI}) has matching package version: ${LUTRIS_DEBIAN_VERSION}"
+if [[ "${APT_VERSION//ppa*/}" = "${PYTHIA_DEBIAN_VERSION}" ]]; then
+    echo "PPA (${PPA_URI}) has matching package version: ${PYTHIA_DEBIAN_VERSION}"
     APT_PPA_VERSION="${APT_VERSION//*ppa/}"
     APT_PPA_VERSION="${APT_PPA_VERSION//~*/}"
     # Only autoincrement if the derived APT_PPA_VERSION is an integer.
@@ -138,11 +138,11 @@ fi
 # versions of Ubuntu runners for build jobs, and so we use this to
 # build the non-LTS versions on the closest matching LTS version.
 if [[ -f "${CODEBASE_ROOT}/.github/scripts/build-ubuntu-${OS_VERSION}.sh" ]]; then
-    echo "::group::Building version-specific deb for ${OS_CODENAME}: ${LUTRIS_DEBIAN_VERSION}${PPA_VERSION}"
+    echo "::group::Building version-specific deb for ${OS_CODENAME}: ${PYTHIA_DEBIAN_VERSION}${PPA_VERSION}"
     # shellcheck disable=SC1090
     source "${CODEBASE_ROOT}/.github/scripts/build-ubuntu-${OS_VERSION}.sh"
 else
-    echo "::group::Building generic deb for ${OS_CODENAME}: ${LUTRIS_DEBIAN_VERSION}${PPA_VERSION}"
+    echo "::group::Building generic deb for ${OS_CODENAME}: ${PYTHIA_DEBIAN_VERSION}${PPA_VERSION}"
     # shellcheck source=./build-ubuntu-generic.sh
     source "${CODEBASE_ROOT}/.github/scripts/build-ubuntu-generic.sh"
 fi

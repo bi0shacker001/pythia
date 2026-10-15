@@ -30,6 +30,7 @@ import functools
 import json
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -91,6 +92,12 @@ def _guarded(fn):
             return {"status": "error", "slot": fn.__name__, "message": str(exc) or exc.__class__.__name__}
 
     return wrapper
+
+
+# How often the agent's events are read while this process serves, and the
+# kinds after which the handheld panels redraw (a sync, an arrival, a launch).
+_AGENT_EVENTS_EVERY_S = 2
+_HANDHELD_EVENT_KINDS = {"session", "library", "arrived", "launch"}
 
 
 def _off_the_main_thread(fn):
@@ -172,6 +179,7 @@ class Backend(QObject):
         self._log_handler = _UiLogHandler(self)
         logger.addHandler(self._log_handler)
         self.refresh_games()
+        self._follow_agent_events()
 
     # ---- UI log (one buffer: the event log, the error console and logLine) ------
     def _keep(self, entry: dict):
@@ -200,6 +208,45 @@ class Backend(QObject):
         if title:
             result["title"] = title
         return result
+
+    def _follow_agent_events(self):
+        """While this process serves droidtop handhelds, what the agent's service
+        does (a handheld asked to start a game, synced, a session ended, a
+        version arrived) goes into the one UI log as source "agent", so the
+        Activity page and the error console show it; the handheld panels redraw
+        after a sync or an arrival. One background thread; nothing without the
+        agent module."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return
+
+        def run():
+            from pythia.droidtop import AgentError, service
+
+            seen = 0
+            while True:
+                time.sleep(_AGENT_EVENTS_EVERY_S)
+                try:
+                    if service.serving().get("state") != "serving":
+                        continue
+                    new = service.events(seen)
+                except AgentError as ex:
+                    self._record("warn", "agent", f"What the droidtop agent does is not shown here: {ex}")
+                    return
+                except Exception as ex:  # noqa: BLE001 -- a background thread: log once and stop
+                    logger.exception("Following the droidtop agent's events failed: %s", ex)
+                    return
+                if not new:
+                    continue
+                seen = new[-1]["seq"]
+                for event in new:
+                    level = event.get("level") if event.get("level") in ("info", "warn") else "info"
+                    self._record(level, "agent", event.get("message", ""), event.get("kind"))
+                if any(event.get("kind") in _HANDHELD_EVENT_KINDS for event in new):
+                    self.handheldsChanged.emit()
+
+        threading.Thread(target=run, name="droidtop-events", daemon=True).start()
 
     def _answer_later(self, slot: str, work) -> dict:
         """A slot whose work touches the disk or the network answers at once with
@@ -340,7 +387,7 @@ class Backend(QObject):
         self._job_finish(
             job,
             f"{ok} game{'s' if ok != 1 else ''} found"
-            + (f", {skipped} ROM folder{'s' if skipped != 1 else ''} left out" if skipped else "")
+            + (f", {skipped} folder{'s' if skipped != 1 else ''} left out (ROMs or a launcher)" if skipped else "")
             + (f", {bad} not identified" if bad else ""),
         )
         self.scanComplete.emit(_jsonable(results))

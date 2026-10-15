@@ -9,7 +9,7 @@ saying why.
 
 from types import ModuleType
 
-_RELEASES = "https://github.com/Droidtop/droidtop-agent/releases"
+RELEASES = "https://github.com/Droidtop/droidtop-agent/releases"
 
 try:  # an optional, compiled dependency
     import droidtop_agent as _module  # type: ignore[import-not-found]
@@ -19,13 +19,13 @@ except ImportError as ex:  # pragma: no cover - depends on the install
     _module = None
     _missing = (
         f"droidtop's agent module is not installed ({ex}). Install the droidtop_agent wheel for this "
-        f"system from {_RELEASES}"
+        f"system from {RELEASES}"
     )
 
 # A wheel from before the agent's crates had their own submodules has one JSON
 # call and no AgentError: Pythia needs a newer one.
 if _module is not None and not hasattr(_module, "AgentError"):  # pragma: no cover - depends on the install
-    _missing = f"the installed droidtop_agent module is too old for Pythia. Install the newest wheel from {_RELEASES}"
+    _missing = f"the installed droidtop_agent module is too old for Pythia. Install the newest wheel from {RELEASES}"
     _module = None
 
 if _module is not None:

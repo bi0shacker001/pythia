@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 from unittest import TestCase, mock
 
-from pythia.droidtop import library, native, scan, store
+from pythia.droidtop import library, native, scan, service, store
 
 
 class TitleKeyTest(TestCase):
@@ -179,3 +179,43 @@ class GamesByDeviceTest(TestCase):
             rp5["games"][1], {"key": "title:eternum", "title": "Eternum", "platform": "pc", "version": "0.9.5"}
         )
         self.assertEqual(win4, {"id": "win4", "name": "Win 4", "games": []})
+
+
+class AgentEventsTest(TestCase):
+    def test_events_since_the_last_seen(self):
+        fake = mock.Mock()
+        fake.service.events.return_value = [{"seq": 3, "kind": "launch", "message": "x"}]
+        with mock.patch.object(native, "_module", fake):
+            self.assertEqual(service.events(2)[0]["kind"], "launch")
+        fake.service.events.assert_called_once_with(since=2)
+
+    def test_an_agent_module_without_events_says_so(self):
+        fake = mock.Mock()
+        fake.service = mock.Mock(spec=["serve", "serving"])
+        with mock.patch.object(native, "_module", fake):
+            with self.assertRaisesRegex(native.AgentError, "newer wheel"):
+                service.events()
+
+
+class LauncherFoldersTest(TestCase):
+    """scanning.scan_library leaves out a launcher's folder and anything found below it."""
+
+    def test_a_launcher_folder_and_what_is_below_it_are_left_out(self):
+        from pythia import scanning
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            launcher, portal, game = (
+                root / "Epic Games" / "Launcher",
+                root / "Epic Games" / "Launcher" / "Portal",
+                root / "Game",
+            )
+            with (
+                mock.patch.object(scanning, "_discover_roots", return_value=[portal, game]),
+                mock.patch.object(scanning, "_rom_folders", return_value={}),
+                mock.patch.object(scanning, "_launcher_rule", return_value=lambda f: f == launcher),
+                mock.patch.object(scanning.onboarding, "onboard", return_value={"status": "ok", "name": "Game"}),
+            ):
+                results = scanning.scan_library(root)
+        self.assertEqual([r["status"] for r in results], ["skipped", "ok"])
+        self.assertIn("Launcher is a launcher's own folder", results[0]["message"])

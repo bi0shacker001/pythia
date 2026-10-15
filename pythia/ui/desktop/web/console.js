@@ -4,7 +4,7 @@
    warning and error, failed slot calls with their redacted arguments, progress
    lines) plus the page's own errors, which this file sends to
    Backend.report_web_error so they travel the same path. Entries: time, level,
-   source (python | pythia | web), the slot when one is involved, the message.
+   source (python | pythia | agent | web), the slot when one is involved, the message.
    Controls: level and source filters, Clear, Copy, dock bottom or right.
    Ctrl+Shift+E toggles it; it works over the desktop and the handheld shell. */
 (function () {
@@ -78,7 +78,7 @@
       <div class="console-head">
         <strong>Error console</strong>
         <label>Level <select data-level><option value="all">All</option><option value="info">Info and up</option><option value="warn" selected>Warnings and errors</option><option value="error">Errors</option></select></label>
-        <label>Source <select data-source><option value="all">All</option><option value="python">Python</option><option value="pythia">Progress</option><option value="web">Web page</option></select></label>
+        <label>Source <select data-source><option value="all">All</option><option value="python">Python</option><option value="pythia">Progress</option><option value="agent">Handhelds (agent)</option><option value="web">Web page</option></select></label>
         <span class="console-count"></span>
         <span class="spacer"></span>
         <button class="btn small" type="button" data-copy>Copy</button>

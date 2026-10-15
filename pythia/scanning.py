@@ -115,8 +115,23 @@ def scan_library(root: Path | str):
     generic = library.generic_plugin if library.generic_plugin in library.enabled_plugins() else None
 
     roms = _rom_folders(root)
+    is_launcher = _launcher_rule()
     results = []
     for discovered in _discover_roots(root, enabled, generic):
+        # The walk can go below a launcher's folder (Epic's Launcher/Portal):
+        # it, or any folder between it and the scanned one, counts.
+        launcher = next(
+            (f for f in (discovered, *discovered.parents) if f != root and root in f.parents and is_launcher(f)), None
+        )
+        if launcher is not None:
+            results.append(
+                {
+                    "status": "skipped",
+                    "game_path": str(discovered),
+                    "message": f"{launcher.name} is a launcher's own folder, not a game.",
+                }
+            )
+            continue
         rom = roms.get(discovered)
         if rom is not None:
             results.append(
@@ -131,6 +146,27 @@ def scan_library(root: Path | str):
             continue
         results.append(onboarding.onboard(discovered))
     return results
+
+
+def _launcher_rule():
+    """droidtop-agent's rule for a launcher's own folder (Battle.net, the EA
+    app, Origin, GOG Galaxy, Epic's Launcher; pythia.droidtop.scan), or one
+    that knows none, with a warning, without the agent module or with one
+    from before the rule."""
+    from pythia import droidtop  # noqa: PLC0415
+    from pythia.droidtop import AgentError  # noqa: PLC0415
+
+    if not droidtop.available():
+        logger.warning("Launcher folders are scanned as games: %s", droidtop.why_unavailable())
+        return lambda path: False
+    from pythia.droidtop import scan  # noqa: PLC0415
+
+    try:
+        scan.launcher_folder(Path("."))
+    except AgentError as ex:
+        logger.warning("Launcher folders are scanned as games: %s", ex)
+        return lambda path: False
+    return scan.launcher_folder
 
 
 def _rom_folders(root: Path) -> dict[Path, dict]:

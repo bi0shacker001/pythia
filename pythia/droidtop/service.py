@@ -3,7 +3,7 @@ the same service as ``droidtop-agent run``, on the agent's own threads."""
 
 import threading
 
-from pythia.droidtop.native import AgentError, available, submodule, why_unavailable
+from pythia.droidtop.native import RELEASES, AgentError, available, submodule, why_unavailable
 from pythia.util.log import logger
 
 _serving_lock = threading.Lock()
@@ -45,3 +45,16 @@ def start_in_background() -> None:
             logger.exception("The droidtop agent failed to start: %s", ex)
 
     threading.Thread(target=run, name="droidtop-agent", daemon=True).start()
+
+
+def events(since: int = 0) -> list[dict]:
+    """What the service did after event ``since`` (0: the last 500), oldest
+    first: ``seq``, ``ms``, ``level`` ("info", "warn"), ``kind`` ("launch",
+    "arrived", "session", "library"...) and ``message``. An agent module from
+    before the service had events raises AgentError saying so."""
+    module = submodule("service")
+    if not hasattr(module, "events"):
+        raise AgentError(
+            f"this droidtop_agent module cannot report what the agent does; install a newer wheel from {RELEASES}"
+        )
+    return module.events(since=since)

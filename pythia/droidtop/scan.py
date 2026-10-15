@@ -5,7 +5,7 @@ folders. Refusals raise AgentError."""
 from collections import defaultdict
 from pathlib import Path
 
-from pythia.droidtop.native import submodule
+from pythia.droidtop.native import AgentError, submodule
 
 
 def rom_folders(root: Path) -> dict[Path, dict]:
@@ -38,3 +38,13 @@ def rom_folders(root: Path) -> dict[Path, dict]:
         for folder, platforms in roms.items()
         if folder not in has_other
     }
+
+
+def launcher_folder(path: Path) -> bool:
+    """Whether ``path`` is a launcher's own folder (Battle.net, the EA app,
+    Origin, GOG Galaxy, Epic's Launcher), by the agent's scanner rule. An
+    agent module from before the rule raises AgentError saying so."""
+    module = submodule("scan")
+    if not hasattr(module, "launcher_folder"):
+        raise AgentError("this droidtop_agent module does not know launcher folders; install a newer wheel")
+    return bool(module.launcher_folder(str(path)))

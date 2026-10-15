@@ -3,6 +3,7 @@ modules over the compiled agent module, without that module."""
 
 import os
 import tempfile
+import threading
 from unittest import TestCase, mock
 
 from pythia.droidtop import library, native, store
@@ -87,3 +88,41 @@ class NativeTest(TestCase):
         ):
             self.assertEqual(library.export(rescan=False), {"games": 0, "changes": 0})
         fake.scan.set_manager_games.assert_called_once_with("Pythia", [], rescan=False)
+
+
+class ExportSoonTest(TestCase):
+    """library.export_soon(): what the UI calls after each change to the library."""
+
+    def run_burst(self, serving_state):
+        fake = mock.Mock()
+        fake.service.serving.return_value = {"state": serving_state}
+        first_call_started, release = threading.Event(), threading.Event()
+
+        def slow_export(*_args, **_kwargs):
+            first_call_started.set()
+            release.wait(5)
+            return {"games": 0, "changes": 0}
+
+        fake.scan.set_manager_games.side_effect = slow_export
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(library.datadir, "list_all_entries", return_value=[]),
+            mock.patch.object(library, "get_system_uuid", return_value="me"),
+        ):
+            library.export_soon()
+            if serving_state == "serving":
+                self.assertTrue(first_call_started.wait(5))
+            for _ in range(5):  # changes while the first export runs
+                library.export_soon()
+            release.set()
+            thread = library._export_thread
+            if thread is not None:
+                thread.join(5)
+            self.assertIsNone(library._export_thread)
+        return fake.scan.set_manager_games.call_count
+
+    def test_a_burst_of_changes_costs_two_exports(self):
+        self.assertEqual(self.run_burst("serving"), 2)
+
+    def test_nothing_is_handed_over_while_another_program_serves(self):
+        self.assertEqual(self.run_burst("stopped"), 0)

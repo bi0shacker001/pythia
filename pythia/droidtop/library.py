@@ -13,6 +13,7 @@ name>`), else its title as `title:<words>`.
 """
 
 import os
+import threading
 
 from pythia import datadir
 from pythia.droidtop.native import AgentError, available, submodule
@@ -106,6 +107,44 @@ def export_if_serving() -> None:
         return
     try:
         if submodule("service").serving().get("state") == "serving":
-            export()
+            result = export()
+            logger.info(
+                "Handed %s games to the droidtop agent (%s library changes)", result["games"], result["changes"]
+            )
     except AgentError as ex:
         logger.warning("Could not hand the library to the droidtop agent: %s", ex)
+
+
+_export_lock = threading.Lock()
+_export_wanted = threading.Event()
+_export_thread: threading.Thread | None = None
+
+
+def export_soon() -> None:
+    """export_if_serving() on a background thread: what a front end calls
+    after any change to the library. Changes that arrive while an export runs
+    are handed over by one more export when it ends, so a burst of changes
+    costs at most two rescans and the last change is never missed."""
+    global _export_thread
+    if not available():
+        return
+    with _export_lock:
+        _export_wanted.set()
+        if _export_thread is not None and _export_thread.is_alive():
+            return
+
+        def run():
+            global _export_thread
+            while True:
+                with _export_lock:
+                    if not _export_wanted.is_set():
+                        _export_thread = None
+                        return
+                    _export_wanted.clear()
+                try:
+                    export_if_serving()
+                except Exception as ex:  # a background thread: log, never raise
+                    logger.exception("Handing the library to the droidtop agent failed: %s", ex)
+
+        _export_thread = threading.Thread(target=run, name="droidtop-library", daemon=True)
+        _export_thread.start()

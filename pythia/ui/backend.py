@@ -233,6 +233,10 @@ class Backend(QObject):
         games = datadir.list_known_games()
         self._games = [{"game_id": gid, "entries": _jsonable(entries)} for gid, entries in sorted(games.items())]
         self.gamesChanged.emit()
+        # While this process serves droidtop handhelds, the library is theirs too.
+        from pythia.droidtop import library as droidtop_library
+
+        droidtop_library.export_soon()
 
     @Property("QVariantList", notify=gamesChanged)
     def games(self):

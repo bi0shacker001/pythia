@@ -47,7 +47,9 @@ _NAME_VERSION_RE = re.compile(r"^(.*?)[-_ ](?:v(\d+(?:[._]\d+)*[a-zA-Z]*)|(\d+[.
 # -library case: BeingADik/Chap3+/10.0-sancho, Fetish Locator/Week 1/2/3, My New
 # Family/Part 1, Thief of Hearts/Part1 all fragmented into separate bogus "games"
 # because only the leaf name was ever considered).
-_GENERIC_PART_PREFIX_RE = re.compile(r"^(chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?)\.?\s*", re.IGNORECASE)
+_GENERIC_PART_PREFIX_RE = re.compile(
+    r"^(chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?)\.?\s*", re.IGNORECASE
+)
 
 
 def _is_generic_part_leaf(name: str) -> bool:
@@ -212,6 +214,14 @@ def find_candidates(detection: dict, name_hint: str, path: Path):
             matches[0] if matches else None
         )
 
+    # Part folders of one game (Thief of Hearts/Part1 + Part2, Fetish Locator/Week 1
+    # + Week 3): the leaf is a bare part marker and a sibling part folder under the
+    # same parent is already tracked by this system, so this is the same game,
+    # not a name lookalike (2026-10-14 real-data finding: each part became its own
+    # game, then the duplicate finder offered to fold them back together).
+    if certain is None and _is_generic_part_leaf(Path(path).name):
+        certain = _sibling_part_entry(own, Path(path_str))
+
     suggested = []
     if certain is None:
         target = name_hint.lower()
@@ -229,6 +239,22 @@ def find_candidates(detection: dict, name_hint: str, path: Path):
         suggested = [e for _, e in scored]
 
     return {"certain": certain, "suggested": suggested}
+
+
+def _sibling_part_entry(own_entries: list, path: Path):
+    """This system's entry that already tracks another part folder beside `path`
+    (same parent, leaf also a bare part marker), or None."""
+    parent = str(path.parent)
+    for entry in own_entries:
+        for group in entry.get("versions", []):
+            for variant in group.get("variants", []):
+                other = variant.get("path")
+                if not other:
+                    continue
+                other = Path(other)
+                if str(other.parent) == parent and _is_generic_part_leaf(other.name):
+                    return entry
+    return None
 
 
 def entry_id_source(entry: dict) -> str:
@@ -295,7 +321,10 @@ def preview(path: Path):
 
     derived_name, derived_version, mods, language = _derive_name_version_mods_language(path)
     name = detection.get("name") or derived_name
-    version_label = detection.get("version_label") or derived_version or path.name
+    # No version token anywhere means no version: None, never the folder name
+    # (2026-10-14 real-data finding: 102 of 162 scanned games carried their own
+    # name as their "version", which every front end then showed as a version).
+    version_label = detection.get("version_label") or derived_version or None
 
     candidates = find_candidates(detection, name, path)
 
@@ -352,7 +381,10 @@ def onboard(path: Path, decision: dict | None = None):
         if existing_entry is None:
             foreign_seed = _find_any_entry_by_game_id(game_id)
             if foreign_seed is None:
-                return {"status": "error", "message": f"No existing tracked game with id {game_id} on any known system."}
+                return {
+                    "status": "error",
+                    "message": f"No existing tracked game with id {game_id} on any known system.",
+                }
     else:
         # Automatic: certain match -> link, otherwise new. Used by scan_library() and
         # any caller that doesn't want to prompt.
@@ -556,7 +588,10 @@ def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[di
             (
                 e
                 for e in own
-                if any(p.get("platform") == kind and str(p.get("id")) == str(match_value) for p in e.get("platform_ids", []))
+                if any(
+                    p.get("platform") == kind and str(p.get("id")) == str(match_value)
+                    for p in e.get("platform_ids", [])
+                )
             ),
             None,
         )
@@ -594,7 +629,10 @@ def sync_owned(plugin) -> dict:
     no real list_owned() implementation."""
     owned = plugin.list_owned()
     if owned is None:
-        return {"status": "error", "message": f"'{plugin.id}' has no account connected (or doesn't support list_owned())."}
+        return {
+            "status": "error",
+            "message": f"'{plugin.id}' has no account connected (or doesn't support list_owned()).",
+        }
 
     own = _own_entries()
     linked = 0

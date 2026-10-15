@@ -22,10 +22,12 @@ separate datadir+cache calls, same single-write-path consolidation as onboarding
 """
 
 import difflib
+from pathlib import Path
 
 from pythia import datadir
 from pythia.database import games as games_db
 from pythia.identity import get_system_uuid
+from pythia.onboarding import _is_generic_part_leaf
 
 NAME_SIMILARITY_THRESHOLD = 0.6
 
@@ -58,6 +60,23 @@ def _summarize(entry: dict) -> dict:
     }
 
 
+def _part_folders_of_one_game(a: dict, b: dict) -> bool:
+    """Both entries' installs are bare part folders (Part1, Week 3, ...) under one
+    parent folder: parts of one game, recorded before onboarding learned to link
+    them (2026-10-14). Stronger evidence than a similar name, so the pair is
+    reported with `reason` "parts" and the top score."""
+    for va in _variants(a):
+        for vb in _variants(b):
+            pa, pb = Path(va["path"]), Path(vb["path"])
+            if pa.parent == pb.parent and _is_generic_part_leaf(pa.name) and _is_generic_part_leaf(pb.name):
+                return True
+    return False
+
+
+def _variants(entry: dict):
+    return [v for g in entry.get("versions", []) for v in g.get("variants", []) if v.get("path")]
+
+
 def find_merge_candidates():
     """Every pair of this system's own tracked games whose canonical names are
     similar enough to plausibly be the same game, sorted by similarity descending.
@@ -71,9 +90,12 @@ def find_merge_candidates():
             name_b = (b.get("canonical_name") or "").lower()
             if not name_a or not name_b:
                 continue
+            if _part_folders_of_one_game(a, b):
+                candidates.append({"score": 1.0, "reason": "parts", "a": _summarize(a), "b": _summarize(b)})
+                continue
             score = difflib.SequenceMatcher(None, name_a, name_b).ratio()
             if score >= NAME_SIMILARITY_THRESHOLD:
-                candidates.append({"score": round(score, 3), "a": _summarize(a), "b": _summarize(b)})
+                candidates.append({"score": round(score, 3), "reason": "name", "a": _summarize(a), "b": _summarize(b)})
     candidates.sort(key=lambda c: c["score"], reverse=True)
     return candidates
 

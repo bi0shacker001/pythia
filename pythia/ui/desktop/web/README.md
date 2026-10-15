@@ -29,12 +29,13 @@ from the same model and the same backend.
 `unavailable` (the feature has no backend yet; `message` says so) or `error` (`message` is the
 reason). No bridge, no answer and a thrown exception all become an `error` result, so a page
 always has something honest to draw. A slot whose work touches the disk or the network
-(`get_game_saves`, `get_save_backups`, `restore_save_copy`) answers `pending` with a request id
+(the `_off_the_main_thread` slots: the library's reads and writes, plugin probes, saves,
+diagnostics) answers `pending` with a request id
 at once and runs on a thread of its own (`Backend._answer_later`); its result arrives as the
 `asyncResult` signal, and `call()` resolves with it, so a page treats it like any other slot. `loadInto(host, slot, args, draw)` is the loading path:
 skeletons, the call, then `draw` on `ok` or the state block for the answer (with Retry on an
-error). Older slots that answer with a bare list (`get_all_plugins`, `get_downloader_plugins`,
-`find_manager_for_game`) count as good answers.
+error). Older slots that answer with a bare list (`get_all_plugins`, `get_downloader_plugins`) count
+as good answers.
 
 Failures are logged on both sides through one path: the backend's `_guarded` decorator logs
 a slot's exception with its name and redacted arguments and returns an `error`; `_unavailable`

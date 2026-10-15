@@ -93,6 +93,19 @@ def _guarded(fn):
     return wrapper
 
 
+def _off_the_main_thread(fn):
+    """A slot whose work reads or writes the library on disk, asks plugins or
+    uses the network: it runs on a thread of its own through
+    Backend._answer_later, so the window never waits on it. The page's call()
+    waits for the answer the same way."""
+
+    @functools.wraps(fn)
+    def wrapper(self, *args):
+        return self._answer_later(fn.__name__, lambda: fn(self, *args))
+
+    return wrapper
+
+
 _LEVELS = {"error": logging.ERROR, "warn": logging.WARNING, "info": logging.INFO, "debug": logging.DEBUG}
 
 
@@ -466,6 +479,7 @@ class Backend(QObject):
     # ---- notes ------------------------------------------------------------------
     @Slot(str, str, result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def save_notes(self, game_id: str, text: str):
         """Update this system's own entry for `game_id`'s free-text notes field
         (part of the schema since Milestone 3). No-op if this system doesn't own
@@ -495,6 +509,7 @@ class Backend(QObject):
     # this `backend` context object, so these slots exist specifically for it).
     @Slot(result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def get_system_info(self):
         from pythia.identity import app_data_dir
 
@@ -579,6 +594,7 @@ class Backend(QObject):
 
     @Slot(str, result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def get_capabilities(self, category: str):
         """The plugins of one category with that category's own real state: a game
         source's account, a launcher's presence on this computer, an engine
@@ -793,6 +809,7 @@ class Backend(QObject):
     # ---- launcher hand-off --------------------------------------------------
     @Slot(str, result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def find_manager_for_game(self, game_id: str):
         """Every (manager plugin, source kind) this game could be handed off to --
         lets the UI show/hide an "Open" action and pick which source to use if more
@@ -806,15 +823,18 @@ class Backend(QObject):
         candidates = manager_plugins.find_for_game(entries)
         ctx = PluginContext(log=self._log)
         return _jsonable(
-            [
-                {
-                    "manager_id": p.id,
-                    "manager_name": p.display_name,
-                    "kind": d["kind"],
-                    "available": bool(p.is_available(ctx)),
-                }
-                for p, d in candidates
-            ]
+            {
+                "status": "ok",
+                "managers": [
+                    {
+                        "manager_id": p.id,
+                        "manager_name": p.display_name,
+                        "kind": d["kind"],
+                        "available": bool(p.is_available(ctx)),
+                    }
+                    for p, d in candidates
+                ],
+            }
         )
 
     @Slot(str, str)
@@ -858,6 +878,7 @@ class Backend(QObject):
 
     @Slot(str, result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def get_platform_status(self, game_id: str):
         """What this install needs per platform, from the engine plugin that owns its
         kind. Honest answers: no install here, no engine plugin for the kind, or the
@@ -967,6 +988,7 @@ class Backend(QObject):
 
     @Slot(str, str, result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def rename_game(self, game_id: str, name: str):
         """Change this system's own canonical name for a game; other systems keep
         theirs (one writer per file). Recorded in the entry's history."""
@@ -988,6 +1010,7 @@ class Backend(QObject):
 
     @Slot(str, result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def forget_game(self, game_id: str):
         """Remove this system's record of a game. Files on disk are untouched."""
         games_db.delete_game(game_id)
@@ -996,6 +1019,7 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def rebuild_index(self):
         games_db.rebuild_cache()
         self.refresh_games()
@@ -1117,6 +1141,7 @@ class Backend(QObject):
 
     @Slot(str, result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def export_diagnostics(self, dest_dir: str):
         """Settings > Advanced > Export diagnostics: the log file plus app, system
         and plugin facts. No credentials are included."""
@@ -1358,6 +1383,7 @@ class Backend(QObject):
 
     @Slot(str, bool, result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def get_game_saves(self, game_id: str, fetch: bool):
         """Where the droidtop agent finds this game's saves on this computer: the
         `patterns` it knows (None: none known) and the `files` there now. With
@@ -1374,9 +1400,7 @@ class Backend(QObject):
         mine = [e for e in entries if e.get("system_uuid") == get_system_uuid()]
         entry = (mine or entries)[0]
         key, title = library.game_key(entry), entry.get("canonical_name") or ""
-        return self._answer_later(
-            "get_game_saves", lambda: {"status": "ok", "key": key, **saves.lookup(key, title, fetch=fetch)}
-        )
+        return {"status": "ok", "key": key, **saves.lookup(key, title, fetch=fetch)}
 
     @Slot(result="QVariant")
     @_guarded

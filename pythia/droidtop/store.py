@@ -37,3 +37,28 @@ def set_launch(device_id: str, allowed: bool) -> None:
 def library() -> dict[str, Any]:
     """The library every paired device shares, by game key."""
     return submodule("store").library()
+
+
+def games_by_device(library: dict[str, Any], devices: list[dict]) -> list[dict]:
+    """Each paired handheld (``devices``, as devices() gives them) with the
+    games the shared ``library`` says are installed on it: ``key``,
+    ``title``, ``platform`` and ``version``, by title. A handheld that has not
+    synced yet has none."""
+    out = []
+    for device in devices:
+        games = []
+        for key, record in library.items():
+            install = ((record.get("installs") or {}).get(device["id"]) or {}).get("install") or {}
+            if not install.get("installed"):
+                continue
+            games.append(
+                {
+                    "key": key,
+                    "title": record.get("title") or key,
+                    "platform": record.get("platform"),
+                    "version": install.get("version"),
+                }
+            )
+        games.sort(key=lambda g: g["title"].lower())
+        out.append({"id": device["id"], "name": device.get("name") or device["id"][:16], "games": games})
+    return out

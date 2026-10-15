@@ -154,3 +154,28 @@ class RomFoldersTest(TestCase):
 
     def test_a_pc_game_folder_is_never_one(self):
         self.assertEqual(self.found("/g", ("Game", "pc", "folder")), {})
+
+
+class GamesByDeviceTest(TestCase):
+    """droidtop.store.games_by_device(): each handheld's games, from the shared library."""
+
+    def test_installed_games_per_handheld_by_title(self):
+        def install(installed, version=None):
+            return {"device_name": "x", "install": {"installed": installed, "version": version}}
+
+        library = {
+            "title:eternum": {"title": "Eternum", "platform": "pc", "installs": {"rp5": install(True, "0.9.5")}},
+            "rom:psx/crash": {
+                "title": "Crash",
+                "platform": "psx",
+                "installs": {"rp5": install(True), "pc": install(True)},
+            },
+            "steam:440": {"title": "TF2", "platform": "pc", "installs": {"rp5": install(False), "pc": install(True)}},
+        }
+        devices = [{"id": "rp5", "name": "Retroid"}, {"id": "win4", "name": "Win 4"}]
+        rp5, win4 = store.games_by_device(library, devices)
+        self.assertEqual([g["title"] for g in rp5["games"]], ["Crash", "Eternum"])
+        self.assertEqual(
+            rp5["games"][1], {"key": "title:eternum", "title": "Eternum", "platform": "pc", "version": "0.9.5"}
+        )
+        self.assertEqual(win4, {"id": "win4", "name": "Win 4", "games": []})

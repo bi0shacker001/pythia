@@ -1211,6 +1211,20 @@ class Backend(QObject):
 
         return _jsonable({"status": "ok", "devices": store.devices()})
 
+    @Slot(result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def get_handheld_games(self):
+        """Each paired handheld with the games the shared library says are
+        installed on it (what it last synced to this computer)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("get_handheld_games")
+        from pythia.droidtop import store
+
+        return _jsonable({"status": "ok", "handhelds": store.games_by_device(store.library(), store.devices())})
+
     @Slot(str, result="QVariant")
     @_guarded
     def pair_with_code(self, code: str):

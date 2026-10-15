@@ -443,6 +443,22 @@ function renderHandhelds() {
       $(`[data-handheld-forget="${d.id}"]`, table).onclick = async () => { if (await confirmDanger({ title: `Forget ${d.name}?`, body: 'It can no longer sync with this computer until you pair it again.', recommendation: 'We recommend Cancel.', proceed: 'Forget' })) await act('forget_handheld', [d.id], `Forgot ${d.name}`, { what: 'Forgetting it' }); };
     });
   }, { what: 'Handhelds' });
+  renderHandheldGames();
+}
+// What each paired handheld has installed, from the library it syncs with this computer.
+function renderHandheldGames() {
+  const host = $('#handheldGames'); if (!host) return;
+  $('#handheldGamesSummary').textContent = '';
+  loadInto(host, 'get_handheld_games', [], (r, h) => {
+    const handhelds = r.handhelds || [];
+    if (!handhelds.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'A paired handheld\'s games show here once it syncs with this computer.' })); return; }
+    $('#handheldGamesSummary').textContent = fmt.n(handhelds.reduce((n, d) => n + d.games.length, 0), 'game');
+    handhelds.forEach((d) => {
+      h.appendChild(el(`<h3 style="font:500 1rem var(--serif);margin:6px 0">${esc(d.name)} <small>${esc(fmt.n(d.games.length, 'game'))}</small></h3>`));
+      if (!d.games.length) { h.appendChild(stateBlock({ title: 'Nothing from it yet', body: 'It sends the games it has when it syncs with this computer.' })); return; }
+      h.appendChild(el(`<table class="table"><thead><tr><th>Game</th><th>Platform</th><th>Version</th></tr></thead><tbody>${d.games.map((g) => `<tr><td class="primary-cell"><strong>${esc(g.title)}</strong><small class="mono">${esc(g.key)}</small></td><td>${esc(g.platform ? platformName(g.platform) : '—')}</td><td>${esc(g.version || '—')}</td></tr>`).join('')}</tbody></table>`));
+    });
+  }, { what: 'Handheld games' });
 }
 async function pairHandheld() {
   const code = await prompt({ title: 'Pair a handheld', body: 'On the handheld: Settings > Computers > Pair a computer. Type the 6 digits it shows, or the text of its QR code.', hint: '123 456', save: 'Pair' });

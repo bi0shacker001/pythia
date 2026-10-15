@@ -466,8 +466,10 @@ async function pairHandheld() {
   const r = await call('pair_with_code', code.trim());
   if (ok(r)) flash('Pairing…'); else flash(r.status === 'unavailable' ? r.message : `Not paired: ${r.message}`, 'caution');
 }
-async function showPairCode() {
-  const host = $('#pairShowing'); if (!host) return;
+// One pairing-code panel for both shells: `host` is where it draws, `showing()` whether its page is still open,
+// `paired()` redraws that page's handheld list.
+async function showPairCode(host = $('#pairShowing'), showing = () => state.view === 'systems', paired = renderHandhelds) {
+  if (!host) return;
   stopPairPoll();
   const r = await call('show_pairing_code');
   host.innerHTML = '';
@@ -477,11 +479,11 @@ async function showPairCode() {
   host.appendChild(box);
   $('[data-pair-stop]', box).onclick = stop;
   pairPoll = setInterval(async () => {
-    if (state.view !== 'systems') { stop(); return; }
+    if (!showing()) { stop(); return; }
     const s = await call('pairing_status');
     if (!ok(s) || s.state === 'waiting') return;
     stopPairPoll();
-    if (s.state === 'paired') { host.innerHTML = ''; flash(`Paired with ${s.paired}`); renderHandhelds(); }
+    if (s.state === 'paired') { host.innerHTML = ''; flash(`Paired with ${s.paired}`); paired(); }
     else if (s.state === 'failed') { $('#pairOutcome', box).innerHTML = visibleStatus(s.error || 'Pairing stopped', 'critical'); }
   }, 1500);
 }
@@ -725,9 +727,10 @@ function renderHHDownloads() {
 }
 function renderHHSystems() {
   const host = $('#hhContent');
-  host.innerHTML = `<div class="hh-system-grid">${systems.map((s) => `<article class="hh-system"><h2>${esc(s.name)}</h2><p>${esc(s.mine && model.app ? model.app.platform : 'Synced record')} · ${fmt.n(s.games, 'game')}</p><div class="line"><span>Installed</span><b>${s.installed}</b></div><div class="line"><span>Record</span><b style="color:var(--positive)">${s.mine ? 'This computer' : 'Synced'}</b></div></article>`).join('')}</div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Library folder</h2><span class="spacer"></span><small>Shared by every system</small></div><div class="hh-panel-body"><div class="hh-setting"><strong class="mono" style="font-size:0.75rem;word-break:break-all">${esc(model.info?.sync_folder || '')}</strong><small>Copying versions between devices is not built yet.</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div></div></section><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Handhelds</h2><span class="spacer"></span><button class="hh-action" data-hh-pair>Pair a handheld</button></div><div class="hh-panel-body hh-summary-list" id="hhHandhelds"></div></section>`;
+  host.innerHTML = `<div class="hh-system-grid">${systems.map((s) => `<article class="hh-system"><h2>${esc(s.name)}</h2><p>${esc(s.mine && model.app ? model.app.platform : 'Synced record')} · ${fmt.n(s.games, 'game')}</p><div class="line"><span>Installed</span><b>${s.installed}</b></div><div class="line"><span>Record</span><b style="color:var(--positive)">${s.mine ? 'This computer' : 'Synced'}</b></div></article>`).join('')}</div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Library folder</h2><span class="spacer"></span><small>Shared by every system</small></div><div class="hh-panel-body"><div class="hh-setting"><strong class="mono" style="font-size:0.75rem;word-break:break-all">${esc(model.info?.sync_folder || '')}</strong><small>Copying versions between devices is not built yet.</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div></div></section><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Handhelds</h2><span class="spacer"></span><button class="hh-action" data-hh-pair-show>Show a code</button><button class="hh-action" data-hh-pair>Pair a handheld</button></div><div class="hh-panel-body"><div id="hhPairShowing"></div><div class="hh-summary-list" id="hhHandhelds"></div></div></section>`;
   if (!systems.length) host.prepend(stateBlock({ kind: model.ready ? 'empty' : 'loading', title: 'No systems yet' }));
   $('[data-hh-pair]', host).onclick = pairHandheld;
+  $('[data-hh-pair-show]', host).onclick = () => showPairCode($('#hhPairShowing', host), () => state.shell === 'handheld' && state.hhPage === 'systems', renderHandheld);
   loadInto($('#hhHandhelds', host), 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
     if (!devices.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'On the handheld: Settings > Computers > Pair a computer.' })); return; }

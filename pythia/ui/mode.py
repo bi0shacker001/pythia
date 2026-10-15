@@ -42,7 +42,7 @@ def resolve_mode(app, hint: str | None) -> str:
     return _detect_screen_mode(app)
 
 
-def launch(hint: str | None = None, relaunch: bool = False):
+def launch(hint: str | None = None, relaunch: bool = False, error_console: bool = False):
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError:
@@ -70,7 +70,7 @@ def launch(hint: str | None = None, relaunch: bool = False):
 
     from pythia.ui.backend import Backend
 
-    backend = Backend()
+    backend = Backend(error_console=error_console)
 
     if mode == "bigpicture":
         from pythia.ui.bigpicture.app import run

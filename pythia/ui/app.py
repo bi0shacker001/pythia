@@ -8,8 +8,13 @@ picks between the three real front ends: the QtWidgets desktop UI
 QtWebEngine rendering the real HTML/CSS/JS mockup at pythia/ui/desktop/web/
 index.html) -- the fast-iteration testing surface for UI changes, explicit-
 hint-only per mode.py's own docstring, never auto-selected.
+
+Flags: `--ui <desktop|bigpicture|web>` picks the front end; `--error-console`
+turns on the web UI's error console for this run (the config key
+`error_console = True` in pythia.conf turns it on permanently). Off by default.
 """
 
+import logging
 import sys
 
 from pythia import settings
@@ -26,6 +31,12 @@ def run(argv: list[str] | None = None) -> int:
         i = argv.index("--ui")
         if i + 1 < len(argv):
             ui_hint = argv[i + 1]
+    error_console = "--error-console" in argv
+
+    # Settings > Advanced > Log level (Backend.set_log_level writes the same key).
+    saved_level = {"debug": logging.DEBUG, "info": logging.INFO}.get(settings.read_setting("log_level").lower())
+    if saved_level is not None:
+        logger.setLevel(saved_level)
 
     logger.info("Starting Pythia %s (Qt UI)", settings.VERSION)
     init_pythia()
@@ -35,7 +46,7 @@ def run(argv: list[str] | None = None) -> int:
 
     from pythia.ui import mode
 
-    mode.launch(hint=ui_hint)
+    mode.launch(hint=ui_hint, error_console=error_console)
     return 0
 
 

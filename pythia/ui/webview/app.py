@@ -14,11 +14,12 @@ work here -- it was already a plain QObject with @Property/@Slot members for
 the QML big-picture front end, and QWebChannel exposes exactly that same
 surface to JavaScript automatically.
 
-Real, known gap: only the Library view's game list is actually wired to real
-data right now (via `pythia.games`, kept live through its own gamesChanged
-signal). Every other page in the mockup (Downloads, Systems, Activity,
-Plugins, Settings) still renders its own bundled placeholder data -- wiring
-those up is real follow-up work, not done in this pass.
+Since 2026-10-14 every page of the mockup reads the backend through that bridge
+(see pythia/ui/desktop/web/README.md for the page-to-slot table): a page with
+no backend yet still calls its slot and shows the "unavailable" answer it gets.
+The page's own JavaScript errors reach Pythia's log through
+Backend.report_web_error, and the error console (`--error-console`, or
+`error_console = True` in pythia.conf) shows that one log live.
 """
 
 import sys
@@ -37,7 +38,8 @@ class _LoggingPage(QWebEnginePage):
     """Surfaces the mockup's own JS console messages (errors especially) to
     stderr -- without this, a JS exception in the mockup's script just fails
     silently with no way to tell the real bridge/adapter code from a genuine
-    mockup bug."""
+    mockup bug. (The page also reports its errors to Backend.report_web_error
+    itself, so they land in Pythia's log and the error console.)"""
 
     def javaScriptConsoleMessage(self, level, message, line_number, source_id):
         print(f"[web console] {source_id}:{line_number}: {message}", file=sys.stderr)

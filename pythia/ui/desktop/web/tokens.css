@@ -1,0 +1,94 @@
+/* Pythia web UI: design tokens. The one place with colours and numbers that
+   themes, text size, motion and the focus ring are made of. index.html's own
+   stylesheet reads these roles; the three themes below redefine colour roles
+   only. Documented in README.md next to this file. */
+
+:root {
+  /* Text size: Settings > Interface > Text size sets --text-scale (1.0 to 1.5).
+     Every font size in index.html is in rem, so one value reflows the whole UI. */
+  --text-scale: 1;
+  font-size: calc(16px * var(--text-scale));
+
+  /* Motion: every animation reads these; Reduce motion sets them to 0. */
+  --motion-fast: 150ms;
+  --motion-dialog: 200ms;
+  --motion-ease: cubic-bezier(.2, 0, 0, 1);
+
+  /* Focus ring: two tones so it reads on any ground. */
+  --ring-outer: 3px;
+  --ring-inner: 1px;
+
+  /* Sizes of the shell (px: they are about the window, not the text). */
+  --sidebar:236px;--top:58px;--menu:28px;--status:32px;--radius:10px;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Cascadia Code","SFMono-Regular",Consolas,monospace;
+
+  /* Short role aliases index.html's stylesheet reads; they resolve per theme. */
+  --bg0:var(--page);--bg1:var(--surface-0);--bg2:var(--surface-1);--bg3:var(--surface-2);--bg4:var(--surface-3);
+  --line:var(--border);--line2:var(--border-strong);--text:var(--text-primary);--muted:var(--text-secondary);--dim:var(--text-tertiary);
+  --amber:var(--accent);--amber2:var(--accent-hover);--amber-bg:var(--accent-soft);
+  --ok:var(--positive);--ok-bg:var(--positive-soft);--pending:var(--warning);--pending-bg:var(--warning-soft);
+  --critical:var(--critical-token);--critical-bg:var(--critical-soft-token);--info:var(--informational);--info-bg:var(--informational-soft);
+}
+
+/* ---- Colour roles. Ink & Amber is the default (dark). ---- */
+:root,html[data-theme="ink"]{
+  color-scheme:dark;
+  --page:#12111a;--chrome:#181722;--sidebar-surface:#15141e;
+  --surface-0:#191824;--surface-1:#201e2d;--surface-2:#282537;--surface-3:#302c42;
+  --border:#39364d;--border-strong:#4a4661;
+  --text-primary:#eeeaf5;--text-secondary:#b4afc6;--text-tertiary:#8b86a0;
+  --accent:#d9a441;--accent-hover:#ebba63;--accent-soft:#39301d;--on-accent:#251b08;
+  --positive:#63bd91;--positive-soft:#192c24;--warning:#d9a441;--warning-soft:#342a18;
+  --critical-token:#df6976;--critical-soft-token:#351d25;--informational:#78a9dc;--informational-soft:#182a3c;
+  --selection:#332c20;--focus:#f4c56e;--focus-inner:#12111a;--overlay:rgba(5,4,9,.76);
+  --shadow:0 18px 48px rgba(0,0,0,.34);
+  /* Notice tones. Info follows the accent unless it would collide with caution
+     (here it does: amber accent vs amber caution), so info uses neutral ink and
+     the circle-i glyph tells it apart. Caution and danger hues are locked;
+     only their lightness moves per theme to keep contrast. */
+  --info-ink:#eeeaf5;--info-plate:#262433;--on-info:#d7d2e4;
+  --caution-ink:#ffc56b;--caution-plate:#342a18;--on-caution:#f1e3c6;
+  --danger-ink:#ff8a95;--danger-plate:#3a1f26;--on-danger:#f6d6da;
+  --danger-fill:#c8323f;--on-danger-fill:#ffffff;
+}
+html[data-theme="parchment"]{
+  color-scheme:light;
+  --page:#ece7da;--chrome:#f7f4ec;--sidebar-surface:#e7e1d2;
+  --surface-0:#faf8f2;--surface-1:#ffffff;--surface-2:#f3eee2;--surface-3:#e9e1d0;
+  --border:#d5ccb8;--border-strong:#bdb19a;
+  --text-primary:#28241f;--text-secondary:#5c5448;--text-tertiary:#7d7363;
+  --accent:#a8672a;--accent-hover:#bd7a36;--accent-soft:#f0dfc2;--on-accent:#fff9ed;
+  --positive:#2f8f5e;--positive-soft:#e2f2e7;--warning:#a8672a;--warning-soft:#f4e5cc;
+  --critical-token:#b8433f;--critical-soft-token:#f7e2df;--informational:#356f9c;--informational-soft:#e0edf6;
+  --selection:#eee1c8;--focus:#8f561e;--focus-inner:#ffffff;--overlay:rgba(49,42,32,.42);
+  --shadow:0 18px 48px rgba(73,55,31,.16);
+  --info-ink:#28241f;--info-plate:#e9e3d4;--on-info:#3f3a33;
+  --caution-ink:#8a5a00;--caution-plate:#f6e8cc;--on-caution:#4f3a10;
+  --danger-ink:#a8232f;--danger-plate:#f7dcdf;--on-danger:#5b1a21;
+  --danger-fill:#b8262f;--on-danger-fill:#ffffff;
+}
+html[data-theme="cobalt"]{
+  color-scheme:dark;
+  --page:#0e141d;--chrome:#121b26;--sidebar-surface:#101823;
+  --surface-0:#151f2b;--surface-1:#1a2634;--surface-2:#223142;--surface-3:#293b4e;
+  --border:#314559;--border-strong:#466078;
+  --text-primary:#e7edf3;--text-secondary:#aebccb;--text-tertiary:#8496a8;
+  --accent:#5fa9d8;--accent-hover:#7dbce2;--accent-soft:#1b3446;--on-accent:#07141f;
+  --positive:#63bd91;--positive-soft:#173128;--warning:#d4a95d;--warning-soft:#302819;
+  --critical-token:#df6976;--critical-soft-token:#391e27;--informational:#78a9dc;--informational-soft:#182c40;
+  --selection:#203a4d;--focus:#8fd0f4;--focus-inner:#0e141d;--overlay:rgba(2,8,14,.76);
+  --shadow:0 18px 48px rgba(0,0,0,.38);
+  /* The blue accent is far enough from amber, so info uses the accent. */
+  --info-ink:#8cc3ea;--info-plate:#182c40;--on-info:#d6e4f0;
+  --caution-ink:#ffc56b;--caution-plate:#302819;--on-caution:#f1e3c6;
+  --danger-ink:#ff8a95;--danger-plate:#391e27;--on-danger:#f6d6da;
+  --danger-fill:#c8323f;--on-danger-fill:#ffffff;
+}
+
+/* Reduce motion: the app's own setting and the platform's preference both
+   zero every motion role, so nothing moves. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-fast: 0ms; --motion-dialog: 0ms; }
+}
+html[data-motion="off"] { --motion-fast: 0ms; --motion-dialog: 0ms; }

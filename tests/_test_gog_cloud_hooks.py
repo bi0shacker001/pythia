@@ -302,7 +302,7 @@ class TestResolveSaveLocations(unittest.TestCase):
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "saves")
-        self.assertEqual(result[0]["save_path"], "/opt/games/mygame/saves")
+        self.assertEqual(result[0]["save_path"], os.path.normpath("/opt/games/mygame/saves"))
 
     def test_returns_empty_on_scoped_token_error(self):
         game = MagicMock()

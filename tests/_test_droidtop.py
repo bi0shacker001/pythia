@@ -141,7 +141,7 @@ class RomFoldersTest(TestCase):
             ]
         }
         with mock.patch.object(native, "_module", fake):
-            return {str(k.relative_to(root)): v for k, v in scan.rom_folders(Path(root)).items()}
+            return {k.relative_to(root).as_posix(): v for k, v in scan.rom_folders(Path(root)).items()}
 
     def test_system_folders_and_folders_of_them_are_rom_folders(self):
         got = self.found("/g", ("psx/Crash.chd", "psx", "emulator"), ("Emu/snes/Zelda.sfc", "snes", "emulator"))

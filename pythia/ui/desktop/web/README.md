@@ -28,7 +28,10 @@ from the same model and the same backend.
 `call(slot, ...args)` resolves to the slot's result. Every result is a status dict: `ok`,
 `unavailable` (the feature has no backend yet; `message` says so) or `error` (`message` is the
 reason). No bridge, no answer and a thrown exception all become an `error` result, so a page
-always has something honest to draw. `loadInto(host, slot, args, draw)` is the loading path:
+always has something honest to draw. A slot whose work touches the disk or the network
+(`get_game_saves`, `get_save_backups`, `restore_save_copy`) answers `pending` with a request id
+at once and runs on a thread of its own (`Backend._answer_later`); its result arrives as the
+`asyncResult` signal, and `call()` resolves with it, so a page treats it like any other slot. `loadInto(host, slot, args, draw)` is the loading path:
 skeletons, the call, then `draw` on `ok` or the state block for the answer (with Retry on an
 error). Older slots that answer with a bare list (`get_all_plugins`, `get_downloader_plugins`,
 `find_manager_for_game`) count as good answers.
@@ -48,7 +51,10 @@ which the Activity page's event log and the error console both read.
 | Downloads & intake | `get_intake` + `intakeChanged` (files the watcher saw, scan decisions, the watcher), `start_watch`/`stop_watch` + `downloadDetected`, `forget_detected`; `get_downloader_plugins` for the cards |
 | Reconciliation | decisions from `decisionNeeded`/`get_intake`, resolved with `resolveDecision` after a confirm; possible duplicates from `refresh_merge_candidates` + `mergeCandidatesReady` (`reason` "parts" marks part folders of one game), folded with `merge_games` through the danger dialog; "Not the same" is remembered in the page's own storage |
 | Systems & sync | the `system_uuid`s in the synced folder, `get_system_info`, `get_app_info`, `rebuild_index`; cross-system table from the entries; "Add system" asks `get_transfer_settings` (unavailable) |
-| Launcher entries, Save backups | `get_launcher_entries`, `get_save_backups` (unavailable, drawn as such) |
+| Launcher entries | `get_launcher_entries` (unavailable, drawn as such) |
+| Save backups | `get_save_backups`: the copies of saves the droidtop agent kept when a sync with a handheld would have overwritten saves that differ; "Put back…" is `restore_save_copy` after a confirm (the saves there now are kept first); "Back up now" is `back_up_saves_now` (unavailable) |
+| Game inspector > Saves | `get_game_saves`: where the droidtop agent finds the game's saves (the Ludusavi manifest by key or title) and the files there now; "Download the manifest and look" asks again with `fetch` |
+| Systems & sync > Handhelds | `get_agent_status`, `get_handhelds`, `pair_with_code` + `pairingFinished`, `show_pairing_code` / `pairing_status` / `cancel_pairing`, `set_primary_handheld`, `set_handheld_launch`, `forget_handheld`, `handheldsChanged`. Without the droidtop agent module each answers unavailable, titled "The droidtop agent module is not installed" |
 | Activity & jobs | `get_jobs` + `jobsChanged` (the backend's own operations from call to completion), `clear_finished_jobs`; event log from `get_ui_log` + `uiLog`; `export_diagnostics` |
 | Settings > General | `get_system_info`, `get_ui_mode`/`set_ui_mode`, `set_option` (resident watcher: unavailable), `move_app_data` (unavailable) |
 | Settings > Library | `get_library_folders`, `get_scan_settings` (unavailable) |

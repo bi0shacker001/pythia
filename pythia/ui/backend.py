@@ -139,6 +139,7 @@ class Backend(QObject):
     uiLog = Signal("QVariant")  # one {"ts", "level", "source", "slot", "message"} entry
     handheldsChanged = Signal()  # a handheld was paired, forgotten or changed
     pairingFinished = Signal("QVariant")  # {"status": "ok", "paired": name} or an error result
+    asyncResult = Signal("QVariant")  # a slow slot's answer: {"request": id, ...its result}
 
     def __init__(self, error_console: bool = False):
         super().__init__()
@@ -147,6 +148,7 @@ class Backend(QObject):
         self._awaiting_live_decision = False
         self._watch_stop_event = None
         self._watcher: dict[str, Any] | None = None
+        self._async_requests = 0
         self._games = []
         self._lock = threading.Lock()
         self._ui_log: list[dict] = []
@@ -185,6 +187,32 @@ class Backend(QObject):
         if title:
             result["title"] = title
         return result
+
+    def _answer_later(self, slot: str, work) -> dict:
+        """A slot whose work touches the disk or the network answers at once with
+        {"status": "pending", "request": id}; `work()` runs on a thread of its own
+        and its result (or the error it raised, logged like _guarded's) arrives
+        as asyncResult with the same id. The page's call() waits for it, so to a
+        page a slow slot reads like any other."""
+        with self._lock:
+            self._async_requests += 1
+            request = f"{slot}-{self._async_requests}"
+
+        def run():
+            from pythia.droidtop import AgentError
+
+            try:
+                result = work()
+            except AgentError as exc:  # the agent refused, in words a page can show: no traceback
+                self._record("warn", "python", f"{slot}: {exc}", slot)
+                result = {"status": "error", "slot": slot, "message": str(exc)}
+            except Exception as exc:  # noqa: BLE001 -- the page needs the reason, whatever it was
+                logger.exception("%s failed: %s", slot, exc, extra={"ui_slot": slot})
+                result = {"status": "error", "slot": slot, "message": str(exc) or exc.__class__.__name__}
+            self.asyncResult.emit(_jsonable({**result, "request": request}))
+
+        threading.Thread(target=run, name=slot, daemon=True).start()
+        return {"status": "pending", "slot": slot, "request": request}
 
     # ---- jobs: the backend's own operations, start to finish -------------------
     def _job_start(self, kind: str, title: str, detail: str = "") -> str:
@@ -1273,6 +1301,12 @@ class Backend(QObject):
             return self._agent_unavailable("get_save_backups")
         from pythia.droidtop import saves
 
+        return self._answer_later(
+            "get_save_backups", lambda: {"status": "ok", "backups": self._save_backup_rows(saves)}
+        )
+
+    @staticmethod
+    def _save_backup_rows(saves) -> list[dict]:
         rows = []
         for game in saves.copies():
             for copy in game["copies"]:
@@ -1284,15 +1318,57 @@ class Backend(QObject):
                 )
                 rows.append(
                     {
+                        "key": game.get("key"),
+                        "title": game.get("title") or "",
                         "game": game.get("title") or "A game from a handheld, with no title known",
                         "system": ("Newest from " if copy["newest"] else "Older, from ") + copy["device"],
                         "last_snapshot": when,
                         "state": "To look at" if not copy["newest"] and not copy["reviewed"] else "Kept",
-                        "size": f"{copy['files']} files",
+                        "size": f"{copy['files']} file{'' if copy['files'] == 1 else 's'}",
                         "path": copy["path"],
                     }
                 )
-        return _jsonable({"status": "ok", "backups": rows})
+        return rows
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    def restore_save_copy(self, key: str, path: str, title: str):
+        """Puts a kept copy of saves back where the game keeps them; the agent
+        keeps what is there now as this computer's own copy first."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("restore_save_copy")
+        from pythia.droidtop import saves
+
+        def work():
+            files = saves.restore(key, path, title)
+            self._record("info", "python", f"Put back {files} save files for {title or key}", "restore_save_copy")
+            return {"status": "ok", "files": files}
+
+        return self._answer_later("restore_save_copy", work)
+
+    @Slot(str, bool, result="QVariant")
+    @_guarded
+    def get_game_saves(self, game_id: str, fetch: bool):
+        """Where the droidtop agent finds this game's saves on this computer: the
+        `patterns` it knows (None: none known) and the `files` there now. With
+        `fetch`, the agent first downloads the Ludusavi manifest if it has none."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("get_game_saves")
+        from pythia.droidtop import library, saves
+
+        entries = datadir.list_known_games().get(game_id) or []
+        if not entries:
+            return {"status": "error", "message": "This game is no longer in the library."}
+        mine = [e for e in entries if e.get("system_uuid") == get_system_uuid()]
+        entry = (mine or entries)[0]
+        key, title = library.game_key(entry), entry.get("canonical_name") or ""
+        return self._answer_later(
+            "get_game_saves", lambda: {"status": "ok", "key": key, **saves.lookup(key, title, fetch=fetch)}
+        )
 
     @Slot(result="QVariant")
     @_guarded

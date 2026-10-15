@@ -34,19 +34,35 @@ function call(name, ...args) {
     if (!pythia) { ErrorConsole.reportWeb('error', `${name}: not connected to Pythia`, 'bridge'); return resolve({ status: 'error', slot: name, message: 'Pythia is not connected to this page.' }); }
     if (typeof pythia[name] !== 'function') { ErrorConsole.reportWeb('error', `${name}: no such backend slot`, 'bridge'); return resolve({ status: 'error', slot: name, message: `Pythia has no "${name}" yet.` }); }
     try {
-      pythia[name](...args, (r) => resolve(r === undefined || r === null ? { status: 'error', slot: name, message: 'Pythia did not answer.' } : r));
+      pythia[name](...args, (r) => {
+        if (r === undefined || r === null) return resolve({ status: 'error', slot: name, message: 'Pythia did not answer.' });
+        // A slow slot answers "pending" at once; its result arrives as asyncResult with the same request id.
+        if (r.status === 'pending' && r.request) return awaitAsync(r.request, resolve);
+        resolve(r);
+      });
     } catch (e) {
       ErrorConsole.reportWeb('error', `${name}: ${e.message}`, 'bridge');
       resolve({ status: 'error', slot: name, message: e.message });
     }
   });
 }
+const asyncWaiting = new Map(); // request id -> resolve
+const asyncEarly = new Map(); // request id -> a result that arrived before its call's answer
+function awaitAsync(request, resolve) {
+  if (asyncEarly.has(request)) { resolve(asyncEarly.get(request)); asyncEarly.delete(request); return; }
+  asyncWaiting.set(request, resolve);
+}
+function asyncArrived(r) {
+  if (!r || !r.request) return;
+  const resolve = asyncWaiting.get(r.request);
+  if (resolve) { asyncWaiting.delete(r.request); resolve(r); } else asyncEarly.set(r.request, r);
+}
 const ok = (r) => r && r.status === 'ok';
 // A void call whose result only needs acknowledging: flash on success, a caution flash with the reason otherwise.
 async function act(name, args, done, { what } = {}) {
   const r = await call(name, ...args);
   if (ok(r)) { if (done) flash(done); return r; }
-  flash(r.status === 'unavailable' ? `${what || 'That'} is not built yet: ${r.message}` : `${what || 'That'} failed: ${r.message}`, 'caution');
+  flash(r.status === 'unavailable' ? `${what || 'That'} is not available: ${r.message}` : `${what || 'That'} failed: ${r.message}`, 'caution');
   return r;
 }
 // loadInto: the one loading path. Skeletons, the call, then draw(result) or the state block for it.
@@ -202,12 +218,13 @@ function renderDetail(g) {
   const host = $('#gameDetail');
   if (!g) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Pick a game', body: 'Its details open here.' })); return; }
   const updates = g.updates || [];
-  host.innerHTML = `<div class="detail-hero"><div class="cover-large art-${g.art}">${esc(initials(g.name))}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${gameStatus(g)}<span class="tag">${g.version ? `Version ${esc(g.version)}` : 'No version number'}</span><span class="tag">${g.systems.length} system${g.systems.length === 1 ? '' : 's'}</span>${g.managed ? '<span class="tag">Externally managed</span>' : ''}</div><p>${esc(g.note.split('\n')[0] || '')}</p><div class="detail-actions" id="detailActions">${g.path ? '<button class="btn" data-detail-action="open-folder">Open folder</button><button class="btn" data-detail-action="scan">Rescan install</button>' : ''}<button class="btn" data-detail-tab="versions">Manage versions</button><button class="icon-btn" data-detail-action="more" aria-label="More actions">•••</button></div></div></div><div class="detail-tabs"><button class="tab" data-tab="overview">Overview</button><button class="tab" data-tab="engine">Engine &amp; Compatibility</button><button class="tab" data-tab="versions">Versions</button><button class="tab" data-tab="systems">Systems</button><button class="tab" data-tab="notes">Notes</button><button class="tab" data-tab="history">History</button></div>
+  host.innerHTML = `<div class="detail-hero"><div class="cover-large art-${g.art}">${esc(initials(g.name))}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${gameStatus(g)}<span class="tag">${g.version ? `Version ${esc(g.version)}` : 'No version number'}</span><span class="tag">${g.systems.length} system${g.systems.length === 1 ? '' : 's'}</span>${g.managed ? '<span class="tag">Externally managed</span>' : ''}</div><p>${esc(g.note.split('\n')[0] || '')}</p><div class="detail-actions" id="detailActions">${g.path ? '<button class="btn" data-detail-action="open-folder">Open folder</button><button class="btn" data-detail-action="scan">Rescan install</button>' : ''}<button class="btn" data-detail-tab="versions">Manage versions</button><button class="icon-btn" data-detail-action="more" aria-label="More actions">•••</button></div></div></div><div class="detail-tabs"><button class="tab" data-tab="overview">Overview</button><button class="tab" data-tab="engine">Engine &amp; Compatibility</button><button class="tab" data-tab="versions">Versions</button><button class="tab" data-tab="systems">Systems</button><button class="tab" data-tab="notes">Notes</button><button class="tab" data-tab="saves">Saves</button><button class="tab" data-tab="history">History</button></div>
 <div class="tab-pane" data-pane="overview"><div class="stats-grid"><div class="stat"><div class="label">Latest installed</div><div class="value">${esc(versionText(g))}</div></div><div class="stat"><div class="label">Systems</div><div class="value">${g.systems.length}</div><div class="sub">${esc(g.systems.join(' · '))}</div></div><div class="stat"><div class="label">Status</div><div class="value" style="text-align:left;font-size:0.875rem">${gameStatus(g)}</div>${g.added ? `<div class="sub">Added ${esc(fmt.date(g.added))}</div>` : ''}</div></div><div class="kv"><div class="key">Canonical name</div><div class="value">${esc(g.name)} ${g.mine ? '<button class="row-action" style="float:right" data-detail-action="rename" aria-label="Rename">✎</button>' : ''}</div><div class="key">Game ID</div><div class="value mono">${esc(g.id)}</div><div class="key">Source</div><div class="value">${esc(g.source)}</div><div class="key">Engine</div><div class="value">${esc(g.engine)}</div><div class="key">Platforms</div><div class="value">${esc(g.platforms.map(platformName).join(' · ') || '—')}</div><div class="key">Primary path</div><div class="value mono">${esc(g.path || '—')}</div>${g.knownOn.length ? `<div class="key">Known on</div><div class="value">${esc(g.knownOn.map((k) => `${kindName(k.platform) || k.platform} (${k.id})`).join(' · '))}</div>` : ''}${g.ownedOn.length ? `<div class="key">Owned on</div><div class="value">${esc(g.ownedOn.map((k) => kindName(k) || k).join(' · '))}</div>` : ''}</div></div>
 <div class="tab-pane" data-pane="engine" id="engineTab"></div>
 <div class="tab-pane" data-pane="versions">${updates.length ? `<h3 style="font:500 1.0625rem var(--serif);margin:0 0 9px">Available, not installed</h3>${updates.map((u) => `<div class="available-update"><span class="status-icon pending" aria-hidden="true">↻</span><div><strong>${esc(u.version || 'Newer version')} · ${esc(platformName(u.platform))}</strong><br><small>Seen via ${esc(u.source || 'a store')}${u.detected_at ? ` · ${esc(fmt.date(u.detected_at))}` : ''}</small></div><button class="btn small primary" style="margin-left:auto" data-detail-action="apply-update" data-version="${esc(u.version || '')}">Review update</button></div>`).join('')}` : ''}<h3 style="font:500 1.0625rem var(--serif);margin:14px 0 9px">Installed versions</h3>${g.versions.length ? g.versions.map((v) => `<div class="version-group"><div class="version-head"><strong>${esc(v.version && v.version !== g.name ? v.version : 'No version number')}</strong><small>${(v.variants || []).length} variant${(v.variants || []).length === 1 ? '' : 's'}</small><span class="spacer"></span></div>${(v.variants || []).map((x) => `<div class="variant-row"><div><div class="variant-name">${esc(x.language && x.language !== 'unknown' ? `Language ${x.language}` : 'Default')} ${(x.mods || []).length ? '' : ''}</div><div class="variant-path">${esc(x.path || '')}</div></div><div class="platforms">${(x.platforms || []).map((p) => `<span class="platform">${esc(platformName(p))}</span>`).join('')}</div><div>${(x.mods || []).length ? x.mods.map((m) => `<span class="tag">${esc(m.name || m)}</span>`).join(' ') : '<span style="color:var(--dim);font-size:0.625rem">No mods</span>'}</div><button class="row-action" data-variant-menu="${esc(x.path || '')}" aria-label="Variant actions">•••</button></div>`).join('')}</div>`).join('') : ''}<div id="versionsState"></div><div style="margin-top:10px"><button class="btn small" data-detail-action="add-folder">＋ Add another folder</button></div></div>
 <div class="tab-pane" data-pane="systems"><table class="table"><thead><tr><th>System</th><th>Availability</th><th>Versions</th><th>Readiness</th><th></th></tr></thead><tbody>${g.entries.map((e) => `<tr><td class="primary-cell"><strong>${esc(systemName(e.system_uuid))}</strong><small>${e.updated_at ? `Record updated ${esc(fmt.dateTime(e.updated_at))}` : 'Synced record'}</small></td><td>${(e.versions || []).some((v) => (v.variants || []).some((x) => x.path)) ? (e.system_uuid === model.mySystem ? routineStatus('Installed here') : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">i</span>Installed there</span>`) : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not installed</span>`}</td><td>${esc((e.versions || []).map((v) => (v.version && v.version !== e.canonical_name ? v.version : 'no version')).join(', ') || '—')}</td><td data-readiness="${esc(e.system_uuid)}">${e.system_uuid === model.mySystem ? '…' : '<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not checked here</span>'}</td><td>${e.system_uuid === model.mySystem ? '<button class="btn small" data-detail-tab="engine">Inspect</button>' : ''}</td></tr>`).join('')}</tbody></table></div>
 <div class="tab-pane" data-pane="notes">${g.mine ? `<textarea class="notes-area" id="notesArea" aria-label="Notes">${esc(g.note)}</textarea><div style="display:flex;justify-content:flex-end;margin-top:9px"><button class="btn primary" data-detail-action="save-note">Save note</button></div>` : ''}<div id="notesState"></div></div>
+<div class="tab-pane" data-pane="saves" id="savesTab"></div>
 <div class="tab-pane" data-pane="history"><div class="timeline">${[...g.events].reverse().map((e) => `<div class="timeline-item"><strong>${esc(EVENT_NAMES[e.type] || e.type)}</strong><p>${esc(e.detail || '')}</p><time>${esc(fmt.dateTime(e.timestamp))}</time></div>`).join('')}</div><div id="historyState"></div></div>`;
   if (!g.versions.length) $('#versionsState', host).appendChild(stateBlock({ title: 'Nothing installed here', body: g.ownedOn.length ? `Owned on ${g.ownedOn.map((k) => kindName(k) || k).join(', ')}, not installed on this computer.` : 'No folder is known for this game on this computer.' }));
   if (!g.mine) $('#notesState', host).appendChild(stateBlock({ title: 'Notes live on their computer', body: `This record belongs to ${g.systems.find((s) => s !== 'This computer') || 'another computer'}; notes are read-only here.${g.note ? `\n\n${g.note}` : ''}` }));
@@ -227,6 +244,22 @@ function renderDetail(g) {
     $('#detailActions', host).prepend(b);
   });
   renderEngineTab(g);
+  renderSavesTab(g);
+}
+// Where the droidtop agent finds this game's saves (backend: get_game_saves, the agent's saves crate).
+function renderSavesTab(g, fetch = false) {
+  const pane = $('#savesTab'); if (!pane) return;
+  loadInto(pane, 'get_game_saves', [g.id, fetch], (r, host) => {
+    const files = r.files || [];
+    if (!r.patterns) {
+      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `The droidtop agent knows where a game keeps its saves from the Ludusavi manifest, by its key (${r.key}) or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true) }] }));
+      return;
+    }
+    host.appendChild(el(`<div class="kv"><div class="key">Looked for</div><div class="mono" style="word-break:break-all">${(r.patterns || []).map(esc).join('<br>')}</div></div>`));
+    if (!files.length) { host.appendChild(stateBlock({ title: 'No save files here yet', body: 'Nothing matches those places on this computer now. They sync with paired handhelds once there are some.' })); return; }
+    host.appendChild(el(`<table class="table"><thead><tr><th>File</th><th></th></tr></thead><tbody>${files.map((f) => `<tr><td class="primary-cell"><strong>${esc(f.name)}</strong><small class="mono">${esc(f.path)}</small></td><td><button class="btn small" data-open-save="${esc(f.path)}">Show</button></td></tr>`).join('')}</tbody></table>`));
+    $$('[data-open-save]', host).forEach((b) => (b.onclick = () => act('open_path', [b.dataset.openSave.replace(/[\\/][^\\/]*$/, '')], null, { what: 'Opening the folder' })));
+  }, { what: "This game's saves" });
 }
 function renderEngineTab(g) {
   const pane = $('#engineTab'); if (!pane) return;
@@ -456,7 +489,18 @@ function renderSaves() {
   loadInto($('#savesState'), 'get_save_backups', [], (r) => {
     const backups = r.backups || [];
     $('#savesSummary').textContent = `${fmt.n(backups.length, 'kept copy', 'kept copies')}`;
-    $('#saveRows').innerHTML = backups.map((b) => `<tr><td class="primary-cell"><strong>${esc(b.game)}</strong><small>${esc(b.system || '')}</small></td><td>${esc(fmt.dateTime(b.last_snapshot))}</td><td>${esc(b.state)}</td><td>${esc(b.size || '—')}</td><td></td></tr>`).join('');
+    $('#saveRows').innerHTML = backups.map((b) => `<tr><td class="primary-cell"><strong>${esc(b.game)}</strong><small>${esc(b.system || '')}</small></td><td>${esc(fmt.dateTime(b.last_snapshot))}</td><td>${esc(b.state)}</td><td>${esc(b.size || '—')}</td><td><button class="btn small" data-restore-copy="${esc(b.path)}">Put back…</button></td></tr>`).join('');
+    backups.forEach((b) => {
+      const btn = $(`[data-restore-copy="${CSS.escape(b.path)}"]`, $('#saveRows'));
+      if (!btn) return;
+      btn.onclick = async () => {
+        if (!(await confirm({ tone: 'caution', title: `Put this copy of ${b.game}'s saves back?`, body: 'The saves there now are kept first, as this computer\'s own copy, so nothing is lost.', details: `${b.system}\n${b.path}`, proceed: 'Put back' }))) return;
+        btn.disabled = true;
+        const r = await act('restore_save_copy', [b.key || '', b.path, b.title || ''], null, { what: 'Putting the saves back' });
+        btn.disabled = false;
+        if (ok(r)) { if (r.files) flash(`Put back ${fmt.n(r.files, 'file')}`); else flash('Nothing in that copy matches where the game keeps its saves; nothing was put back.', 'caution'); renderSaves(); }
+      };
+    });
     if (!backups.length) $('#savesState').appendChild(stateBlock({ title: 'No copies of saves kept', body: 'A copy is kept here when a sync with a handheld would overwrite saves that differ.' }));
   }, { what: 'Save backups' });
 }
@@ -849,6 +893,7 @@ function connect() {
   if (!(window.qt && qt.webChannelTransport)) { renderChrome(); renderNoBackend(); return; }
   new QWebChannel(qt.webChannelTransport, (channel) => {
     pythia = channel.objects.pythia;
+    pythia.asyncResult.connect(asyncArrived);
     window.pythia = pythia;
     pythia.gamesChanged.connect(refreshGames);
     pythia.handheldsChanged.connect(() => { if (state.view === 'systems') renderHandhelds(); if (state.shell === 'handheld' && state.hhPage === 'systems') renderHandheld(); });

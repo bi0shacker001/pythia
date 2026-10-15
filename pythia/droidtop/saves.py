@@ -10,3 +10,18 @@ def copies() -> list[dict]:
     each with ``device``, ``stamp`` (UTC, ``20261008T224500Z``), ``files``,
     ``path``, ``newest`` and ``reviewed``."""
     return submodule("saves").copies()
+
+
+def lookup(key: str, title: str = "", fetch: bool = False) -> dict:
+    """Where a game keeps its saves here: ``patterns`` (None when nothing is
+    known) and the ``files`` there now, each with ``name`` and ``path``. With
+    ``fetch``, the Ludusavi manifest is fetched first when there is none yet.
+    May rescan (slow)."""
+    return submodule("saves").lookup(key, title, fetch=fetch)
+
+
+def restore(key: str, path: str, title: str = "") -> int:
+    """Puts the kept copy at ``path`` back where the game keeps its saves;
+    what is there now is kept first as this computer's own copy. Returns how
+    many files it put back. May rescan (slow)."""
+    return submodule("saves").restore(key, path, title)

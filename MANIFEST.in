@@ -1,8 +1,12 @@
-recursive-include lutris *.py
-include bin/lutris
+recursive-include pythia *.py
+recursive-include pythia/ui/desktop/web *
+recursive-include pythia/ui/bigpicture/qml *
+recursive-include share *
+include bin/pythia
 include LICENSE
 include AUTHORS
 include MANIFEST.in
 include README.rst
 graft debian
 prune tests
+global-exclude __pycache__ *.pyc

@@ -14,5 +14,5 @@ override_dh_builddeb:
 	dh_builddeb -- -Zgzip
 
 execute_after_dh_install:
-	install -m 0644 -D debian/apparmor-profile debian/lutris/etc/apparmor.d/lutris-bwrap-userns-restrict
-	dh_apparmor --profile-name=lutris-bwrap-userns-restrict
+	install -m 0644 -D debian/apparmor-profile debian/pythia/etc/apparmor.d/pythia-bwrap-userns-restrict
+	dh_apparmor --profile-name=pythia-bwrap-userns-restrict

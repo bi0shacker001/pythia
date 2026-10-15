@@ -11,20 +11,13 @@
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Main entry point for Pythia"""
+"""Main entry point for Pythia: sets up the search path for the source tree
+and the meson and Debian layouts, then runs pythia.launch.main(), the same
+entry point an installed package's `pythia` command runs."""
 
-import gettext
-import locale
-import multiprocessing
 import os
 import sys
 from os.path import dirname, normpath, realpath
-
-# Python 3.14 changes the default to 'forkserver' which is very different;
-# let's not put up with _that_! (Windows has no fork start method at all --
-# real, separate gap, not addressed here; this only matters on POSIX.)
-if hasattr(os, "fork"):
-    multiprocessing.set_start_method("fork")
 
 LAUNCH_PATH = dirname(realpath(__file__))
 
@@ -41,49 +34,6 @@ if os.path.isdir(os.path.join(LAUNCH_PATH, "../pythia")):
 else:
     sys.path.insert(0, os.path.normpath(os.path.join(LAUNCH_PATH, "../lib/pythia")))
 
-try:
-    locale.setlocale(locale.LC_ALL, "")
-except locale.Error as ex:
-    sys.stderr.write("Unsupported locale setting: %s\n" % ex)
+from pythia.launch import main  # noqa: E402
 
-try:
-    # optional_settings does not exist if you don't use the meson build system
-    from pythia import optional_settings  # type: ignore
-
-    try:
-        locale.bindtextdomain("pythia", optional_settings.LOCALE_DIR)
-        gettext.bindtextdomain("pythia", optional_settings.LOCALE_DIR)
-        locale.textdomain("pythia")
-        gettext.textdomain("pythia")
-    except Exception as ex:
-        sys.stderr.write(
-            "Couldn't bind gettext domain, translations won't work.\n"
-            "LOCALE_DIR: %s\nError: %s\n" % (optional_settings.LOCALE_DIR, ex)
-        )
-except ImportError:
-    pass
-
-if "WEBKIT_DISABLE_DMABUF_RENDERER" not in os.environ:
-    os.environ["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
-
-# GTK removal (2026-08-04): pythia.gui (GTK) is gone. Any real CLI flag
-# (list/install/export/exec/...) always goes through the headless entry
-# point, same as before -- scripting shouldn't need a display. Bare
-# `pythia` with no arguments, or `--ui <desktop|bigpicture|web>` explicitly
-# picking a front end (see pythia.ui.mode), tries the new Qt UI if PySide6
-# is installed; everything else is a headless CLI flag.
-wants_ui = len(sys.argv) == 1 or "--ui" in sys.argv
-if wants_ui:
-    try:
-        from pythia.ui.app import main as qt_main
-
-        qt_main()
-    except ImportError as ex:
-        sys.stderr.write(f"Qt UI unavailable ({ex}), falling back to the headless CLI.\n")
-        from pythia.app import main
-
-        main()
-else:
-    from pythia.app import main
-
-    main()
+main()

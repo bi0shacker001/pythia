@@ -41,3 +41,8 @@ CLAUDE.md
 
 # glade recovery files
 *.ui~
+
+# Python package builds
+*.egg-info/
+/build/
+/dist/

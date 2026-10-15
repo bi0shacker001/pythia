@@ -29,6 +29,7 @@ def get_wrapper_script_location() -> str:
     candidates = [
         os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "..")),
         os.path.dirname(os.path.dirname(settings.__file__)),
+        sys.prefix,  # an installed package (pip, a venv) puts its data files under the prefix
         "/usr",
         "/usr/local",
     ]

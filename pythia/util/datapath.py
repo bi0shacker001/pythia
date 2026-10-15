@@ -19,6 +19,9 @@ def get() -> str:
         data_path = os.path.normpath(os.path.join(sys.path[0], "share/pythia"))
     elif system.path_exists(os.path.normpath(os.path.join(launch_path, "../../share/pythia"))):
         data_path = os.path.normpath(os.path.join(launch_path, "../../share/pythia"))
+    elif system.path_exists(os.path.join(sys.prefix, "share", "pythia")):
+        # An installed package (pip, a venv): its data files land under the prefix.
+        data_path = os.path.join(sys.prefix, "share", "pythia")
     else:
         import pythia
 

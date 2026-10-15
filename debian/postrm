@@ -7,14 +7,14 @@ if [ -e /etc/apparmor.d/abi/4.0 ]; then
         # By default only apt purge remove AppArmor profiles, remove
         # it even with an apt remove and notify user that a reboot is
         # required.
-        rm -f /etc/apparmor.d/lutris-bwrap-userns-restrict
-        rm -f /etc/apparmor.d/local/lutris-bwrap-userns-restrict
+        rm -f /etc/apparmor.d/pythia-bwrap-userns-restrict
+        rm -f /etc/apparmor.d/local/pythia-bwrap-userns-restrict
 
         # Used by unattended-upgrades etc.
         touch /var/run/reboot-required || true
 
-        if ! grep -Fqsx lutris /run/reboot-required.pkgs; then
-            echo lutris >> /run/reboot-required.pkgs || true
+        if ! grep -Fqsx pythia /run/reboot-required.pkgs; then
+            echo pythia >> /run/reboot-required.pkgs || true
         fi
 
         # same thing for the older update-notifier interface

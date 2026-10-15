@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "pythia"
 version = "0.5.23"
@@ -33,6 +37,9 @@ dependencies = [
     "PySide6",
 ]
 
+[project.scripts]
+pythia = "pythia.launch:main"
+
 [project.urls]
 Homepage = "https://github.com/bi0shacker001/pythia"
 Repository = "https://github.com/bi0shacker001/pythia"
@@ -48,6 +55,22 @@ dev = [
     "pygobject-stubs>=2.17.0"
 ]
 
+
+[tool.setuptools.packages.find]
+include = ["pythia", "pythia.*"]
+
+[tool.setuptools.package-data]
+# The Qt UIs' pages and QML, loaded from beside their modules.
+"pythia.ui.desktop" = ["web/*"]
+"pythia.ui.bigpicture" = ["qml/*"]
+
+[tool.setuptools.data-files]
+# pythia.util.datapath and the game-launch wrapper are looked up under the prefix.
+"share/pythia/bin" = ["share/pythia/bin/pythia-wrapper"]
+"share/pythia/conf" = ["share/pythia/conf/*"]
+"share/pythia/json" = ["share/pythia/json/*"]
+"share/pythia/media" = ["share/pythia/media/*"]
+"share/pythia/ui" = ["share/pythia/ui/*"]
 
 [tool.mypy]
 python_version = "3.10"

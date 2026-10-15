@@ -35,7 +35,7 @@ Item {
     }
 
     function statusText(entry) {
-        return statusFor(entry) === "critical" ? "Configuration invalid" : ""
+        return statusFor(entry) === "critical" ? "Not identified" : ""
     }
 
     ListModel { id: filteredModel }

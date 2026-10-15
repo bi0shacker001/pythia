@@ -227,9 +227,7 @@ def run_update_check(log=None) -> dict:
             )
             updated += 1
             log(f"  -> update available: {installed_version} -> {result['version']}")
-            datadir.add_timeline_event(
-                entry, "f95_update_detected", f"{installed_version} -> {result['version']}"
-            )
+            datadir.add_timeline_event(entry, "f95_update_detected", f"{installed_version} -> {result['version']}")
         entry["available_updates"] = available_updates
 
         saved_path = datadir.save_entry(entry)

@@ -75,8 +75,4 @@ def find_for_kind(kind: str):
     willingness to try that kind, or it's the plugin whose own id/detect naturally
     produced that kind in the first place (e.g. the Ren'Py engine plugin for kind
     "renpy")."""
-    return [
-        p
-        for p in enabled_plugins()
-        if p.refines_kinds is None or kind in p.refines_kinds or kind in p.id
-    ]
+    return [p for p in enabled_plugins() if p.refines_kinds is None or kind in p.refines_kinds or kind in p.id]

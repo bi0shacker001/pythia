@@ -182,7 +182,6 @@ class LibraryPlugin(PluginMeta):
         return self.match(game_root)
 
 
-
 class ManagerPlugin(PluginMeta):
     """Hands a game off to a launcher application capable of running it -- Steam
     client, Heroic, Lutris, Playnite, GOG Galaxy, ... (2026-08-02, split out of

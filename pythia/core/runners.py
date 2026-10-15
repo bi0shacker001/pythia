@@ -158,7 +158,8 @@ def resolve_version(catalog: list[dict], version: str | None, os_name: str, arch
         found = select(lambda c: c.get("architecture") == arch and c.get("version") == version)
         if found:
             return found
-        return None  # an explicitly requested version that doesn't exist for this arch is a real miss, not a fallback case
+        # an explicitly requested version that doesn't exist for this arch is a real miss, not a fallback case
+        return None
 
     found = select(lambda c: c.get("architecture") == arch and c.get("default"))
     if found:
@@ -215,7 +216,9 @@ def _extract_archive(archive_path: Path, dest_dir: Path, merge_single: bool = Tr
             inner.rmdir()
 
 
-def download_and_install(url: str, dest_dir: Path, is_archive: bool = False, merge_single: bool = True, log=lambda *_: None) -> Path:
+def download_and_install(
+    url: str, dest_dir: Path, is_archive: bool = False, merge_single: bool = True, log=lambda *_: None
+) -> Path:
     """Download `url` (to Pythia's own cache dir, matching Lutris's own
     settings.CACHE_DIR-based staging) and either extract it into `dest_dir` (archive
     case, ported from runner.py's download_and_extract()/extract()) or save it
@@ -241,7 +244,7 @@ def download_and_install(url: str, dest_dir: Path, is_archive: bool = False, mer
         result = dest_dir
 
     if os.name != "nt":
-        for path in ([result] if result.is_file() else result.rglob("*")):
+        for path in [result] if result.is_file() else result.rglob("*"):
             if path.is_file():
                 path.chmod(path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
     return result
@@ -255,7 +258,9 @@ def is_available(tool_id: str, version: str | None = None, log=lambda *_: None) 
     return resolve_version(catalog, version, platform.system(), _normalized_arch()) is not None
 
 
-def ensure_tool(tool_id: str, version: str | None = None, exe_name: str | None = None, log=lambda *_: None) -> Path | None:
+def ensure_tool(
+    tool_id: str, version: str | None = None, exe_name: str | None = None, log=lambda *_: None
+) -> Path | None:
     """Return the path to a working local copy of `tool_id`'s binary, downloading
     (and, if it's an archive, extracting) it -- once, cached under
     app_data_dir()/tools/ -- if not already present. None if no build exists for

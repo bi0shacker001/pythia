@@ -26,8 +26,8 @@ from pythia.util.sniper import get_sniper_ld_library_path, get_sniper_run_comman
 if TYPE_CHECKING:
     from pythia.api import RunnerVersionDict
     from pythia.config import GameConfigDict, LaunchConfigDict, RunnerConfigDict, SystemConfigDict
-    from pythia.game import Game
     from pythia.delegates import InstallUIDelegate
+    from pythia.game import Game
     from pythia.installer.installer import PythiaInstaller
     from pythia.installer.interpreter import ScriptInterpreter
 

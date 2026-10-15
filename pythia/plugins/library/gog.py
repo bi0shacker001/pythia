@@ -214,7 +214,7 @@ class GogPlugin(LibraryPlugin, MetadataPlugin):
         if not info_files:
             return None
         stem = info_files[0].stem  # "goggame-1207658691"
-        gog_id = stem[len("goggame-"):]
+        gog_id = stem[len("goggame-") :]
         return {
             "kind": "gog",
             "name": None,

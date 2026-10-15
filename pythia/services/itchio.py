@@ -7,7 +7,6 @@ from gettext import gettext as _
 from typing import Any
 from urllib.parse import quote_plus, urlencode
 
-
 from pythia import settings
 from pythia.database import games as games_db
 from pythia.exceptions import UnavailableGameError

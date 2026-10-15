@@ -17,12 +17,12 @@ from typing import Any, TypeAlias, cast
 import requests
 
 from pythia import settings
-from pythia.util.notifier import NotificationSource
 from pythia.util import http, system
 from pythia.util.graphics.gpu import get_gpus_info
 from pythia.util.http import HTTPError, Request
 from pythia.util.linux import LINUX_SYSTEM
 from pythia.util.log import logger
+from pythia.util.notifier import NotificationSource
 from pythia.util.strings import time_ago
 
 API_KEY_FILE_PATH = os.path.join(settings.CACHE_DIR, "auth-token")

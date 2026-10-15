@@ -43,7 +43,7 @@ from collections.abc import Callable
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
-from pythia.exceptions import PythiaError, MisconfigurationError
+from pythia.exceptions import MisconfigurationError, PythiaError
 
 if TYPE_CHECKING:
     from pythia.runners.runner import Runner

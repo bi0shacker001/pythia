@@ -514,7 +514,8 @@ def run(argv: list[str] | None = None) -> int:
             from pythia.installer.interpreter import ScriptInterpreter  # noqa: PLC0415
         except ImportError as ex:
             print(
-                f"Can't run installers yet: {ex}. ScriptInterpreter still subclasses GObject.Object (real, structural -- not yet ported off GTK/GObject)."
+                f"Can't run installers yet: {ex}. ScriptInterpreter still subclasses GObject.Object "
+                "(real, structural -- not yet ported off GTK/GObject)."
             )
             return 1
 

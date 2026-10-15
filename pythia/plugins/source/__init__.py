@@ -8,8 +8,8 @@ LibraryPlugin/DownloaderPlugin/ModPlugin (multi-category) would appear here too,
 alongside every other category it implements, from one instance.
 """
 
-from pythia.plugins.source.local_path import plugin as local_path_source  # noqa: F401
 from pythia.plugins.registry import filter_enabled, for_category
+from pythia.plugins.source.local_path import plugin as local_path_source  # noqa: F401
 
 
 def all_plugins() -> list:

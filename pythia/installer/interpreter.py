@@ -8,8 +8,8 @@ from gi.repository import GObject
 from pythia import settings
 from pythia.config import PythiaConfig
 from pythia.database.games import get_game_by_field
-from pythia.exceptions import AuthenticationError, MisconfigurationError, UnavailableGameError
 from pythia.delegates import Delegate
+from pythia.exceptions import AuthenticationError, MisconfigurationError, UnavailableGameError
 from pythia.installer import get_entry_point_path
 from pythia.installer.commands import CommandsMixin
 from pythia.installer.errors import MissingGameDependencyError, ScriptingError

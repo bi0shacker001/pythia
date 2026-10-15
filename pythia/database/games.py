@@ -29,7 +29,6 @@ from typing import Any, TypeAlias
 from pythia import datadir
 from pythia.database import sql
 from pythia.identity import get_system_uuid, new_game_id
-from pythia.util.log import logger
 from pythia.util.strings import slugify
 
 DbGameDict: TypeAlias = dict[str, Any]
@@ -315,7 +314,9 @@ def get_games(
     if variant_filter_keys & _VARIANT_FIELDS:
         return _get_games_via_variant_filter(searches, filters, excludes, sorts)
 
-    rows = sql.filtered_query(settings.DB_PATH, "games", searches=searches, filters=filters, excludes=excludes, sorts=sorts)
+    rows = sql.filtered_query(
+        settings.DB_PATH, "games", searches=searches, filters=filters, excludes=excludes, sorts=sorts
+    )
     games = []
     for row in rows:
         row = _row_to_game_dict(row)
@@ -332,7 +333,9 @@ def _get_games_via_variant_filter(searches, filters, excludes, sorts) -> list[Db
     # the "variants" table has no slug column (that's a game-level field), so
     # a variant-scoped query always needs an explicit sort.
     sorts = sorts or [("id", "ASC")]
-    rows = sql.filtered_query(settings.DB_PATH, "variants", searches=searches, filters=filters, excludes=excludes, sorts=sorts)
+    rows = sql.filtered_query(
+        settings.DB_PATH, "variants", searches=searches, filters=filters, excludes=excludes, sorts=sorts
+    )
     games = []
     for row in rows:
         entry = _load_entry(row["game_id"], row["system_uuid"])
@@ -544,7 +547,8 @@ def get_used_platforms() -> list[str]:
     with sql.db_cursor(settings.DB_PATH) as cursor:
         rows = sql.cursor_execute(
             cursor,
-            "select distinct platform from variants where platform is not null and platform is not '' order by platform",
+            "select distinct platform from variants "
+            "where platform is not null and platform is not '' order by platform",
         ).fetchall()
     return [r[0] for r in rows if r[0]]
 

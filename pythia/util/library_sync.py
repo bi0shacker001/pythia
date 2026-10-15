@@ -12,9 +12,9 @@ from pythia.database.categories import (
 )
 from pythia.database.games import add_game, get_games, get_games_where
 from pythia.game import Game
-from pythia.util.notifier import NotificationSource
 from pythia.util import http
 from pythia.util.log import logger
+from pythia.util.notifier import NotificationSource
 
 LIBRARY_URL = settings.SITE_URL + "/api/users/library"
 LOCAL_LIBRARY_SYNCING = NotificationSource()

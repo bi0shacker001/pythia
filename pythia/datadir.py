@@ -36,11 +36,23 @@ PLATFORM_ID_KINDS = {
 }
 
 LANGUAGE_TOKENS = {
-    "eng": "en", "en": "en", "english": "en",
-    "jp": "ja", "jpn": "ja", "japanese": "ja",
-    "cn": "zh", "chs": "zh", "cht": "zh", "chinese": "zh",
-    "kr": "ko", "kor": "ko", "korean": "ko",
-    "mtl": "mtl", "machine-translated": "mtl", "machinetranslated": "mtl", "translated": "mtl",
+    "eng": "en",
+    "en": "en",
+    "english": "en",
+    "jp": "ja",
+    "jpn": "ja",
+    "japanese": "ja",
+    "cn": "zh",
+    "chs": "zh",
+    "cht": "zh",
+    "chinese": "zh",
+    "kr": "ko",
+    "kor": "ko",
+    "korean": "ko",
+    "mtl": "mtl",
+    "machine-translated": "mtl",
+    "machinetranslated": "mtl",
+    "translated": "mtl",
 }
 
 

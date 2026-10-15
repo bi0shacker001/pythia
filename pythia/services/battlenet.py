@@ -4,10 +4,8 @@ import json
 import os
 from gettext import gettext as _
 
-
 from pythia import settings
 from pythia.config import PythiaConfig, write_game_config
-from pythia.util.app_singleton import get_default as get_default_application
 from pythia.database.games import add_game, get_game_by_field, get_games, update_existing
 from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
@@ -15,6 +13,7 @@ from pythia.services.base import BaseService
 from pythia.services.lutris import sync_media
 from pythia.services.service_game import ServiceGame
 from pythia.services.service_media import ServiceMedia
+from pythia.util.app_singleton import get_default as get_default_application
 from pythia.util.battlenet.definitions import ProductDbInfo
 from pythia.util.battlenet.product_db import ProductDb
 from pythia.util.log import logger

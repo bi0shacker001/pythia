@@ -157,9 +157,7 @@ class F95LibraryPlugin(LibraryPlugin):
             return []
 
         try:
-            cur = conn.execute(
-                "SELECT id, name, version, installed, type, url, executables FROM games"
-            )
+            cur = conn.execute("SELECT id, name, version, installed, type, url, executables FROM games")
             rows = cur.fetchall()
         except sqlite3.OperationalError:
             return []
@@ -195,11 +193,40 @@ class F95LibraryPlugin(LibraryPlugin):
 
 
 _GAMES_TABLE_COLUMNS = (
-    "id", "custom", "name", "version", "developer", "type", "status", "url",
-    "added_on", "last_updated", "last_full_check", "last_check_version", "last_launched",
-    "score", "votes", "rating", "finished", "installed", "updated", "archived",
-    "executables", "description", "changelog", "tags", "unknown_tags", "unknown_tags_flag",
-    "labels", "tab", "notes", "image_url", "downloads", "previews_urls", "reviews_total", "reviews",
+    "id",
+    "custom",
+    "name",
+    "version",
+    "developer",
+    "type",
+    "status",
+    "url",
+    "added_on",
+    "last_updated",
+    "last_full_check",
+    "last_check_version",
+    "last_launched",
+    "score",
+    "votes",
+    "rating",
+    "finished",
+    "installed",
+    "updated",
+    "archived",
+    "executables",
+    "description",
+    "changelog",
+    "tags",
+    "unknown_tags",
+    "unknown_tags_flag",
+    "labels",
+    "tab",
+    "notes",
+    "image_url",
+    "downloads",
+    "previews_urls",
+    "reviews_total",
+    "reviews",
 )
 
 
@@ -215,13 +242,11 @@ def export_to_sqlite(path: str):
     from pythia import datadir
 
     conn = sqlite3.connect(path)
-    conn.execute(
-        f"CREATE TABLE IF NOT EXISTS games ({', '.join(_GAMES_TABLE_COLUMNS)})"
-    )
+    conn.execute(f"CREATE TABLE IF NOT EXISTS games ({', '.join(_GAMES_TABLE_COLUMNS)})")
 
     rows = []
     seen_ids = set()
-    for game_id, entries in datadir.list_known_games().items():
+    for entries in datadir.list_known_games().values():
         for entry in entries:
             f95_id = next(
                 (p.get("id") for p in entry.get("platform_ids", []) if p.get("platform") == "f95"),

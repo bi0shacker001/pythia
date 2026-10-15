@@ -363,11 +363,12 @@ async function mergeInto(c, keepId, foldId) {
 
 // ---- Systems & sync --------------------------------------------------------------------
 function renderSystems() {
+  renderHandhelds();
   const q = state.view === 'systems' ? state.search.toLowerCase() : '';
   const list = systems.filter((s) => !q || s.name.toLowerCase().includes(q));
   $('#systemsSummary').textContent = model.ready ? `${fmt.n(systems.length, 'system')} in the synced folder` : '';
   const n = $('#systemsNotice'); n.innerHTML = '';
-  if (model.info) n.appendChild(notice({ tone: 'info', placement: 'page', title: 'Systems come from the synced folder', body: 'Point your sync tool at the library folder on each computer.', details: `Library folder: ${model.info.sync_folder}\nPairing handhelds, each device's saves and copying versions between devices are not built yet; "Add system" says so.` }));
+  if (model.info) n.appendChild(notice({ tone: 'info', placement: 'page', title: 'Systems come from the synced folder', body: 'Point your sync tool at the library folder on each computer.', details: `Library folder: ${model.info.sync_folder}\nHandhelds pair with this computer below. Copying versions between computers is not built yet; "Add system" says so.` }));
   $('#systemCards').innerHTML = list.length ? list.map((s) => `<article class="card"><div class="card-head"><div class="card-icon">${esc(s.icon)}</div><div><strong>${esc(s.name)}</strong><small class="mono">${esc(s.id)}</small></div></div><div class="card-body"><div class="stats-grid" style="grid-template-columns:1fr 1fr;margin-bottom:0"><div class="stat"><div class="label">Tracked</div><div class="value">${esc(s.games)}</div></div><div class="stat"><div class="label">Installed</div><div class="value">${esc(s.installed)}</div></div></div>${s.mine && model.app ? `<p style="margin-top:10px">${esc(model.app.platform)} · Pythia ${esc(model.app.version)}</p>` : ''}</div><div class="card-foot">${s.mine ? routineStatus('This computer') : routineStatus('Synced record', 'neutral', 'i')}<span class="spacer"></span><button class="btn small" data-system-games="${esc(s.id)}">Games</button></div></article>`).join('') : '';
   $$('[data-system-games]').forEach((b) => (b.onclick = () => { state.search = ''; navigate('library'); $('#globalSearch').value = systemName(b.dataset.systemGames); state.search = systemName(b.dataset.systemGames); renderLibrary(); }));
   const head = $('#crossSystemHead'); const rows = $('#crossSystemRows'); const st = $('#crossSystemState'); st.innerHTML = '';
@@ -377,6 +378,60 @@ function renderSystems() {
   if (!cross.length) { head.innerHTML = ''; rows.innerHTML = ''; st.appendChild(stateBlock({ title: systems.length > 1 ? 'No game is on two systems yet' : 'Only this computer so far', body: 'When another computer writes to the synced folder, games known to both are compared here.' })); return; }
   head.innerHTML = `<tr><th>Game</th>${systems.map((s) => `<th>${esc(s.name)}</th>`).join('')}</tr>`;
   rows.innerHTML = cross.map((g) => `<tr><td class="primary-cell"><strong>${esc(g.name)}</strong><small>${esc(g.engine)}</small></td>${systems.map((s) => { const e = g.entries.find((x) => x.system_uuid === s.id); if (!e) return '<td>—</td>'; const v = (e.versions || []).map((x) => (x.version && x.version !== e.canonical_name ? x.version : null)).filter(Boolean); const inst = (e.versions || []).some((x) => (x.variants || []).some((y) => y.path)); return `<td>${inst ? `<span class="state-pill ok">${esc(v.join(', ') || 'installed')}</span>` : '<span class="state-pill info">known</span>'}</td>`; }).join('')}</tr>`).join('');
+}
+// ---- Handhelds: this computer as the droidtop agent (backend: pythia.droidtop) -----------
+// The pairings are droidtop-agent's own files, shared with droidtop-agent; without the
+// agent module every slot answers "unavailable" and the panel says so.
+let pairPoll = null;
+function stopPairPoll() { if (pairPoll) { clearInterval(pairPoll); pairPoll = null; } }
+function renderHandhelds() {
+  const agentHost = $('#agentState'); const host = $('#handheldState');
+  if (!agentHost || !host) return;
+  loadInto(agentHost, 'get_agent_status', [], (st, h) => {
+    const s = st.serving || {};
+    const line = s.state === 'serving' ? `${routineStatus('Serving')} Handhelds reach this computer as ${esc(st.identity?.name || '')}.`
+      : s.state === 'stopped' ? visibleStatus(s.reason || 'Not serving handhelds', 'pending')
+      : visibleStatus('Not serving handhelds yet', 'neutral', '–');
+    h.appendChild(el(`<p>${line}</p>`));
+    if ((st.places || []).length) h.appendChild(el(`<p><small>Addresses: ${(st.places || []).map((p) => `<span class="mono">${esc(p.address)}</span> (${esc(p.label)})`).join(' · ')}</small></p>`));
+  }, { what: 'This computer as a droidtop agent' });
+  loadInto(host, 'get_handhelds', [], (r, h) => {
+    const devices = r.devices || [];
+    $('#handheldSummary').textContent = fmt.n(devices.length, 'paired handheld');
+    if (!devices.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'On the handheld: Settings > Computers > Pair a computer, then "Pair a handheld" here.' })); return; }
+    const table = el(`<table class="table"><thead><tr><th>Handheld</th><th>Last seen</th><th>Saves win</th><th>Start games</th><th></th></tr></thead><tbody>${devices.map((d) => `<tr><td class="primary-cell"><strong>${esc(d.name)}</strong><small class="mono">${esc(d.id.slice(0, 16))}</small></td><td>${d.last_seen_ms ? esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString())) : 'Never'}<small>${esc(d.last_address || '')}</small></td><td><button class="toggle" data-handheld-primary="${esc(d.id)}" aria-label="Its saves win when both changed"><span></span></button></td><td><button class="toggle" data-handheld-launch="${esc(d.id)}" aria-label="It may start games here"><span></span></button></td><td><button class="btn small" data-handheld-forget="${esc(d.id)}">Forget…</button></td></tr>`).join('')}</tbody></table>`);
+    h.appendChild(table);
+    devices.forEach((d) => {
+      bindSwitch($(`[data-handheld-primary="${d.id}"]`, table), !!d.primary, async (on, node) => { const r2 = await act('set_primary_handheld', [on ? d.id : ''], on ? `${d.name}'s saves win` : 'The newest saves win', { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } else renderHandhelds(); });
+      bindSwitch($(`[data-handheld-launch="${d.id}"]`, table), !!d.launch, async (on, node) => { const r2 = await act('set_handheld_launch', [d.id, on], on ? `${d.name} may start games here` : `${d.name} may no longer start games here`, { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } });
+      $(`[data-handheld-forget="${d.id}"]`, table).onclick = async () => { if (await confirmDanger({ title: `Forget ${d.name}?`, body: 'It can no longer sync with this computer until you pair it again.', recommendation: 'We recommend Cancel.', proceed: 'Forget' })) await act('forget_handheld', [d.id], `Forgot ${d.name}`, { what: 'Forgetting it' }); };
+    });
+  }, { what: 'Handhelds' });
+}
+async function pairHandheld() {
+  const code = await prompt({ title: 'Pair a handheld', body: 'On the handheld: Settings > Computers > Pair a computer. Type the 6 digits it shows, or the text of its QR code.', hint: '123 456', save: 'Pair' });
+  if (!code || !code.trim()) return;
+  const r = await call('pair_with_code', code.trim());
+  if (ok(r)) flash('Pairing…'); else flash(r.status === 'unavailable' ? r.message : `Not paired: ${r.message}`, 'caution');
+}
+async function showPairCode() {
+  const host = $('#pairShowing'); if (!host) return;
+  stopPairPoll();
+  const r = await call('show_pairing_code');
+  host.innerHTML = '';
+  if (!ok(r)) { host.appendChild(fromResult(r, { what: 'Showing a code' })); return; }
+  const stop = async () => { stopPairPoll(); await call('cancel_pairing'); host.innerHTML = ''; };
+  const box = el(`<div class="panel" style="margin-bottom:13px"><div class="panel-body"><p>On the handheld: Settings > Computers > Pair a computer > Use a code from the computer, and type:</p><p><strong class="mono" style="font-size:2rem;letter-spacing:0.1em">${esc(r.code.slice(0, 3))} ${esc(r.code.slice(3))}</strong></p><p>${(r.places || []).map((p) => `<span class="mono">${esc(p.address)}</span> <small>${esc(p.label)}</small>`).join('<br>')}</p><p><small>The code works for ${Math.ceil((r.seconds || 0) / 60)} minutes. For a device with a camera, the same invitation as text:</small><br><small class="mono" style="word-break:break-all">${esc(r.invite)}</small></p><p id="pairOutcome"></p><button class="btn small" data-pair-stop>Stop</button></div></div>`);
+  host.appendChild(box);
+  $('[data-pair-stop]', box).onclick = stop;
+  pairPoll = setInterval(async () => {
+    if (state.view !== 'systems') { stop(); return; }
+    const s = await call('pairing_status');
+    if (!ok(s) || s.state === 'waiting') return;
+    stopPairPoll();
+    if (s.state === 'paired') { host.innerHTML = ''; flash(`Paired with ${s.paired}`); renderHandhelds(); }
+    else if (s.state === 'failed') { $('#pairOutcome', box).innerHTML = visibleStatus(s.error || 'Pairing stopped', 'critical'); }
+  }, 1500);
 }
 function updateSystems(raw) {
   const by = new Map();
@@ -525,7 +580,9 @@ async function action(a) {
   if (a === 'rebuild-cache') act('rebuild_index', [], 'Index rebuilt', { what: 'Rebuilding the index' });
   if (a === 'add-system') { const r = await call('get_transfer_settings'); infoSheet({ title: 'Add a system', details: r.message || 'Point your sync tool at the library folder on the other computer; it appears here once it writes a record.' }); }
   if (a === 'reload-launcher') renderLauncher();
-  if (a === 'backup-now') { const r = await call('get_save_backups'); infoSheet({ title: 'Back up saves', details: r.message || 'Started' }); }
+  if (a === 'backup-now') { const r = await call('back_up_saves_now'); infoSheet({ title: 'Back up saves', node: fromResult(r, { what: 'Backing up now' }) }); }
+  if (a === 'pair-handheld') pairHandheld();
+  if (a === 'show-pair-code') showPairCode();
   if (a === 'clear-jobs') act('clear_finished_jobs', [], 'Cleared', { what: 'Clearing' });
   if (a === 'export-diagnostics') exportDiagnostics();
   if (a === 'install-plugin') infoSheet({ title: 'Install a plugin', details: `Drop a plugin folder (with its manifest) into the plugins folder under ${model.info?.app_data_folder || 'the app data folder'}, or pip-install a package that declares a pythia.plugins entry point, then restart Pythia. Plugins from outside Pythia are marked Unofficial.` });
@@ -605,8 +662,14 @@ function renderHHDownloads() {
 }
 function renderHHSystems() {
   const host = $('#hhContent');
-  host.innerHTML = `<div class="hh-system-grid">${systems.map((s) => `<article class="hh-system"><h2>${esc(s.name)}</h2><p>${esc(s.mine && model.app ? model.app.platform : 'Synced record')} · ${fmt.n(s.games, 'game')}</p><div class="line"><span>Installed</span><b>${s.installed}</b></div><div class="line"><span>Record</span><b style="color:var(--positive)">${s.mine ? 'This computer' : 'Synced'}</b></div></article>`).join('')}</div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Library folder</h2><span class="spacer"></span><small>Shared by every system</small></div><div class="hh-panel-body"><div class="hh-setting"><strong class="mono" style="font-size:0.75rem;word-break:break-all">${esc(model.info?.sync_folder || '')}</strong><small>Pairing handhelds and copying versions between devices are not built yet.</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div></div></section>`;
+  host.innerHTML = `<div class="hh-system-grid">${systems.map((s) => `<article class="hh-system"><h2>${esc(s.name)}</h2><p>${esc(s.mine && model.app ? model.app.platform : 'Synced record')} · ${fmt.n(s.games, 'game')}</p><div class="line"><span>Installed</span><b>${s.installed}</b></div><div class="line"><span>Record</span><b style="color:var(--positive)">${s.mine ? 'This computer' : 'Synced'}</b></div></article>`).join('')}</div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Library folder</h2><span class="spacer"></span><small>Shared by every system</small></div><div class="hh-panel-body"><div class="hh-setting"><strong class="mono" style="font-size:0.75rem;word-break:break-all">${esc(model.info?.sync_folder || '')}</strong><small>Copying versions between devices is not built yet.</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div></div></section><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Handhelds</h2><span class="spacer"></span><button class="hh-action" data-hh-pair>Pair a handheld</button></div><div class="hh-panel-body hh-summary-list" id="hhHandhelds"></div></section>`;
   if (!systems.length) host.prepend(stateBlock({ kind: model.ready ? 'empty' : 'loading', title: 'No systems yet' }));
+  $('[data-hh-pair]', host).onclick = pairHandheld;
+  loadInto($('#hhHandhelds', host), 'get_handhelds', [], (r, h) => {
+    const devices = r.devices || [];
+    if (!devices.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'On the handheld: Settings > Computers > Pair a computer.' })); return; }
+    devices.forEach((d) => h.appendChild(el(`<div class="hh-summary" style="cursor:default"><span class="art art-a">${esc(initials(d.name))}</span><span><strong>${esc(d.name)}</strong><small>${d.last_seen_ms ? `Seen ${esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString()))}` : 'Not seen yet'}${d.primary ? ' · its saves win' : ''}</small></span>${routineStatus('Paired')}</div>`)));
+  }, { what: 'Handhelds' });
 }
 function renderHHSettings() {
   const page = state.hhSettingsPage; const host = $('#hhContent');
@@ -788,6 +851,8 @@ function connect() {
     pythia = channel.objects.pythia;
     window.pythia = pythia;
     pythia.gamesChanged.connect(refreshGames);
+    pythia.handheldsChanged.connect(() => { if (state.view === 'systems') renderHandhelds(); if (state.shell === 'handheld' && state.hhPage === 'systems') renderHandheld(); });
+    pythia.pairingFinished.connect((r) => flash(r.status === 'ok' ? `Paired with ${r.paired}` : `Not paired: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'));
     pythia.logLine.connect(() => { if (state.view === 'activity') renderJobs(); });
     pythia.uiLog.connect((e) => { model.events.push(e); if (model.events.length > 500) model.events.shift(); if (state.view === 'activity') renderJobs(); });
     pythia.jobsChanged.connect((jobs) => { model.jobs = jobs || []; renderChrome(); if (state.view === 'activity' || state.view === 'downloads') renderCurrent(); if (state.shell === 'handheld' && state.hhPage === 'home') renderHandheld(); });

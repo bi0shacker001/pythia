@@ -43,6 +43,11 @@ def run(argv: list[str] | None = None) -> int:
     migrate()
     rebuild_cache()
     run_all_checks(async_ops=True)
+    # While Pythia runs it is this computer's droidtop agent (pythia.droidtop):
+    # it serves paired handhelds unless droidtop-agent already does.
+    from pythia.droidtop import service
+
+    service.start_in_background()
 
     from pythia.ui import mode
 

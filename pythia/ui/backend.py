@@ -136,6 +136,8 @@ class Backend(QObject):
     jobsChanged = Signal("QVariant")  # the whole job list, newest first
     intakeChanged = Signal("QVariant")  # {"detected": [...], "decisions": [...]}
     uiLog = Signal("QVariant")  # one {"ts", "level", "source", "slot", "message"} entry
+    handheldsChanged = Signal()  # a handheld was paired, forgotten or changed
+    pairingFinished = Signal("QVariant")  # {"status": "ok", "paired": name} or an error result
 
     def __init__(self, error_console: bool = False):
         super().__init__()
@@ -1100,6 +1102,148 @@ class Backend(QObject):
 
         QApplication.instance().quit()
 
+    # ---- handhelds: this computer as the droidtop agent (pythia.droidtop) --------
+    # droidtop-agent's crates, loaded in this process: the pairings and the
+    # library are the agent's own files, shared with droidtop-agent. Without
+    # the agent module every slot here answers "unavailable" with the reason.
+    def _agent_unavailable(self, slot: str) -> dict:
+        from pythia.droidtop import why_unavailable
+
+        return self._unavailable(slot, why_unavailable() or "droidtop's agent module is not installed.")
+
+    @Slot(result="QVariant")
+    @_guarded
+    def get_agent_status(self):
+        """This computer as handhelds know it, whether this process serves
+        them (or why not), and the addresses a handheld can use."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("get_agent_status")
+        from pythia.droidtop import pair, service, store
+
+        return _jsonable(
+            {"status": "ok", "identity": store.identity(), "serving": service.serving(), "places": pair.places()}
+        )
+
+    @Slot(result="QVariant")
+    @_guarded
+    def get_handhelds(self):
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("get_handhelds")
+        from pythia.droidtop import store
+
+        return _jsonable({"status": "ok", "devices": store.devices()})
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def pair_with_code(self, code: str):
+        """Pairs with a handheld showing `code`, on a job of its own (it waits
+        on the network); pairingFinished says how it went."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("pair_with_code")
+        job = self._job_start("pair", "Pair a handheld", "With the code the handheld shows")
+        threading.Thread(target=self._pair_worker, args=(code.strip(), job), daemon=True).start()
+        return {"status": "ok", "job": job}
+
+    def _pair_worker(self, code: str, job: str):
+        from pythia.droidtop import AgentError, pair
+
+        try:
+            name = pair.pair(code)
+            result = {"status": "ok", "paired": name}
+            self._job_finish(job, f"Paired with {name}")
+        except AgentError as exc:
+            result = {"status": "error", "message": str(exc)}
+            self._job_finish(job, str(exc), ok=False)
+        self.pairingFinished.emit(result)
+        self.handheldsChanged.emit()
+
+    @Slot(result="QVariant")
+    @_guarded
+    def show_pairing_code(self):
+        """This computer shows a code for 10 minutes: the code, the addresses
+        with their labels and the invitation text; pairing_status says how
+        it is going."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("show_pairing_code")
+        from pythia.droidtop import pair
+
+        return _jsonable({"status": "ok", **pair.show()})
+
+    @Slot(result="QVariant")
+    @_guarded
+    def pairing_status(self):
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("pairing_status")
+        from pythia.droidtop import pair
+
+        status = pair.status()
+        if status.get("state") == "paired":
+            self.handheldsChanged.emit()
+        return _jsonable({"status": "ok", **status})
+
+    @Slot(result="QVariant")
+    @_guarded
+    def cancel_pairing(self):
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("cancel_pairing")
+        from pythia.droidtop import pair
+
+        pair.cancel()
+        return {"status": "ok"}
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def forget_handheld(self, device_id: str):
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("forget_handheld")
+        from pythia.droidtop import store
+
+        store.unpair(device_id)
+        self.handheldsChanged.emit()
+        return {"status": "ok"}
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def set_primary_handheld(self, device_id: str):
+        """The handheld whose saves win here when both changed; "" for the newest copy."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("set_primary_handheld")
+        from pythia.droidtop import store
+
+        store.set_primary(device_id or None)
+        self.handheldsChanged.emit()
+        return {"status": "ok"}
+
+    @Slot(str, bool, result="QVariant")
+    @_guarded
+    def set_handheld_launch(self, device_id: str, allowed: bool):
+        """Whether a handheld may start games here (to stream them with Steam Link)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("set_handheld_launch")
+        from pythia.droidtop import store
+
+        store.set_launch(device_id, allowed)
+        self.handheldsChanged.emit()
+        return {"status": "ok"}
+
     # ---- features with no backend yet -------------------------------------------
     # Each page still calls its slot through the normal path; the slot answers
     # "unavailable" with the reason and logs the attempt. When the feature lands,
@@ -1107,7 +1251,43 @@ class Backend(QObject):
     @Slot(result="QVariant")
     @_guarded
     def get_save_backups(self):
-        return self._unavailable("get_save_backups", "Save backups are not built yet.")
+        """The copies of saves the droidtop agent keeps on this computer when a
+        sync with a handheld would overwrite saves that differ: one row per
+        copy, the newest from each device first."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("get_save_backups")
+        from pythia.droidtop import saves
+
+        rows = []
+        for game in saves.copies():
+            for copy in game["copies"]:
+                stamp = copy["stamp"]
+                when = (
+                    f"{stamp[0:4]}-{stamp[4:6]}-{stamp[6:8]}T{stamp[9:11]}:{stamp[11:13]}:{stamp[13:15]}Z"
+                    if len(stamp) >= 15
+                    else None
+                )
+                rows.append(
+                    {
+                        "game": game.get("title") or "A game from a handheld, with no title known",
+                        "system": ("Newest from " if copy["newest"] else "Older, from ") + copy["device"],
+                        "last_snapshot": when,
+                        "state": "To look at" if not copy["newest"] and not copy["reviewed"] else "Kept",
+                        "size": f"{copy['files']} files",
+                        "path": copy["path"],
+                    }
+                )
+        return _jsonable({"status": "ok", "backups": rows})
+
+    @Slot(result="QVariant")
+    @_guarded
+    def back_up_saves_now(self):
+        return self._unavailable(
+            "back_up_saves_now",
+            "Copies are kept when a sync with a handheld would overwrite saves; backing up on demand is not built yet.",
+        )
 
     @Slot(result="QVariant")
     @_guarded

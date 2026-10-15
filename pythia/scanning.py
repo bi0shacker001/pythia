@@ -20,6 +20,7 @@ from pathlib import Path
 
 from pythia import onboarding
 from pythia.plugins import engine, library
+from pythia.util.log import logger
 
 
 def _shortcut_roots(path: Path, plugins):
@@ -113,7 +114,39 @@ def scan_library(root: Path | str):
     # the user hasn't disabled it.
     generic = library.generic_plugin if library.generic_plugin in library.enabled_plugins() else None
 
+    roms = _rom_folders(root)
     results = []
     for discovered in _discover_roots(root, enabled, generic):
+        rom = roms.get(discovered)
+        if rom is not None:
+            results.append(
+                {
+                    "status": "skipped",
+                    "game_path": str(discovered),
+                    "message": f"{discovered.name} is a ROM folder ({', '.join(rom['systems'])}: "
+                    f"{rom['roms']} ROM{'' if rom['roms'] == 1 else 's'}), "
+                    "not a PC game; the droidtop agent lists its ROMs.",
+                }
+            )
+            continue
         results.append(onboarding.onboard(discovered))
     return results
+
+
+def _rom_folders(root: Path) -> dict[Path, dict]:
+    """The ROM system folders under `root`, by droidtop-agent's scanner rules
+    (pythia.droidtop.scan): Pythia's own walk would track `psx/` or `3ds/` as
+    a game. Without the agent module, none are known and a warning says so."""
+    from pythia import droidtop  # noqa: PLC0415
+    from pythia.droidtop import AgentError  # noqa: PLC0415
+
+    if not droidtop.available():
+        logger.warning("ROM folders are scanned as games: %s", droidtop.why_unavailable())
+        return {}
+    from pythia.droidtop import scan  # noqa: PLC0415
+
+    try:
+        return scan.rom_folders(root)
+    except AgentError as ex:
+        logger.warning("ROM folders are scanned as games: the droidtop agent's scanner failed: %s", ex)
+        return {}

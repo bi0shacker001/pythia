@@ -18,6 +18,7 @@ with ``native`` they are the only place that touches the extension module:
 - ``service``: serving paired handhelds while Pythia runs;
 - ``saves``: the copies of saves kept on this computer;
 - ``library``: the games Pythia tracks, handed to the agent (``scan``).
+- ``scan``: the agent's scanner rules over a folder Pythia scans (its ROM folders).
 
 Without the module every call raises ``AgentError`` saying why, and Pythia
 works as before.

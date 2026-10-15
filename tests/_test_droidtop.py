@@ -4,9 +4,10 @@ modules over the compiled agent module, without that module."""
 import os
 import tempfile
 import threading
+from pathlib import Path
 from unittest import TestCase, mock
 
-from pythia.droidtop import library, native, store
+from pythia.droidtop import library, native, scan, store
 
 
 class TitleKeyTest(TestCase):
@@ -126,3 +127,30 @@ class ExportSoonTest(TestCase):
 
     def test_nothing_is_handed_over_while_another_program_serves(self):
         self.assertEqual(self.run_burst("stopped"), 0)
+
+
+class RomFoldersTest(TestCase):
+    """droidtop.scan.rom_folders(): the agent's scanner says which folders are ROM folders."""
+
+    def found(self, root, *games):
+        fake = mock.Mock()
+        fake.scan.scan_with.return_value = {
+            "games": [
+                {"game": {"platform": platform, "install": {"path": os.path.join(root, path), "launcher": launcher}}}
+                for path, platform, launcher in games
+            ]
+        }
+        with mock.patch.object(native, "_module", fake):
+            return {str(k.relative_to(root)): v for k, v in scan.rom_folders(Path(root)).items()}
+
+    def test_system_folders_and_folders_of_them_are_rom_folders(self):
+        got = self.found("/g", ("psx/Crash.chd", "psx", "emulator"), ("Emu/snes/Zelda.sfc", "snes", "emulator"))
+        self.assertEqual(got["psx"], {"systems": ["psx"], "roms": 1})
+        self.assertEqual(set(got), {"psx", "Emu", "Emu/snes"})
+
+    def test_a_folder_with_a_pc_game_in_it_is_not(self):
+        got = self.found("/g", ("Mixed/psx/Crash.chd", "psx", "emulator"), ("Mixed/Game", "pc", "folder"))
+        self.assertEqual(set(got), {"Mixed/psx"})
+
+    def test_a_pc_game_folder_is_never_one(self):
+        self.assertEqual(self.found("/g", ("Game", "pc", "folder")), {})

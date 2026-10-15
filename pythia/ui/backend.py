@@ -316,12 +316,20 @@ class Backend(QObject):
         for r in results:
             if r["status"] == "ok":
                 self._job_log(job, f"  -> game_id {r['game_id']}")
+            elif r["status"] == "skipped":
+                self._job_log(job, f"  left out: {r['message']}")
             else:
                 self._job_log(job, f"  error: {r['message']}")
         self.refresh_games()
         ok = sum(1 for r in results if r["status"] == "ok")
-        bad = len(results) - ok
-        self._job_finish(job, f"{ok} game{'s' if ok != 1 else ''} found" + (f", {bad} not identified" if bad else ""))
+        skipped = sum(1 for r in results if r["status"] == "skipped")
+        bad = len(results) - ok - skipped
+        self._job_finish(
+            job,
+            f"{ok} game{'s' if ok != 1 else ''} found"
+            + (f", {skipped} ROM folder{'s' if skipped != 1 else ''} left out" if skipped else "")
+            + (f", {bad} not identified" if bad else ""),
+        )
         self.scanComplete.emit(_jsonable(results))
 
         for r in results:

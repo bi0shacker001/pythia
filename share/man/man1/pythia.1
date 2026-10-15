@@ -1,67 +1,112 @@
-.\" Generated with help2man.
-.TH LUTRIS "1"
+.TH PYTHIA "1" "October 2026" "pythia 0.5.23" "User Commands"
 .SH NAME
-lutris \- video game preservation platform
+pythia \- game library manager for your computers and handhelds
+.SH SYNOPSIS
+.B pythia
+[\fI\,OPTION\/\fR]... [\fI\,URI\/\fR]
+.br
+.B pythia
+\fB\-\-ui\fR \fI\,desktop|bigpicture|web\/\fR [\fB\-\-error\-console\fR]
 .SH DESCRIPTION
-.SS "Usage:"
-.IP
-lutris [OPTION] URI
+Pythia tracks which versions of which games exist on which of your computers and
+handhelds. While it runs, it is this computer's droidtop agent: paired droidtop
+handhelds sync their library and saves with it.
 .PP
-Run a game directly by adding the parameter lutris:rungame/game\-identifier.
-.br
-If several games share the same identifier you can use the numerical ID (displayed when running lutris \fB\-\-list\-games\fR) and add lutris:rungameid/numerical\-id.
-.br
-To install a game, add lutris:install/game\-identifier.
-.SS "Help Options:"
+With no option, or with \fB\-\-ui\fR, Pythia opens its window. Any other option runs
+the command line interface and needs no display.
+.PP
+\fIURI\fR is a pythia:rungame/<slug>, pythia:rungameid/<id> or pythia:install/<slug> URI.
+.SS "Interface:"
+.TP
+\fB\-\-ui\fR \fI\,desktop|bigpicture|web\/\fR
+Open this front end.
+.TP
+\fB\-\-error\-console\fR
+Show the error console in the web front end.
+.SS "Options:"
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Show help options
-.TP
-\fB\-\-help\-all\fR
-Show all help options
-.TP
-\fB\-\-help\-gapplication\fR
-Show GApplication options
-.TP
-\fB\-\-help\-gtk\fR
-Show GTK+ Options
-.SS "Application Options:"
+Show the help and exit.
 .TP
 \fB\-v\fR, \fB\-\-version\fR
-Print the version of Lutris and exit
+Print the version of Pythia and exit.
 .TP
 \fB\-d\fR, \fB\-\-debug\fR
-Show debug messages
+Show debug messages.
 .TP
-\fB\-i\fR, \fB\-\-install\fR
-Install a game from a yml file
+\fB\-i\fR, \fB\-\-install\fR \fI\,FILE_OR_URL\/\fR
+Install a game from a yml file.
 .TP
-\fB\-b\fR, \fB\-\-output\-script\fR
-Generate a bash script to run a game without the client
+\fB\-f\fR, \fB\-\-force\fR
+Force updates.
 .TP
-\fB\-e\fR, \fB\-\-exec\fR
-Execute a program with the lutris runtime
+\fB\-b\fR, \fB\-\-output\-script\fR \fI\,GAME\/\fR
+Generate a bash script to run a game without the client.
+.TP
+\fB\-e\fR, \fB\-\-exec\fR \fI\,COMMAND\/\fR
+Execute a program with the Pythia Runtime.
 .TP
 \fB\-l\fR, \fB\-\-list\-games\fR
-List all games in database
+List all games in the database.
 .TP
 \fB\-o\fR, \fB\-\-installed\fR
-Only list installed games
+Only list installed games.
 .TP
 \fB\-s\fR, \fB\-\-list\-steam\-games\fR
-List available Steam games
+List available Steam games.
 .TP
 \fB\-\-list\-steam\-folders\fR
-List all known Steam library folders
+List all known Steam library folders.
+.TP
+\fB\-\-list\-runners\fR
+List all known runners.
+.TP
+\fB\-\-list\-wine\-versions\fR
+List all known Wine versions.
+.TP
+\fB\-a\fR, \fB\-\-list\-all\-service\-games\fR
+List all games for all services in the database.
+.TP
+\fB\-\-list\-service\-games\fR \fI\,SERVICE\/\fR
+List all games for the given service in the database.
+.TP
+\fB\-r\fR, \fB\-\-install\-runner\fR \fI\,RUNNER\/\fR
+Install a runner.
+.TP
+\fB\-u\fR, \fB\-\-uninstall\-runner\fR \fI\,RUNNER\/\fR
+Uninstall a runner.
+.TP
+\fB\-\-export\fR \fI\,SLUG\/\fR
+Export a game.
+.TP
+\fB\-\-import\fR \fI\,FILE\/\fR
+Import a game.
+.TP
+\fB\-\-dest\fR \fI\,PATH\/\fR
+Destination path for export or import.
 .TP
 \fB\-j\fR, \fB\-\-json\fR
-Display the list of games in JSON format
+Display the list of games in JSON format.
 .TP
 \fB\-\-reinstall\fR
-Reinstall game
+Reinstall a game.
+.SS "droidtop (this computer as the droidtop agent of paired handhelds):"
 .TP
-\fB\-\-submit\-issue\fR
-Submit an issue
+\fB\-\-droidtop\-serve\fR
+Serve paired droidtop handhelds until stopped.
 .TP
-\fB\-\-display\fR=\fI\,DISPLAY\/\fR
-X display to use
+\fB\-\-droidtop\-pair\fR \fI\,CODE\/\fR
+Pair with a handheld showing CODE.
+.TP
+\fB\-\-droidtop\-pair\-show\fR
+Show a code and this computer's addresses for a handheld to pair.
+.TP
+\fB\-\-droidtop\-devices\fR
+List the paired handhelds.
+.TP
+\fB\-\-droidtop\-unpair\fR \fI\,ID\/\fR
+Forget a paired handheld (the start of its id is enough).
+.SH "SEE ALSO"
+https://github.com/bi0shacker001/pythia
+.PP
+Pythia is largely based on Lutris (https://lutris.net).

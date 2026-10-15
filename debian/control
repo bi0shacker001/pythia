@@ -1,7 +1,7 @@
-Source: lutris
+Source: pythia
 Section: games
 Priority: optional
-Maintainer: Mathieu Comandon <mathieucomandon@gmail.com>
+Maintainer: bi0shacker001 <bioshacker001@gmail.com>
 Build-Depends: debhelper-compat (= 12),
                appstream,
                dh-apparmor,
@@ -9,11 +9,11 @@ Build-Depends: debhelper-compat (= 12),
                meson,
 Rules-Requires-Root: no
 Standards-Version: 4.5.0
-Homepage: https://lutris.net
-Vcs-Browser: https://github.com/lutris/lutris
-Vcs-Git: https://github.com/lutris/lutris.git
+Homepage: https://github.com/bi0shacker001/pythia
+Vcs-Browser: https://github.com/bi0shacker001/pythia
+Vcs-Git: https://github.com/bi0shacker001/pythia.git
 
-Package: lutris
+Package: pythia
 Architecture: all
 Depends: ${misc:Depends},
          ${python3:Depends},
@@ -21,38 +21,38 @@ Depends: ${misc:Depends},
          python3-lxml,
          python3-requests,
          python3-pil,
-         python3-gi,
-         python3-gi-cairo,
          python3-setproctitle,
          python3-magic,
          python3-distro,
          python3-dbus,
-         gir1.2-gtk-3.0,
-         gir1.2-webkit2-4.0 | gir1.2-webkit2-4.1,
-         gir1.2-notify-0.7,
-         glib-networking,
          psmisc,
          cabextract,
          unzip,
          p7zip,
          curl,
-         fluid-soundfont-gs,
          x11-xserver-utils,
          mesa-utils,
          vulkan-tools,
-Recommends: python3-evdev,
+Recommends: python3-pyside6.qtcore,
+            python3-pyside6.qtgui,
+            python3-pyside6.qtwidgets,
+            python3-pyside6.qtwebenginewidgets,
+            python3-pyside6.qtwebchannel,
+            python3-pyside6.qtqml,
+            python3-pyside6.qtquick,
+            python3-evdev,
             python3-protobuf,
             python3-pefile,
-            gvfs-backends,
             libwine-development | libwine,
             winetricks,
-            fluidsynth,
             gamescope,
             gamemode,
             xdg-desktop-portal,
-            xdg-desktop-portal-gtk | xdg-desktop-portal-kde,
-Description: video game preservation platform
- Lutris helps you install and play video games from all eras and from most
- gaming systems. By leveraging and combining existing emulators, engine
- re-implementations and compatibility layers, it gives you a central interface
- to launch all your games.
+Description: game library manager for your computers and handhelds
+ Pythia tracks which versions of which games exist on which of your computers
+ and handhelds, where you own them, and what each one needs to run. While it
+ runs, it is this computer's droidtop agent: paired droidtop handhelds sync
+ their library and saves with it.
+ .
+ Its window needs PySide6 (the python3-pyside6.* packages, or pip); without
+ it the command line works. Pythia is largely based on Lutris.

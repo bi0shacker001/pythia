@@ -1,3 +1,10 @@
+pythia (0.5.23) noble; urgency=medium
+
+  * Pythia: Lutris 0.5.23 as a multi-system game library manager with a Qt
+    UI, and this computer's droidtop agent while it runs.
+
+ -- bi0shacker001 <bioshacker001@gmail.com>  Thu, 15 Oct 2026 04:30:00 +0000
+
 lutris (0.5.23) jammy; urgency=medium
 
   * Add GOG depot-based downloads, DLC installs, and incremental updates via gogdl integration

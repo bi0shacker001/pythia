@@ -49,11 +49,6 @@ install_subdir(
   strip_directory: true,
 )
 
-install_subdir(
-  'share/mime',
-  install_dir: join_paths(datadir, 'mime'),
-  strip_directory: true,
-)
 
 install_subdir(
   'share/pythia',

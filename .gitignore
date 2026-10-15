@@ -15,7 +15,7 @@ lutris.e4p
 pga.db
 tests/coverage/*
 /dist
-/lutris.egg-info
+*.egg-info/
 /flake.nix
 /flake.lock
 
@@ -42,7 +42,4 @@ CLAUDE.md
 # glade recovery files
 *.ui~
 
-# Python package builds
-*.egg-info/
-/build/
 /dist/

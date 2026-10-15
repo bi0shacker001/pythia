@@ -1,16 +1,17 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: lutris
-Upstream-Contact: Mathieu Comandon <mathieucomandon@gmail.com>
-Upstream-Source: https://github.com/lutris
+Upstream-Name: pythia
+Upstream-Contact: bi0shacker001 <bioshacker001@gmail.com>
+Upstream-Source: https://github.com/bi0shacker001/pythia
 
 Files: *
-Copyright: 2009 Mathieu Comandon <mathieucomandon@gmail.com>
+Copyright: 2009 Mathieu Comandon <mathieucomandon@gmail.com> and the Lutris contributors
+           2026 bi0shacker001 <bioshacker001@gmail.com>
 License: GPL-3.0-or-later
  On Debian systems, the complete text of the General Public License version 3
  can be found in "/usr/share/common-licenses/GPL-3".
 
-Files: share/metainfo/net.lutris.Lutris.metainfo.xml
-Copyright: Lutris Team <mathieucomandon@gmail.com>
+Files: share/metainfo/net.pythia.Pythia.metainfo.xml
+Copyright: 2026 bi0shacker001 <bioshacker001@gmail.com>
 License: CC0-1.0
  On Debian systems, the complete text of the CC0-1.0 license
  can be found in "/usr/share/common-licenses/CC0-1.0".

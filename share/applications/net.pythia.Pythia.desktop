@@ -1,13 +1,12 @@
 [Desktop Entry]
-Name=Lutris
-StartupWMClass=net.lutris.Lutris
-Comment=Video Game Preservation Platform
+Name=Pythia
+StartupWMClass=net.pythia.Pythia
+Comment=Game library manager for your computers and handhelds
 Categories=Game;PackageManager;
-Keywords=gaming;wine;emulator;
-Exec=lutris %U
-Icon=net.lutris.Lutris
+Keywords=gaming;library;handheld;droidtop;wine;emulator;
+Exec=pythia %U
+Icon=net.pythia.Pythia
 Terminal=false
 Type=Application
 StartupNotify=true
-MimeType=x-scheme-handler/lutris;application/x-lutris;
-X-GNOME-UsesNotifications=true
+MimeType=x-scheme-handler/pythia;

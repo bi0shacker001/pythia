@@ -33,7 +33,9 @@ the droidtop coordinator for this lane. Later sections follow them.
    certificates. A computer can also pair with another computer (owner,
    2026-10-16: "Computer to computer pairing is ABSOLUTELY a pythia
    feature, it's the whole fucking reason it exists"). droidtop-agent's
-   DESIGN.md section 3 and its crates are changed to match.
+   DESIGN.md section 3 records it, and its crates pin a computer as they
+   pin a handheld (droidtop-agent 377b92d, which Pythia's native module
+   is built from).
 6. **One entry per game across stores.** A game owned on several stores is
    one library entry with several store ids (Droidtop/tracker#133, droidtop
    SPEC 7m), not one entry per store.

@@ -355,7 +355,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-contexts"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=8921635019f21eea9df6d1827576c80eda2b2e1e#8921635019f21eea9df6d1827576c80eda2b2e1e"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=377b92db32b378f871eec7a1b8b3ee5c425ce155#377b92db32b378f871eec7a1b8b3ee5c425ce155"
 dependencies = [
  "droidtop-agent-core",
  "droidtop-agent-store",
@@ -367,11 +367,12 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-core"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=8921635019f21eea9df6d1827576c80eda2b2e1e#8921635019f21eea9df6d1827576c80eda2b2e1e"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=377b92db32b378f871eec7a1b8b3ee5c425ce155#377b92db32b378f871eec7a1b8b3ee5c425ce155"
 dependencies = [
  "boringtun",
  "chacha20poly1305",
  "ed25519-dalek",
+ "hkdf",
  "rand_core",
  "rcgen",
  "rustls",
@@ -390,7 +391,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-pair"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=8921635019f21eea9df6d1827576c80eda2b2e1e#8921635019f21eea9df6d1827576c80eda2b2e1e"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=377b92db32b378f871eec7a1b8b3ee5c425ce155#377b92db32b378f871eec7a1b8b3ee5c425ce155"
 dependencies = [
  "droidtop-agent-core",
  "droidtop-agent-store",
@@ -400,7 +401,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-saves"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=8921635019f21eea9df6d1827576c80eda2b2e1e#8921635019f21eea9df6d1827576c80eda2b2e1e"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=377b92db32b378f871eec7a1b8b3ee5c425ce155#377b92db32b378f871eec7a1b8b3ee5c425ce155"
 dependencies = [
  "dirs",
  "droidtop-agent-core",
@@ -415,7 +416,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-scan"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=8921635019f21eea9df6d1827576c80eda2b2e1e#8921635019f21eea9df6d1827576c80eda2b2e1e"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=377b92db32b378f871eec7a1b8b3ee5c425ce155#377b92db32b378f871eec7a1b8b3ee5c425ce155"
 dependencies = [
  "dirs",
  "droidtop-agent-core",
@@ -433,7 +434,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-service"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=8921635019f21eea9df6d1827576c80eda2b2e1e#8921635019f21eea9df6d1827576c80eda2b2e1e"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=377b92db32b378f871eec7a1b8b3ee5c425ce155#377b92db32b378f871eec7a1b8b3ee5c425ce155"
 dependencies = [
  "dirs",
  "droidtop-agent-contexts",
@@ -452,7 +453,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-store"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=8921635019f21eea9df6d1827576c80eda2b2e1e#8921635019f21eea9df6d1827576c80eda2b2e1e"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=377b92db32b378f871eec7a1b8b3ee5c425ce155#377b92db32b378f871eec7a1b8b3ee5c425ce155"
 dependencies = [
  "dirs",
  "droidtop-agent-core",

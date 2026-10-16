@@ -16,12 +16,12 @@ crate-type = ["cdylib"]
 # droidtop-agent's crates, used as they are: the protocol and channel the
 # handhelds speak (core) and the computer's side (store, pair, scan, saves,
 # service). Pinned by commit; moving the pin is a change of its own.
-droidtop-agent-core = { git = "https://github.com/Droidtop/droidtop-agent", rev = "8921635019f21eea9df6d1827576c80eda2b2e1e" }
-droidtop-agent-store = { git = "https://github.com/Droidtop/droidtop-agent", rev = "8921635019f21eea9df6d1827576c80eda2b2e1e" }
-droidtop-agent-pair = { git = "https://github.com/Droidtop/droidtop-agent", rev = "8921635019f21eea9df6d1827576c80eda2b2e1e" }
-droidtop-agent-scan = { git = "https://github.com/Droidtop/droidtop-agent", rev = "8921635019f21eea9df6d1827576c80eda2b2e1e" }
-droidtop-agent-saves = { git = "https://github.com/Droidtop/droidtop-agent", rev = "8921635019f21eea9df6d1827576c80eda2b2e1e" }
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "8921635019f21eea9df6d1827576c80eda2b2e1e" }
+droidtop-agent-core = { git = "https://github.com/Droidtop/droidtop-agent", rev = "377b92db32b378f871eec7a1b8b3ee5c425ce155" }
+droidtop-agent-store = { git = "https://github.com/Droidtop/droidtop-agent", rev = "377b92db32b378f871eec7a1b8b3ee5c425ce155" }
+droidtop-agent-pair = { git = "https://github.com/Droidtop/droidtop-agent", rev = "377b92db32b378f871eec7a1b8b3ee5c425ce155" }
+droidtop-agent-scan = { git = "https://github.com/Droidtop/droidtop-agent", rev = "377b92db32b378f871eec7a1b8b3ee5c425ce155" }
+droidtop-agent-saves = { git = "https://github.com/Droidtop/droidtop-agent", rev = "377b92db32b378f871eec7a1b8b3ee5c425ce155" }
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "377b92db32b378f871eec7a1b8b3ee5c425ce155" }
 # windowcast's host identity folder, the one droidtop-agent and windowcast share,
 # at the commit droidtop-agent pins.
 windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "93efcb9ebf108ae71222b9fe3e19d0d57cfb102e" }

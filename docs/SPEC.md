@@ -126,3 +126,185 @@ gilrs (XInput and Windows.Gaming.Input on Windows, evdev on Linux).
 - The page does not also read the browser's Gamepad API.
 - Without the native module, controllers are not read, and Settings says
   so.
+
+## 3. Hand-offs
+
+From UX review A3 (G6, conflict C4). A hand-off is any action that leaves
+Pythia: Open folder, Open in <launcher>, a store page, a help link.
+
+- In neither shell is a hand-off the first or default focus target.
+- In the handheld shell every hand-off asks first, with Cancel focused,
+  because the pad does not work in the program it opens.
+- On desktop, Open folder does not ask. Open in <launcher> asks the first
+  time for each launcher only.
+
+## 4. First run
+
+From UX review A19 (O4; conflict accepted from the newcomer review: the
+first run never promises a sync that does not exist).
+
+The first run is a short sequence of steps, shown once, before the shell
+opens. In order:
+
+1. **Start in.** Desktop, Handheld or Remember last (A8). The choice is
+   already made by auto-detect (the firmware names a handheld, or a game
+   controller is the only input), so the person confirms it rather than
+   picks it.
+2. **"Do you use droidtop on a handheld?"** Yes leads to pairing (section
+   7); No and Not now go on. This step is shown only once pairing is built
+   (UX review C1). Until then it is left out, and the step count does not
+   include it.
+3. **Add folders.** Folders and their roles (section 5). Adding a Library
+   folder runs Look (A16): nothing is written until the person adds what
+   was found.
+4. **Connect sources.** Optional: store accounts (Steam, GOG, itch and the
+   rest of the library plugins). Skip is as prominent as Connect.
+
+It ends with what to do next: the Library, and Review when Look left
+anything there (A18).
+
+- **Back stays inside.** Back (B, Escape, ‹) goes to the previous step and
+  never leaves the first run. On step 1 it does nothing.
+- **Answered steps are skipped.** A step whose answer is already stored
+  (Start in set in Settings, a folder already tracked, a handheld already
+  paired) is not shown.
+- **The count comes from the steps shown.** "Step 2 of 3" counts only the
+  steps this run shows.
+- Quitting part way keeps the answers given; the next start resumes at the
+  first unanswered step.
+
+## 5. Folders
+
+From UX review A19 (O7).
+
+Settings has one list of folders. Each folder has:
+
+- **A role.** Library: games live here, and a new folder in it is offered
+  through Look. Downloads: archives and installers arrive here, and each
+  new file waits in Review's New downloads (A18).
+- **"Run while watching"** (Downloads only, optional): a program Pythia
+  starts with the watch and stops it with (a downloader such as
+  F95Checker).
+
+There is one watcher, and it serves both roles. It watches every folder
+in the list, whatever the role, and stops when the list is empty or the
+downloads manager is turned off.
+
+**A folder that cannot be reached** (an unplugged drive, a network share
+that is down) keeps its games. They show as Missing, as droidtop shows a
+folder its walk lost (droidtop SPEC, the scan's "missing"). Nothing is
+removed until the person removes it or the folder comes back without
+them. The folder's row says it cannot be reached, and when it was last
+seen.
+
+## 6. Devices
+
+From UX review A19 (AG2).
+
+The Devices page (today "Systems & sync") lists every device this computer
+knows. Each device has:
+
+- **A name**, which the person can change on this computer.
+- **A type**: a computer (another Pythia, or droidtop-agent) or a
+  droidtop handheld.
+- **Last sync**: when the two last exchanged saves or the library, or
+  "Never".
+- **Pending changes**: what is waiting to go either way, counted (saves,
+  library changes).
+- **Conflicts**: saves that differ on both sides since the last sync.
+  Each conflict is also in Review's Sync conflicts (A18).
+- **The device ID**, read-only, under Info. It is the device's PeerId (its
+  public key, droidtop-agent docs/DESIGN.md section 3).
+
+What syncs with a device is shown on that device's own page, generated
+from the sync model. It says that game files never sync (UX review AG6).
+Pairing is not released without that page (C1).
+
+## 7. Pairing
+
+From UX review A19 (AG5); the owner decision in 1.5. The same protocol is
+written in droidtop's docs/SPEC.md (7o, "Pairing with Pythia"), in the
+same change.
+
+Pairing uses droidtop-agent's crates, so Pythia and droidtop-agent pair the
+same way and share one identity and one trust list per computer
+(droidtop-agent docs/DESIGN.md section 3). The "mutual TLS" of 1.5 is, in
+those crates, mutual authentication with pinned keys over the Noise
+channel (DESIGN.md section 4); no other channel is added. What follows adds a way to find
+each other and a code to compare; the typed-code exchange that exists today
+stays as the fallback.
+
+### 7.1 Being found
+
+- Pythia can be found on the local network while its Devices page is open
+  or Sync with droidtop is on. At no other time does it answer.
+- It answers droidtop's query for computers that can pair: a UDP broadcast
+  on port 47610 with the magic `DTCQ1` and a fresh nonce. The answer,
+  `DTCR1`, carries this computer's PeerId, its name, the pairing TCP port
+  (47612) and the program (`pythia`). This mirrors the existing `DTPQ1` and
+  `DTPR1` (the computer finding a handheld in pairing mode,
+  `droidtop_agent_core::discovery`). Nothing in the answer is trusted; the
+  code is what authenticates.
+- droidtop lists each answer as "Pythia on <computer name>"
+  (droidtop-agent's answers as its own name). droidtop chooses its own
+  menu wording.
+
+### 7.2 One code on both screens
+
+When the person picks a computer on the handheld, the two compare a short
+code (numeric comparison, as Bluetooth and ZRTP do):
+
+1. The handheld connects to the pairing port and sends its hello: its
+   PeerId and a commitment, SHA-256 over the label, its PeerId and a fresh
+   32-byte random value.
+2. The computer replies with its PeerId and its own fresh random value.
+3. The handheld reveals its random value; the computer checks it against
+   the commitment.
+4. Both derive a 6-digit code: HKDF-SHA256 over the label, both PeerIds and
+   both random values, reduced to 000000 to 999999. Both screens show it in
+   large type.
+5. The person confirms on both devices that the codes match. Each side
+   then sends its name and its identity's signature over the transcript
+   (label, side, both PeerIds, both random values, the name), and pins the
+   other's PeerId.
+
+The label is `droidtop-agent pair-confirm v1`. The commitment means neither
+side can choose its value after seeing the other's, so a device in the
+middle gets one chance in a million per attempt to match the two codes.
+"They don't match" on either side ends the attempt on both. One attempt is
+allowed per opening of the pairing screen.
+
+### 7.3 Typing a code instead
+
+The existing exchange stays, both ways, as the fallback: windowcast's
+SPAKE2 exchange (`windowcast_pairing::exchange`, label `droidtop-agent pair
+v2`). Either the handheld shows a code and the person types it into
+Pythia (Pair a handheld), or Pythia shows a code and its addresses and the
+person types them into droidtop (Show a code; droidtop's "Use a code from
+the computer"). Three wrong codes end the attempt.
+
+### 7.4 Waiting, and when nothing comes
+
+- While Pythia waits, the page says "Waiting for a handheld…" and how long
+  it will wait.
+- After 60 seconds with no handheld connecting, the waiting state ends with
+  what to check: the handheld is on the same network as this computer, and
+  droidtop is open on Pair a computer. It offers "Type a code instead"
+  (7.3) and "Keep waiting".
+- A wrong code, a mismatch, or the handheld leaving says which of these it
+  was, in words.
+
+### 7.5 The network, said first
+
+Pythia listens for handhelds on TCP and UDP 47610 and TCP 47612 (and UDP
+47611 away from home). The first time pairing or Sync with droidtop would
+open them, Pythia says, before anything listens, that it needs to reach
+the handheld over the home network and that the system may ask whether to
+allow it, and to allow it on private networks. The system's prompt is
+expected on Windows; this is inferred from how Windows treats a new
+listening program and has not been verified on a test machine.
+
+### 7.6 No camera
+
+No step needs a camera. The QR code droidtop shows of its invitation is an
+extra for a computer that has one, never the only way.

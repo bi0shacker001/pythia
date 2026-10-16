@@ -418,32 +418,37 @@ function renderSystems() {
 // Pythia's own droidtop module (pythia._native) holds the pairings; in a source tree where it
 // was never built every slot answers "unavailable" and the panel says so.
 let pairPoll = null;
+// Whether this build starts Pythia's own games for a handheld (get_agent_status.host_launch).
+let hostLaunch = false;
 function stopPairPoll() { if (pairPoll) { clearInterval(pairPoll); pairPoll = null; } }
 function renderHandhelds() {
   const agentHost = $('#agentState'); const host = $('#handheldState');
   if (!agentHost || !host) return;
-  loadInto(agentHost, 'get_agent_status', [], (st, h) => {
+  // The handhelds list waits for the status, so its "Start games" words match this build.
+  const status = loadInto(agentHost, 'get_agent_status', [], (st, h) => {
     const s = st.serving || {};
     const line = s.state === 'serving' ? `${routineStatus('Serving')} Handhelds reach this computer as ${esc(st.identity?.name || '')}.`
       : s.state === 'stopped' ? visibleStatus(s.reason || 'Not serving handhelds', 'pending')
       : visibleStatus('Not serving handhelds yet', 'neutral', '–');
     h.appendChild(el(`<p>${line}</p>`));
     if ((st.places || []).length) h.appendChild(el(`<p><small>Addresses: ${(st.places || []).map((p) => `<span class="mono">${esc(p.address)}</span> (${esc(p.label)})`).join(' · ')}</small></p>`));
+    hostLaunch = !!st.host_launch;
     renderAgentTakeover(h, st.agent || {});
   }, { what: 'This computer as a droidtop agent' });
-  loadInto(host, 'get_handhelds', [], (r, h) => {
+  const startGamesText = () => (hostLaunch ? "Start games: that handheld may start this computer's games: Steam games for Steam Link (Steam must be running here), and the games Pythia tracks through their launcher, for windowcast to stream." : "Start games: that handheld may start this computer's Steam games, to stream them with Steam Link; Steam must be running here.");
+  status.then(() => loadInto(host, 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
     $('#handheldSummary').textContent = fmt.n(devices.length, 'paired handheld');
     if (!devices.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'On the handheld: Settings > Computers > Pair a computer, then "Pair a handheld" here.' })); return; }
     const table = el(`<table class="table"><thead><tr><th>Handheld</th><th>Last seen</th><th>Saves win</th><th>Start games</th><th></th></tr></thead><tbody>${devices.map((d) => `<tr><td class="primary-cell"><strong>${esc(d.name)}</strong><small class="mono">${esc(d.id.slice(0, 16))}</small></td><td>${d.last_seen_ms ? esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString())) : 'Never'}<small>${esc(d.last_address || '')}</small></td><td><button class="toggle" data-handheld-primary="${esc(d.id)}" aria-label="Its saves win when both changed"><span></span></button></td><td><button class="toggle" data-handheld-launch="${esc(d.id)}" aria-label="It may start games here"><span></span></button></td><td><button class="btn small" data-handheld-forget="${esc(d.id)}">Forget…</button></td></tr>`).join('')}</tbody></table>`);
     h.appendChild(table);
-    h.appendChild(el(`<p><small>Saves win: when a game's saves changed on both sides, that handheld's copy is used here and this computer's is kept under Save backups (off: the newest wins). Start games: that handheld may start this computer's Steam games, to stream them with Steam Link; Steam must be running here.</small></p>`));
+    h.appendChild(el(`<p><small>Saves win: when a game's saves changed on both sides, that handheld's copy is used here and this computer's is kept under Save backups (off: the newest wins). ${startGamesText()}</small></p>`));
     devices.forEach((d) => {
       bindSwitch($(`[data-handheld-primary="${d.id}"]`, table), !!d.primary, async (on, node) => { const r2 = await act('set_primary_handheld', [on ? d.id : ''], on ? `${d.name}'s saves win` : 'The newest saves win', { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } else renderHandhelds(); });
       bindSwitch($(`[data-handheld-launch="${d.id}"]`, table), !!d.launch, async (on, node) => { const r2 = await act('set_handheld_launch', [d.id, on], on ? `${d.name} may start games here` : `${d.name} may no longer start games here`, { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } });
       $(`[data-handheld-forget="${d.id}"]`, table).onclick = async () => { if (await confirmDanger({ title: `Forget ${d.name}?`, body: 'It can no longer sync with this computer until you pair it again.', recommendation: 'We recommend Cancel.', proceed: 'Forget' })) await act('forget_handheld', [d.id], `Forgot ${d.name}`, { what: 'Forgetting it' }); };
     });
-  }, { what: 'Handhelds' });
+  }, { what: 'Handhelds' }));
   renderHandheldGames();
 }
 // droidtop-agent, the separate program: Pythia turns it off while it serves the handhelds (keeping its

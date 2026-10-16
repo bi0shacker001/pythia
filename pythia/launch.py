@@ -57,3 +57,7 @@ def main() -> None:
     from pythia.app import main as cli_main  # noqa: PLC0415
 
     cli_main()
+
+
+if __name__ == "__main__":
+    main()

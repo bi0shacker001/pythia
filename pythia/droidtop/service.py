@@ -50,6 +50,9 @@ def start_in_background() -> None:
                 logger.info("droidtop-agent is turned off while Pythia serves the handhelds: %s", taken)
             if taken["still_running"]:
                 logger.warning("droidtop-agent did not stop: %s", taken["still_running"])
+            from pythia.droidtop import launch  # noqa: PLC0415
+
+            launch.register()
             serve()
             from pythia.droidtop import store  # noqa: PLC0415
 

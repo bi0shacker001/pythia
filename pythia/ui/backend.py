@@ -1249,7 +1249,7 @@ class Backend(QObject):
 
         if not droidtop.available():
             return self._agent_unavailable("get_agent_status")
-        from pythia.droidtop import pair, service, store, takeover
+        from pythia.droidtop import launch, pair, service, store, takeover
 
         return _jsonable(
             {
@@ -1258,6 +1258,7 @@ class Backend(QObject):
                 "serving": service.serving(),
                 "places": pair.places(),
                 "agent": takeover.status(),
+                "host_launch": launch.supported(),
             }
         )
 

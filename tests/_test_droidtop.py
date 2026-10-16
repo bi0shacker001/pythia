@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 from unittest import TestCase, mock
 
-from pythia.droidtop import library, native, scan, service, store, takeover
+from pythia.droidtop import launch, library, native, scan, service, store, takeover
 
 
 class TitleKeyTest(TestCase):
@@ -278,3 +278,77 @@ class TakeoverTest(TestCase):
     def test_pythia_serves_unless_told_not_to(self):
         with mock.patch.object(takeover.settings, "read_bool_setting", side_effect=lambda key, default: default):
             self.assertTrue(takeover.serves())
+
+
+class HandheldLaunchTest(TestCase):
+    """launch.launch_for_handheld: the agent's launcher for keys that are not Steam's."""
+
+    def entry(self, runner=None):
+        variant = {"path": "/games/Tiny", "runner": runner}
+        return {
+            "system_uuid": "me",
+            "game_id": "g1",
+            "canonical_name": "Tiny Game",
+            "versions": [{"version": None, "variants": [variant]}],
+        }
+
+    def run_with(self, entries, key="title:tiny game"):
+        with (
+            mock.patch.object(launch.datadir, "list_all_entries", return_value=entries),
+            mock.patch.object(launch, "get_system_uuid", return_value="me"),
+        ):
+            return launch.launch_for_handheld(key, "Tiny Game")
+
+    def test_steam_keys_and_unknown_keys_are_not_pythias(self):
+        self.assertIsNone(self.run_with([self.entry("linux")], key="steam:440"))
+        self.assertIsNone(self.run_with([self.entry("linux")], key="title:something else"))
+        self.assertIsNone(self.run_with([dict(self.entry("linux"), system_uuid="other")]))
+
+    def test_a_game_with_a_runner_starts_in_a_pythia_process_of_its_own(self):
+        with (
+            mock.patch("pythia.game.Game") as game,
+            mock.patch.object(launch.subprocess, "Popen") as popen,
+        ):
+            result = self.run_with([self.entry("linux")])
+        self.assertEqual(result, {"result": "started", "stream": "windowcast"})
+        game.assert_called_once_with("g1")
+        command = popen.call_args.args[0]
+        self.assertEqual(command[1:], ["-m", "pythia.launch", "pythia:rungameid/g1"])
+
+    def test_lutris_refusing_it_is_told_to_the_handheld_and_nothing_runs(self):
+        from pythia.exceptions import GameConfigError
+
+        with (
+            mock.patch("pythia.game.Game") as game,
+            mock.patch.object(launch.subprocess, "Popen") as popen,
+        ):
+            game.return_value.check_launchable.side_effect = GameConfigError("Missing runner")
+            result = self.run_with([self.entry("linux")])
+        self.assertEqual(result["result"], "failed")
+        self.assertIn("Missing runner", result["message"])
+        popen.assert_not_called()
+
+    def test_without_a_runner_or_a_store_launcher_it_says_so(self):
+        with mock.patch("pythia.plugins.manager.find_for_game", return_value=[]):
+            result = self.run_with([self.entry()])
+        self.assertEqual(result["result"], "failed")
+        self.assertIn("cannot start here yet", result["message"])
+
+    def test_a_store_game_goes_to_its_launcher(self):
+        plugin = mock.Mock(display_name="Epic Games Launcher")
+        plugin.is_available.return_value = True
+        plugin.open.return_value = True
+        with mock.patch("pythia.plugins.manager.find_for_game", return_value=[(plugin, {"kind": "egs"})]):
+            result = self.run_with([self.entry()])
+        self.assertEqual(result, {"result": "started", "stream": "windowcast"})
+        plugin.open.assert_called_once()
+
+    def test_a_build_without_host_launches_registers_nothing(self):
+        fake = mock.Mock()
+        fake.service = mock.Mock(spec=["serve", "serving", "events"])
+        with mock.patch.object(native, "_module", fake):
+            self.assertFalse(launch.register())
+        fake2 = mock.Mock()
+        with mock.patch.object(native, "_module", fake2):
+            self.assertTrue(launch.register())
+        fake2.service.set_launcher.assert_called_once_with(launcher=launch.launch_for_handheld)

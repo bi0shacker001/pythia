@@ -36,6 +36,11 @@ serde_json = "1"
 # installed Python's import library.
 pyo3 = { version = "0.22", features = ["extension-module", "abi3-py310", "generate-import-lib"] }
 
+[features]
+# Starting Pythia's games for a handheld: needs droidtop-agent's
+# launch::Launcher, which the pinned commit does not have yet.
+host-launch = []
+
 [build-dependencies]
 pyo3-build-config = "0.22"
 

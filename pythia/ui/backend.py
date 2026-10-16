@@ -371,6 +371,40 @@ class Backend(QObject):
         job = self._job_start("scan", f"Scan {path_str}", "Finds every game folder inside")
         threading.Thread(target=self._scan_worker, args=(path_str, job), daemon=True).start()
 
+    @Slot(result="QVariant")
+    @_guarded
+    def start_store_scan(self):
+        """Records the games the stores on this computer have installed (Steam,
+        Epic, GOG, Amazon, itch, Battle.net, the Linux launchers), found by
+        droidtop's scanner from the stores' own records (pythia.store_installs)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("start_store_scan")
+        job = self._job_start("scan", "Store games", "Finds the games each store on this computer has installed")
+        threading.Thread(target=self._store_scan_worker, args=(job,), daemon=True).start()
+        return {"status": "ok", "job": job}
+
+    def _store_scan_worker(self, job: str):
+        from pythia import store_installs
+        from pythia.droidtop import AgentError
+
+        try:
+            counts = store_installs.record_new()
+        except AgentError as ex:
+            self._job_finish(job, f"Could not ask the stores: {ex}", ok=False)
+            return
+        for failure in counts["failures"]:
+            self._job_log(job, f"  could not record {failure['folder']}: {failure['message']}")
+        self.refresh_games()
+        summary = (
+            f"{counts['found']} store game{'s' if counts['found'] != 1 else ''} found: {counts['recorded']} recorded, "
+            f"{counts['already']} already in the library"
+        )
+        if counts["failed"]:
+            summary += f", {counts['failed']} failed"
+        self._job_finish(job, summary, ok=not counts["failed"])
+
     def _scan_worker(self, path_str: str, job: str):
         self._job_log(job, f"Scanning '{path_str}' ...")
         try:

@@ -186,9 +186,10 @@ class EgsPlugin(LibraryPlugin, ManagerPlugin):
     # same identifier match()/list_owned() above already put in
     # extra["egs_app_name"] -- no separate lookup needed.
     def is_available(self, ctx) -> bool:
-        """Same honest "unknown" as Steam's manager capability -- no reliable
-        cross-platform "is the Epic client installed" check built yet."""
-        return False
+        """Whether the Epic Games Launcher is installed here. It exists only on
+        Windows (and macOS, not supported here): its data folder under ProgramData,
+        or its uninstall record in the registry."""
+        return epic_launcher_installed()
 
     def open(self, detection: dict, ctx) -> bool:
         """No-op (returns False) if `detection` has no Epic AppName to hand off to."""
@@ -211,3 +212,26 @@ class EgsPlugin(LibraryPlugin, ManagerPlugin):
 
 
 plugin = register_builtin(EgsPlugin())
+
+
+def epic_launcher_installed() -> bool:
+    """The Epic Games Launcher on this Windows computer: its data folder
+    (%ProgramData%\\Epic\\EpicGamesLauncher, where its install manifests are),
+    or its registry key. False elsewhere: Epic has no launcher for Linux."""
+    import os  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+
+    if sys.platform != "win32":
+        return False
+    data = os.environ.get("PROGRAMDATA")
+    if data and os.path.isdir(os.path.join(data, "Epic", "EpicGamesLauncher")):
+        return True
+    import winreg  # noqa: PLC0415
+
+    for key in (r"SOFTWARE\WOW6432Node\Epic Games\EpicGamesLauncher", r"SOFTWARE\Epic Games\EpicGamesLauncher"):
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key):
+                return True
+        except OSError:
+            continue
+    return False

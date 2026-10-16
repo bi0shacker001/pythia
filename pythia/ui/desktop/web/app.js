@@ -679,6 +679,11 @@ async function addFolder() {
   if (!path || !path.trim()) return;
   pythia.start_onboard(path.trim()); flash('Adding folder'); navigate('activity');
 }
+// The games the stores on this computer have installed, from droidtop's scanner (backend start_store_scan).
+async function findStoreGames() {
+  const r = await call('start_store_scan');
+  if (ok(r)) { flash('Finding store games'); navigate('activity'); } else flash(r.status === 'unavailable' ? r.message : `Could not ask the stores: ${r.message}`, 'caution');
+}
 async function scanLibrary() {
   const path = await prompt({ title: 'Scan a library folder', body: 'Every game folder inside is recorded. Scanning only reads: nothing is written into your game folders.', hint: 'G:\\games', kind: 'path', save: 'Scan', pick: { label: 'Browse', run: pickFolder('Scan a library folder') } });
   if (!path || !path.trim()) return;
@@ -1067,7 +1072,7 @@ function setup() {
   $('#bulkSelectAll').onclick = () => { filteredGames().forEach((g) => state.bulk.add(g.id)); updateBulkToolbar(); renderLibrary(); };
   $('#bulkClear').onclick = () => { state.bulk.clear(); state.selectionMode = false; updateBulkToolbar(); renderLibrary(); };
   $('#addButton').onclick = (e) => { e.stopPropagation(); const pop = $('#addPopover'); const show = pop.classList.contains('hidden'); pop.classList.toggle('hidden', !show); $('#addButton').setAttribute('aria-expanded', String(show)); toggleThemePopover(false); };
-  $$('[data-add-choice]').forEach((b) => (b.onclick = () => { const kind = b.dataset.addChoice; $('#addPopover').classList.add('hidden'); $('#addButton').setAttribute('aria-expanded', 'false'); closeAllMenus(); if (kind === 'scan') scanLibrary(); else if (kind === 'download') navigate('downloads'); else if (kind === 'folder') addFolder(); else importSource(); }));
+  $$('[data-add-choice]').forEach((b) => (b.onclick = () => { const kind = b.dataset.addChoice; $('#addPopover').classList.add('hidden'); $('#addButton').setAttribute('aria-expanded', 'false'); closeAllMenus(); if (kind === 'scan') scanLibrary(); else if (kind === 'stores') findStoreGames(); else if (kind === 'download') navigate('downloads'); else if (kind === 'folder') addFolder(); else importSource(); }));
   $('#refreshMerges').onclick = () => { model.merges = null; renderReconcile(); pythia.refresh_merge_candidates(); };
   const startupPref = localStorage.getItem('pythia-startup-shell') || 'auto'; $('#startupShellSelect').value = startupPref; $('#desktopLibrarySelect').value = state.libraryMode; $('#handheldLibrarySelect').value = state.hhLibraryMode;
   $('#startupShellSelect').onchange = (e) => localStorage.setItem('pythia-startup-shell', e.target.value);

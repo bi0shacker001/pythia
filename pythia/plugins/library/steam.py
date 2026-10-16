@@ -213,13 +213,12 @@ class SteamPlugin(LibraryPlugin, ManagerPlugin, MetadataPlugin):
 
     # ---- Manager: hand-off to Steam's own client ------------------------------
     def is_available(self, ctx) -> bool:
-        """No reliable cross-platform "is Steam installed" check without touching
-        the registry/specific install paths, which hasn't been built yet -- reports
-        unknown-as-unavailable (False) rather than guessing. open() still works
-        regardless (the OS URI handler either resolves or the hand-off silently
-        does nothing), this only affects whether a future UI shows Steam as a ready
-        option."""
-        return False
+        """Whether Steam is installed here: its folder, found where Steam records it
+        (the registry on Windows, then Program Files; the usual folders, Flatpak and
+        Snap on Linux; see pythia.util.steam.config)."""
+        from pythia.util.steam.config import get_steam_dir  # noqa: PLC0415
+
+        return get_steam_dir() is not None
 
     def open(self, detection: dict, ctx) -> bool:
         """No-op (returns False) if `detection` has no Steam AppID to hand off to."""

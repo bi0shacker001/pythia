@@ -1555,15 +1555,62 @@ class Backend(QObject):
     @Slot(result="QVariant")
     @_guarded
     def back_up_saves_now(self):
-        return self._unavailable(
-            "back_up_saves_now",
-            "Copies are kept when a sync with a handheld would overwrite saves; backing up on demand is not built yet.",
-        )
+        """Keeps a copy of the saves of every game this computer has in the
+        library, where their save location is known (droidtop's saves crate and
+        the Ludusavi manifest), as this computer's own copy on the Save backups
+        page: the copy kept before moves into the dated archive."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("back_up_saves_now")
+        from pythia.droidtop import library, saves
+
+        def work():
+            uuid = get_system_uuid()
+            games = [
+                {"key": library.game_key(e), "title": e.get("canonical_name") or ""}
+                for e in datadir.list_all_entries()
+                if e.get("system_uuid") == uuid
+            ]
+            done = saves.back_up_all(games)
+            self._record(
+                "info",
+                "pythia",
+                f"Backed up the saves of {done['backed_up']} game(s) ({done['files']} file(s)); "
+                f"{done['no_saves']} had none here yet, {done['unknown']} have no known save location",
+                "back_up_saves_now",
+            )
+            return {"status": "ok", **done, "games": len(games)}
+
+        return self._answer_later("back_up_saves_now", work)
 
     @Slot(result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def get_launcher_entries(self):
-        return self._unavailable("get_launcher_entries", "Pythia does not write launcher entries yet.")
+        """What each launcher on this computer lists (droidtop's scanner reads the
+        stores' own records), against the library: tracked, drifted (in the
+        library under another folder) or not in the library."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("get_launcher_entries")
+        from pythia import store_installs
+        from pythia.droidtop import store
+
+        name = store.identity().get("name") or ""
+        return {"status": "ok", "system": name, "entries": store_installs.entries()}
+
+    @Slot(str, str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def record_launcher_entry(self, folder: str, key: str):
+        """Records a launcher's game folder in the library, with its store id."""
+        from pythia import store_installs
+
+        result = store_installs.record(folder, key)
+        self.refresh_games()
+        return _jsonable(result)
 
     @Slot(result="QVariant")
     @_guarded

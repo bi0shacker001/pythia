@@ -561,13 +561,27 @@ function updateSystems(raw) {
 }
 
 // ---- Launcher entries and Save backups: wired, honest, not built yet ----------------------
+// What each launcher on this computer lists (backend get_launcher_entries, from droidtop's scanner), against the library.
 function renderLauncher() {
   $('#launcherSummary').textContent = ''; $('#launcherRows').innerHTML = ''; $('#launcherCount').textContent = '';
+  const q = state.view === 'launcher' ? state.search.toLowerCase() : '';
   loadInto($('#launcherState'), 'get_launcher_entries', [], (r) => {
     const entries = r.entries || [];
-    $('#launcherSummary').textContent = `${fmt.n(entries.length, 'tracked entry', 'tracked entries')}`;
-    $('#launcherRows').innerHTML = entries.map((e) => `<tr><td class="primary-cell"><strong>${esc(e.game)}</strong><small>${esc(e.version || '')}</small></td><td>${esc(e.system)}</td><td>${esc(e.manager)}</td><td>${e.drifted ? '<span class="state-pill critical">Drifted</span>' : routineStatus('Current')}</td><td></td></tr>`).join('');
-    if (!entries.length) $('#launcherState').appendChild(stateBlock({ title: 'No launcher entries', body: 'Entries appear once a launcher plugin writes one.' }));
+    const shown = entries.filter((e) => !q || [e.game, e.manager, e.folder].join(' ').toLowerCase().includes(q));
+    const untracked = entries.filter((e) => e.state === 'untracked').length;
+    $('#launcherSummary').textContent = `${fmt.n(entries.length, 'game')} in this computer's launchers · ${fmt.n(untracked, 'game')} not in the library`;
+    $('#launcherCount').textContent = shown.length === entries.length ? '' : `${shown.length} shown`;
+    const stateCell = (e) => (e.state === 'tracked' ? `${routineStatus('In library')} In library`
+      : e.state === 'drifted' ? `<span class="state-pill critical">Drifted</span><small class="mono">Library: ${esc(e.library_folder || '')}</small>`
+      : '<span class="state-pill info">Not in library</span>');
+    $('#launcherRows').innerHTML = shown.map((e, i) => `<tr><td class="primary-cell"><strong>${esc(e.game)}</strong><small class="mono">${esc(e.folder)}</small></td><td>${esc(r.system || '')}</td><td>${esc(e.manager)}</td><td>${stateCell(e)}</td><td>${e.state === 'untracked' ? `<button class="btn small" data-record-entry="${i}">Record</button>` : ''}</td></tr>`).join('');
+    $$('[data-record-entry]', $('#launcherRows')).forEach((b) => (b.onclick = async () => {
+      const e = shown[Number(b.dataset.recordEntry)]; b.disabled = true;
+      const r2 = await act('record_launcher_entry', [e.folder, e.key], `Recorded ${e.game}`, { what: `Recording ${e.game}` });
+      if (ok(r2)) renderLauncher(); else b.disabled = false;
+    }));
+    if (!entries.length) $('#launcherState').appendChild(stateBlock({ title: 'No launcher lists a game here', body: 'Games that Steam, Epic, GOG, Amazon, itch, Battle.net, Lutris, Bottles or Minigalaxy have installed on this computer show here.' }));
+    else if (!shown.length) $('#launcherState').appendChild(stateBlock({ title: 'No launcher entries match' }));
   }, { what: 'Launcher entries' });
 }
 function renderSaves() {
@@ -716,7 +730,17 @@ async function action(a) {
   if (a === 'rebuild-cache') act('rebuild_index', [], 'Index rebuilt', { what: 'Rebuilding the index' });
   if (a === 'add-system') { const r = await call('get_transfer_settings'); infoSheet({ title: 'Add a system', details: r.message || 'Point your sync tool at the library folder on the other computer; it appears here once it writes a record.' }); }
   if (a === 'reload-launcher') renderLauncher();
-  if (a === 'backup-now') { const r = await call('back_up_saves_now'); infoSheet({ title: 'Back up saves', node: fromResult(r, { what: 'Backing up now' }) }); }
+  if (a === 'backup-now') {
+    flash('Backing up saves…');
+    const r = await call('back_up_saves_now');
+    if (!ok(r)) { infoSheet({ title: 'Back up saves', node: fromResult(r, { what: 'Backing up now' }) }); return; }
+    const parts = [`${fmt.n(r.backed_up, 'game')} backed up (${fmt.n(r.files, 'file')})`];
+    if (r.no_saves) parts.push(`${fmt.n(r.no_saves, 'game')} with no saves here yet`);
+    if (r.unknown) parts.push(`${fmt.n(r.unknown, 'game')} with no known save location`);
+    if ((r.failures || []).length) parts.push(`${fmt.n(r.failures.length, 'failure')}: ${r.failures.map((f) => `${f.title} (${f.message})`).join('; ')}`);
+    flash(parts.join(' · '), (r.failures || []).length ? 'caution' : 'info');
+    if (state.view === 'saves') renderSaves();
+  }
   if (a === 'pair-handheld') pairHandheld();
   if (a === 'show-pair-code') showPairCode();
   if (a === 'clear-jobs') act('clear_finished_jobs', [], 'Cleared', { what: 'Clearing' });

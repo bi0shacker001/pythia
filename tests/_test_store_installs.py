@@ -102,3 +102,57 @@ class AvailabilityTest(TestCase):
                 self.assertTrue(egs.epic_launcher_installed())
             with mock.patch.dict(os.environ, {"PROGRAMDATA": tmp}), mock.patch("sys.platform", "linux"):
                 self.assertFalse(egs.epic_launcher_installed())
+
+
+class LauncherEntriesTest(TestCase):
+    def test_each_launcher_game_is_tracked_drifted_or_untracked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a, b, c, elsewhere = (Path(tmp) / n for n in ("A", "B", "C", "B-old"))
+            for d in (a, b, c, elsewhere):
+                d.mkdir()
+            found = [
+                {"key": "steam:1", "title": "Alpha", "folder": str(a), "store": "steam"},
+                {"key": "steam:2", "title": "Beta", "folder": str(b), "store": "steam"},
+                {"key": "gog:3", "title": "Gamma", "folder": str(c), "store": "gog"},
+            ]
+
+            def entry(steam_id, folder):
+                return {
+                    "system_uuid": "me",
+                    "canonical_name": "x",
+                    "platform_ids": [{"platform": "steam", "id": steam_id}],
+                    "versions": [{"variants": [{"path": str(folder)}]}],
+                }
+
+            library = [entry("1", a), entry("2", elsewhere)]
+            with (
+                mock.patch.object(store_installs, "find", return_value=found),
+                mock.patch.object(store_installs, "get_system_uuid", return_value="me"),
+                mock.patch.object(store_installs.datadir, "list_all_entries", return_value=library),
+            ):
+                rows = {r["game"]: r for r in store_installs.entries()}
+        self.assertEqual(rows["Alpha"]["state"], "tracked")
+        self.assertEqual(rows["Beta"]["state"], "drifted")
+        self.assertEqual(rows["Beta"]["library_folder"], str(elsewhere.resolve()))
+        self.assertEqual(rows["Gamma"]["state"], "untracked")
+
+
+class BackUpAllTest(TestCase):
+    def test_counts_backed_up_without_saves_unknown_and_failures(self):
+        from pythia.droidtop import saves
+
+        answers = {
+            "a": {"files": 2, "known": True},
+            "b": {"files": 0, "known": True},
+            "c": {"files": 0, "known": False},
+        }
+
+        def back_up(key, title=""):
+            if key == "d":
+                raise native.AgentError("disk full")
+            return answers[key]
+
+        with mock.patch.object(saves, "back_up", side_effect=back_up):
+            done = saves.back_up_all([{"key": k, "title": k.upper()} for k in "abcd"])
+        self.assertEqual((done["backed_up"], done["files"], done["no_saves"], done["unknown"]), (1, 2, 1, 1))
+        self.assertEqual(done["failures"], [{"title": "D", "message": "disk full"}])

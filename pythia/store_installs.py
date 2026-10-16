@@ -112,3 +112,55 @@ def record_new() -> dict:
         _keep_store_id(result["path"], game["key"])
         counts["recorded"] += 1
     return counts
+
+
+def entries() -> list[dict]:
+    """What each launcher on this computer lists, against Pythia's library:
+    ``game`` (title), ``key``, ``manager`` (the launcher), ``folder``, and
+    ``state``: ``tracked`` (in the library at that folder), ``drifted`` (the
+    game is in the library under another folder; ``library_folder``) or
+    ``untracked``."""
+    uuid = get_system_uuid()
+    from pythia.droidtop.library import game_key  # noqa: PLC0415
+
+    by_key: dict[str, list[str]] = {}
+    for e in datadir.list_all_entries():
+        if e.get("system_uuid") != uuid:
+            continue
+        folders = [
+            str(Path(v["path"]).resolve())
+            for g in e.get("versions") or []
+            for v in g.get("variants") or []
+            if v.get("path")
+        ]
+        by_key.setdefault(game_key(e), []).extend(folders)
+    tracked = {f for folders in by_key.values() for f in folders}
+    rows = []
+    for game in find():
+        folder = str(Path(game["folder"]).resolve())
+        if folder in tracked:
+            state, library_folder = "tracked", folder
+        elif by_key.get(game["key"]):
+            state, library_folder = "drifted", by_key[game["key"]][0]
+        else:
+            state, library_folder = "untracked", None
+        rows.append(
+            {
+                "game": game["title"],
+                "key": game["key"],
+                "manager": game["store"] or game["key"].partition(":")[0],
+                "folder": game["folder"],
+                "state": state,
+                "library_folder": library_folder,
+            }
+        )
+    return sorted(rows, key=lambda r: (r["game"].casefold(), r["manager"]))
+
+
+def record(folder: str, key: str) -> dict:
+    """Records one launcher entry's folder (onboarding.onboard), keeping the
+    store's id on the entry."""
+    result = onboarding.onboard(folder)
+    if result.get("status") == "ok":
+        _keep_store_id(result["path"], key)
+    return result

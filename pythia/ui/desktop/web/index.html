@@ -308,6 +308,8 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
     <button class="nav-row active" data-nav="library"><span class="nav-icon">▦</span>Library<span class="nav-count" id="allCount"></span></button>
     <button class="nav-row" data-filter-nav="pending"><span class="nav-icon">●</span>Needs attention<span class="nav-count" id="attentionCount"></span></button>
     <button class="nav-row" data-nav="downloads"><span class="nav-icon">⇩</span>Downloads &amp; intake<span class="nav-count" id="downloadsCount"></span></button>
+    <button class="nav-row" data-nav="saves"><span class="nav-icon">⟲</span>Save backups</button>
+    <button class="nav-row" data-nav="launcher"><span class="nav-icon">▶</span>Launcher entries</button>
   </div>
   <div class="nav-group"><div class="nav-label">Coordinate</div>
     <button class="nav-row" data-nav="reconcile"><span class="nav-icon">⇄</span>Reconciliation<span class="nav-count" id="reconcileCount"></span></button>
@@ -376,8 +378,8 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
   </section>
 
   <section class="view" id="view-launcher">
-    <div class="page-head"><div><h1>Launcher entries</h1><p id="launcherSummary"></p></div><div class="head-actions"><button class="btn" data-action="reload-launcher">Rescan launcher entries</button></div></div>
-    <div class="panel"><div class="panel-head"><h2>Tracked entries</h2><small id="launcherCount"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>System</th><th>Manager</th><th>State</th><th></th></tr></thead><tbody id="launcherRows"></tbody></table><div id="launcherState"></div></div></div>
+    <div class="page-head"><div><h1>Launcher entries</h1><p id="launcherSummary"></p></div><div class="head-actions"><button class="btn" data-action="reload-launcher">Look again</button></div></div>
+    <div class="panel"><div class="panel-head"><h2>In this computer's launchers</h2><small id="launcherCount"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>System</th><th>Manager</th><th>State</th><th></th></tr></thead><tbody id="launcherRows"></tbody></table><div id="launcherState"></div></div></div>
   </section>
 
   <section class="view" id="view-saves">

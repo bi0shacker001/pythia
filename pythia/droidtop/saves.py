@@ -25,3 +25,33 @@ def restore(key: str, path: str, title: str = "") -> int:
     what is there now is kept first as this computer's own copy. Returns how
     many files it put back. May rescan (slow)."""
     return submodule("saves").restore(key, path, title)
+
+
+def back_up(key: str, title: str = "") -> dict:
+    """Keeps a copy of a game's saves as they are here now, as this computer's
+    own copy: ``files`` copied (0 when it has none here) and ``known`` (False
+    when no save location is known for it)."""
+    return submodule("saves").back_up(key=key, title=title)
+
+
+def back_up_all(games: list[dict]) -> dict:
+    """back_up() for each of ``games`` (``key``, ``title``): how many were
+    ``backed_up`` (with ``files`` in all), had ``no_saves`` here yet, had
+    ``unknown`` save locations, and each ``failure`` (title and message)."""
+    from pythia.droidtop.native import AgentError  # noqa: PLC0415
+
+    out: dict = {"backed_up": 0, "files": 0, "no_saves": 0, "unknown": 0, "failures": []}
+    for game in games:
+        try:
+            done = back_up(game["key"], game.get("title", ""))
+        except AgentError as ex:
+            out["failures"].append({"title": game.get("title") or game["key"], "message": str(ex)})
+            continue
+        if not done["known"]:
+            out["unknown"] += 1
+        elif done["files"]:
+            out["backed_up"] += 1
+            out["files"] += done["files"]
+        else:
+            out["no_saves"] += 1
+    return out

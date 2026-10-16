@@ -15,6 +15,11 @@ import re
 _ORDERABLE = re.compile(r"^v?\d+(?:[._]\d+)*(?:[a-z]{1,3}\d*)?$", re.IGNORECASE)
 
 
+def _leading_number(part: str) -> int:
+    m = re.match(r"\d+", part)
+    return int(m.group()) if m else 0
+
+
 def compare_loose(a: str | None, b: str | None) -> int:
     a, b = a or "", b or ""
     if not a or not b:
@@ -24,8 +29,7 @@ def compare_loose(a: str | None, b: str | None) -> int:
     for i in range(max(len(left), len(right))):
         lpart = left[i] if i < len(left) else "0"
         rpart = right[i] if i < len(right) else "0"
-        lnum = int(re.match(r"\d*", lpart).group() or 0)
-        rnum = int(re.match(r"\d*", rpart).group() or 0)
+        lnum, rnum = _leading_number(lpart), _leading_number(rpart)
         if lnum != rnum:
             return -1 if lnum < rnum else 1
         ltext, rtext = re.sub(r"^\d+", "", lpart), re.sub(r"^\d+", "", rpart)

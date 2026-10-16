@@ -711,7 +711,7 @@ class Backend(QObject):
         for entry in datadir.list_all_entries():
             if entry.get("system_uuid") != uuid or entry.get("game_id") != game_id:
                 continue
-            holder = entry
+            holder: dict | None = entry
             if path:
                 holder = next(
                     (v for g in entry.get("versions") or [] for v in g.get("variants") or [] if v.get("path") == path),

@@ -25,6 +25,11 @@ droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", r
 # windowcast's host identity folder, the one droidtop-agent and windowcast share,
 # at the commit droidtop-agent pins.
 windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "93efcb9ebf108ae71222b9fe3e19d0d57cfb102e" }
+# Where droidtop-agent keeps its files (as its Dirs::locate).
+dirs = "5"
+# Finding and stopping a running droidtop-agent, on every system.
+sysinfo = { version = "0.33", default-features = false, features = ["system"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The stable ABI (abi3) from Python 3.10 on: one build per system serves
 # every newer Python. generate-import-lib lets Windows link without an
@@ -39,3 +44,7 @@ opt-level = "s"
 lto = true
 codegen-units = 1
 strip = true
+
+[target.'cfg(windows)'.dependencies]
+# droidtop-agent's start at sign-in on Windows: the per-user Run key.
+winreg = "0.52"

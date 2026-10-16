@@ -429,6 +429,7 @@ function renderHandhelds() {
       : visibleStatus('Not serving handhelds yet', 'neutral', '–');
     h.appendChild(el(`<p>${line}</p>`));
     if ((st.places || []).length) h.appendChild(el(`<p><small>Addresses: ${(st.places || []).map((p) => `<span class="mono">${esc(p.address)}</span> (${esc(p.label)})`).join(' · ')}</small></p>`));
+    renderAgentTakeover(h, st.agent || {});
   }, { what: 'This computer as a droidtop agent' });
   loadInto(host, 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
@@ -444,6 +445,32 @@ function renderHandhelds() {
     });
   }, { what: 'Handhelds' });
   renderHandheldGames();
+}
+// droidtop-agent, the separate program: Pythia turns it off while it serves the handhelds (keeping its
+// start at sign-in to put back), and syncs its pairings, library and save copies both ways.
+function renderAgentTakeover(h, a) {
+  const running = a.running || [];
+  if (!a.pythia_serves) {
+    h.appendChild(el(`<p>${visibleStatus('droidtop-agent serves your handhelds, not Pythia. Pythia takes in its pairings and library.', 'neutral', '–')}</p>`));
+    const b = el('<p><button class="btn small">Serve from Pythia again</button></p>');
+    b.querySelector('button').onclick = async () => { const r = await act('serve_from_pythia_again', [], 'Pythia serves your handhelds from its next start, and turns droidtop-agent off then', { what: 'Serving from Pythia' }); if (ok(r)) renderHandhelds(); };
+    h.appendChild(b);
+    return;
+  }
+  if (running.length) {
+    h.appendChild(el(`<p>${visibleStatus(`droidtop-agent is still running (${running.map((p) => `${p.name} ${p.pid}`).join(', ')}) and did not stop when asked, so it serves the handhelds instead of Pythia.`, 'pending')}</p>`));
+    return;
+  }
+  if (!a.turned_off) return;
+  const since = a.turned_off.since ? fmt.dateTime(new Date(a.turned_off.since).toISOString()) : '';
+  h.appendChild(el(`<p><small>droidtop-agent is turned off while Pythia serves your handhelds${since ? ` (since ${esc(since)})` : ''}. Its pairings, library and save copies are kept in step with Pythia's.</small></p>`));
+  const b = el('<p><button class="btn small">Turn droidtop-agent back on…</button></p>');
+  b.querySelector('button').onclick = async () => {
+    if (!(await confirmDanger({ title: 'Turn droidtop-agent back on?', body: 'Its start at sign-in is put back as it was, with Pythia\'s pairings and library written into its folder. Pythia keeps serving your handhelds until it quits, and leaves them to droidtop-agent from its next start.', recommendation: 'We recommend Cancel unless you want droidtop-agent to serve your handhelds instead of Pythia.', proceed: 'Turn it back on' }))) return;
+    const r = await act('turn_agent_back_on', [], 'droidtop-agent starts again at your next sign-in', { what: 'Turning droidtop-agent back on' });
+    if (ok(r)) renderHandhelds();
+  };
+  h.appendChild(b);
 }
 // What each paired handheld has installed, from the library it syncs with this computer.
 function renderHandheldGames() {

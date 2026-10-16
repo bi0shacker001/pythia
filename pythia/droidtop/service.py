@@ -34,7 +34,22 @@ def start_in_background() -> None:
         return
 
     def run():
+        from pythia.droidtop import takeover  # noqa: PLC0415
+
         try:
+            if not takeover.serves():
+                summary = takeover.sync(write_back=False)
+                logger.info(
+                    "Not serving droidtop handhelds: droidtop-agent serves them (turned back on); "
+                    "took in its state: %s",
+                    summary,
+                )
+                return
+            taken = takeover.take_over()
+            if taken["turned_off"] or taken["still_running"]:
+                logger.info("droidtop-agent is turned off while Pythia serves the handhelds: %s", taken)
+            if taken["still_running"]:
+                logger.warning("droidtop-agent did not stop: %s", taken["still_running"])
             serve()
             from pythia.droidtop import store  # noqa: PLC0415
 

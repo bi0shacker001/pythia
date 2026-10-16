@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 from unittest import TestCase, mock
 
-from pythia.droidtop import library, native, scan, service, store
+from pythia.droidtop import library, native, scan, service, store, takeover
 
 
 class TitleKeyTest(TestCase):
@@ -226,3 +226,55 @@ class LauncherFoldersTest(TestCase):
                 results = scanning.scan_library(root)
         self.assertEqual([r["status"] for r in results], ["skipped", "ok"])
         self.assertIn("Launcher is a launcher's own folder", results[0]["message"])
+
+
+class TakeoverTest(TestCase):
+    """Pythia turning droidtop-agent off while it serves, and back on."""
+
+    def agent(self, running=(), starts=False, still=()):
+        fake = mock.Mock()
+        fake.agent.status.return_value = {"running": list(running), "starts_at_sign_in": starts, "turned_off": None}
+        fake.agent.turn_off.return_value = {"entries": ["desktop"] if starts else [], "still_running": list(still)}
+        fake.agent.sync.return_value = {"imported": []}
+        fake.agent.turn_on.return_value = {"entries": ["desktop"]}
+        return fake
+
+    def test_nothing_to_turn_off_still_syncs_and_writes_back(self):
+        fake = self.agent()
+        with mock.patch.object(native, "_module", fake):
+            taken = takeover.take_over()
+        fake.agent.turn_off.assert_not_called()
+        fake.agent.sync.assert_called_once_with(write_back=True)
+        self.assertEqual(taken["turned_off"], [])
+
+    def test_a_running_agent_is_turned_off_before_the_sync(self):
+        fake = self.agent(running=[{"pid": 7, "name": "droidtop-agent"}], starts=True)
+        with mock.patch.object(native, "_module", fake):
+            taken = takeover.take_over()
+        self.assertEqual([c[0] for c in fake.agent.method_calls], ["status", "turn_off", "sync"])
+        self.assertEqual(taken["turned_off"], ["desktop"])
+        fake.agent.sync.assert_called_once_with(write_back=True)
+
+    def test_an_agent_that_did_not_stop_gets_no_writes(self):
+        still = [{"pid": 7, "name": "droidtop-agent"}]
+        fake = self.agent(running=still, still=still)
+        with mock.patch.object(native, "_module", fake):
+            taken = takeover.take_over()
+        fake.agent.sync.assert_called_once_with(write_back=False)
+        self.assertEqual(taken["still_running"], still)
+
+    def test_turning_the_agent_back_on_writes_back_first_and_stops_serving_from_pythia(self):
+        fake = self.agent()
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(takeover.settings, "write_setting") as write,
+        ):
+            done = takeover.turn_agent_back_on()
+        self.assertEqual([c[0] for c in fake.agent.method_calls], ["sync", "turn_on"])
+        fake.agent.sync.assert_called_once_with(write_back=True)
+        write.assert_called_once_with(takeover.SERVE_SETTING, False)
+        self.assertEqual(done["entries"], ["desktop"])
+
+    def test_pythia_serves_unless_told_not_to(self):
+        with mock.patch.object(takeover.settings, "read_bool_setting", side_effect=lambda key, default: default):
+            self.assertTrue(takeover.serves())

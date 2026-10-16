@@ -30,11 +30,13 @@ use droidtop_agent_store::Dirs;
 use pyo3::prelude::*;
 use serde_json::{json, Value};
 
+mod agent;
 mod pair;
 mod saves;
 mod scan;
 mod service;
 mod store;
+mod takeover;
 
 // PyO3 0.22's create_exception! tests a `gil-refs` feature this crate does not
 // declare, which rustc's cfg check reports.
@@ -49,7 +51,7 @@ mod error {
 }
 pub(crate) use error::AgentError;
 
-static FOLDER: Mutex<Option<PathBuf>> = Mutex::new(None);
+pub(crate) static FOLDER: Mutex<Option<PathBuf>> = Mutex::new(None);
 static AGENT: OnceLock<Arc<Agent>> = OnceLock::new();
 static OPENING: Mutex<()> = Mutex::new(());
 
@@ -141,6 +143,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("AgentError", m.py().get_type_bound::<AgentError>())?;
     m.add_function(wrap_pyfunction!(use_folder, m)?)?;
     submodule(m, "store", store::fill)?;
+    submodule(m, "agent", agent::fill)?;
     submodule(m, "pair", pair::fill)?;
     submodule(m, "scan", scan::fill)?;
     submodule(m, "saves", saves::fill)?;

@@ -19,6 +19,8 @@ with ``native`` they are the only place that touches the extension module:
 - ``saves``: the copies of saves kept on this computer;
 - ``library``: the games Pythia tracks, handed to the agent (``scan``).
 - ``scan``: the agent's scanner rules over a folder Pythia scans (its ROM folders).
+- ``takeover``: droidtop-agent, the separate program: turned off while Pythia
+  serves, back on when asked, and its state synced both ways.
 
 In a source tree that was never built there is no module: every call raises
 ``AgentError`` saying how to build it, and the rest of Pythia works.

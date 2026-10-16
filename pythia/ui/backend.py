@@ -180,6 +180,14 @@ class Backend(QObject):
         logger.addHandler(self._log_handler)
         self.refresh_games()
         self._follow_agent_events()
+        # The handhelds' state changed (a pairing, a session): droidtop-agent's
+        # folder gets it too while the agent is off (pythia.droidtop.takeover).
+        self.handheldsChanged.connect(self._sync_with_agent)
+
+    def _sync_with_agent(self):
+        from pythia.droidtop import takeover
+
+        takeover.sync_soon()
 
     # ---- UI log (one buffer: the event log, the error console and logLine) ------
     def _keep(self, entry: dict):
@@ -1231,18 +1239,58 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def get_agent_status(self):
         """This computer as handhelds know it, whether this process serves
-        them (or why not), and the addresses a handheld can use."""
+        them (or why not), the addresses a handheld can use, and droidtop-agent
+        (running, starting at sign-in, turned off by Pythia). Off the main
+        thread: it looks through the running processes."""
         from pythia import droidtop
 
         if not droidtop.available():
             return self._agent_unavailable("get_agent_status")
-        from pythia.droidtop import pair, service, store
+        from pythia.droidtop import pair, service, store, takeover
 
         return _jsonable(
-            {"status": "ok", "identity": store.identity(), "serving": service.serving(), "places": pair.places()}
+            {
+                "status": "ok",
+                "identity": store.identity(),
+                "serving": service.serving(),
+                "places": pair.places(),
+                "agent": takeover.status(),
+            }
         )
+
+    @Slot(result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def turn_agent_back_on(self):
+        """droidtop-agent serves the handhelds again: its start at sign-in is
+        put back as it was, with Pythia's state written into its folder, and
+        Pythia stops serving them from its next start."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("turn_agent_back_on")
+        from pythia.droidtop import takeover
+
+        done = takeover.turn_agent_back_on()
+        kept = ", ".join(done["entries"]) or "no start entry kept"
+        self._record("info", "pythia", f"droidtop-agent turned back on ({kept})")
+        return {"status": "ok", **done}
+
+    @Slot(result="QVariant")
+    @_guarded
+    def serve_from_pythia_again(self):
+        """Pythia serves the handhelds again from its next start."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("serve_from_pythia_again")
+        from pythia.droidtop import takeover
+
+        takeover.serve_from_pythia_again()
+        return {"status": "ok"}
 
     @Slot(result="QVariant")
     @_guarded

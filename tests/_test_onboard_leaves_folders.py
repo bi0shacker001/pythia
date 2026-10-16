@@ -17,13 +17,16 @@ def listing(root: Path) -> dict:
 
 class OnboardLeavesFoldersTest(TestCase):
     def onboard(self, folder: Path, entries=()):
-        saved = []
+        saved: list[dict] = []
+
+        def save(entry):
+            saved.append(entry)
+            return "x.json"
+
         with (
             mock.patch.object(onboarding, "get_system_uuid", return_value="me"),
             mock.patch.object(onboarding.datadir, "list_all_entries", return_value=list(entries)),
-            mock.patch.object(
-                onboarding.games_db, "save_entry_and_sync_cache", side_effect=lambda e: saved.append(e) or "x.json"
-            ),
+            mock.patch.object(onboarding.games_db, "save_entry_and_sync_cache", side_effect=save),
         ):
             result = onboarding.onboard(folder)
         return result, saved

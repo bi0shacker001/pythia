@@ -15,6 +15,7 @@ even where no Pythia plugin recognises the folder itself.
 """
 
 from pathlib import Path
+from typing import Any
 
 from pythia import datadir, onboarding
 from pythia.droidtop.native import submodule
@@ -97,7 +98,7 @@ def record_new() -> dict:
     ``failure``'s folder and message."""
     found = find()
     tracked = _tracked_folders()
-    counts = {"found": len(found), "recorded": 0, "already": 0, "failed": 0, "failures": []}
+    counts: dict[str, Any] = {"found": len(found), "recorded": 0, "already": 0, "failed": 0, "failures": []}
     for game in found:
         if str(Path(game["folder"]).resolve()) in tracked:
             counts["already"] += 1

@@ -23,6 +23,7 @@ from the same model and the same backend.
 | `components.js` | the component library (`window.UI`) |
 | `console.js` | the error console (`window.ErrorConsole`) |
 | `query.js` | the library query (`window.PythiaQuery`): words that must all match, ignoring case, accents and punctuation, across every version, folder, mod, language and kind; filters `source:`, `engine:`, `kind:`, `installed`, `has:update`, `has:nolink` (UX review A11). Tested under node: `tests/web/*.test.mjs` |
+| `versions.js` | ordering a game's versions (`window.PythiaVersions`): droidtop's `Versions.compareLoose`, which labels are version numbers, and the middle-ellipsis for folder paths (UX review A13). Tested under node |
 | `app.js` | the model (`adaptGame`), the backend bridge, the pages of both shells, the menu bar |
 
 ## The data path (one for every page)

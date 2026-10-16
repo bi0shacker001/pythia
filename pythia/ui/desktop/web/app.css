@@ -243,3 +243,8 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
 .primary-slot .slot-reason{max-width:100%;font-size:0.75rem;color:var(--text-secondary);line-height:1.3}
 .hh-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:flex-start}
 .hh-section-body{min-width:0}
+/* UX review A13: versions that cannot be ordered say so above the list */
+.order-note{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;color:var(--text-secondary);font-size:0.8125rem}
+/* A disabled primary action looks unavailable, everywhere (the slot's Play or Install with its reason). */
+.btn.primary:disabled,.hh-action.primary[aria-disabled="true"],.hh-action.primary:disabled{background:var(--surface-2);border-color:var(--border);color:var(--text-secondary)}
+.detail-actions{align-items:flex-start}

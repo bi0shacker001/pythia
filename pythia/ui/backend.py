@@ -607,6 +607,29 @@ class Backend(QObject):
             "message": "This computer has no record of that game, so notes cannot be saved here.",
         }
 
+    @Slot(str, str, result="QVariant")
+    @_guarded
+    def set_current_version(self, game_id: str, version: str):
+        """"Set as current" (UX review A13): the version this computer treats as
+        the game's current one, shown on rows and the hero instead of the
+        latest installed, and the answer when versions cannot be ordered. An
+        empty ``version`` clears it. Recorded in the entry's history."""
+        uuid = get_system_uuid()
+        for entry in datadir.list_all_entries():
+            if entry.get("system_uuid") == uuid and entry.get("game_id") == game_id:
+                labels = [g.get("version") or "" for g in entry.get("versions") or []]
+                if version and version not in labels:
+                    return {"status": "error", "message": f"{version} is not one of this game's versions here."}
+                if version:
+                    entry["current_version"] = version
+                else:
+                    entry.pop("current_version", None)
+                datadir.add_timeline_event(entry, "current_set", version or "cleared")
+                games_db.save_entry_and_sync_cache(entry)
+                self.refresh_games()
+                return {"status": "ok", "current": version or None}
+        return {"status": "error", "message": "This computer has no record of that game."}
+
     # 2026-08-04, Lutris-base port: the old direct-launch variant flag (set_variant_
     # direct) isn't ported -- Lutris's own "linux" runner already covers "just run
     # this executable directly, no compatibility layer needed" (see

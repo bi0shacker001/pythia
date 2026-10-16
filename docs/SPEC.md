@@ -37,6 +37,13 @@ the droidtop coordinator for this lane. Later sections follow them.
 6. **One entry per game across stores.** A game owned on several stores is
    one library entry with several store ids (Droidtop/tracker#133, droidtop
    SPEC 7m), not one entry per store.
+   - Which records are one game follows droidtop SPEC 7m, "What merges,
+     and what only suggests": names equal once case and punctuation are
+     dropped (droidtop's `GameNaming.nameKey`), or part folders side by
+     side, are one game. Names at least 0.6 alike only suggest, one pair
+     at a time. Review's Possible duplicates groups the first kind and
+     lists each alike pair on its own, so a common word never chains
+     unrelated games together (Droidtop/tracker#538, retest B2).
 7. **Sync with droidtop starts on only where droidtop is in use.** Owner,
    2026-10-16, on the Windows retest's B3 (Droidtop/tracker#538): "Pythia
    isn't necessarily used with droidtop. It's a game library manager, I

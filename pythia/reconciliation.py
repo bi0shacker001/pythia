@@ -32,6 +32,14 @@ from pythia.onboarding import _is_generic_part_leaf
 NAME_SIMILARITY_THRESHOLD = 0.6
 
 
+def name_key(name: str) -> str:
+    """droidtop's GameNaming.nameKey: the name in lower case with only letters
+    and digits. Records with equal keys are one game (droidtop SPEC 7m, "What
+    merges, and what only suggests"); names only alike are a suggestion about
+    that one pair, and never join others (Droidtop/tracker#538 retest B2)."""
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
 def _own_entries():
     system_uuid = get_system_uuid()
     return [e for e in datadir.list_all_entries() if e.get("system_uuid") == system_uuid]
@@ -87,6 +95,8 @@ def _variants(entry: dict):
 def find_merge_candidates():
     """Every pair of this system's own tracked games whose canonical names are
     similar enough to plausibly be the same game, sorted by similarity descending.
+    ``reason`` is "parts" (part folders under one parent), "same" (equal
+    name_key: one game) or "name" (only alike: a suggestion for that pair).
     Returns a list of {"score", "a": {...}, "b": {...}} dicts (see _summarize) -- a
     suggestion queue for the user to confirm or dismiss, never auto-applied."""
     entries = _own_entries()
@@ -99,6 +109,9 @@ def find_merge_candidates():
                 continue
             if _part_folders_of_one_game(a, b):
                 candidates.append({"score": 1.0, "reason": "parts", "a": _summarize(a), "b": _summarize(b)})
+                continue
+            if name_key(name_a) and name_key(name_a) == name_key(name_b):
+                candidates.append({"score": 1.0, "reason": "same", "a": _summarize(a), "b": _summarize(b)})
                 continue
             score = difflib.SequenceMatcher(None, name_a, name_b).ratio()
             if score >= NAME_SIMILARITY_THRESHOLD:

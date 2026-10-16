@@ -412,8 +412,13 @@ class DBusScreenSaverInhibitor:
             except Exception as ex:
                 logger.warning("Failed to inhibit screensaver via D-Bus, falling back to GTK: %s", ex)
 
-        # GTK fallback
-        app: "PythiaApplication" = Gio.Application.get_default()
+        # GTK fallback, when a GTK application runs this process: the Qt UI and
+        # the command line (`pythia pythia:rungameid/<id>`) have none, and the
+        # game then runs without an inhibitor rather than not at all.
+        app: "PythiaApplication | None" = Gio.Application.get_default() if Gio is not None else None
+        if app is None or getattr(app, "window", None) is None:
+            logger.info("No screensaver inhibitor for %s: no D-Bus screensaver and no GTK application", game_name)
+            return None
 
         window = app.window
         flags = Gtk.ApplicationInhibitFlags.SUSPEND | Gtk.ApplicationInhibitFlags.IDLE
@@ -440,8 +445,9 @@ class DBusScreenSaverInhibitor:
                 logger.warning("Failed to uninhibit screensaver via D-Bus: %s", ex)
 
         # GTK fallback
-        app: "PythiaApplication" = Gio.Application.get_default()
-        app.uninhibit(cookie)
+        app: "PythiaApplication | None" = Gio.Application.get_default() if Gio is not None else None
+        if app is not None:
+            app.uninhibit(cookie)
 
 
 def _get_suspend_inhibitor() -> DBusScreenSaverInhibitor:

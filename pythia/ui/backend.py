@@ -1758,7 +1758,12 @@ class Backend(QObject):
         ``reason``, the ``pages`` it covers) and agent mode."""
         from pythia import modes
 
-        return {"status": "ok", "manager": modes.manager_mode(), "agent": modes.agent_mode()}
+        return {
+            "status": "ok",
+            "manager": modes.manager_mode(),
+            "agent": modes.agent_mode(),
+            "sync": modes.sync_with_droidtop(),
+        }
 
     @Slot(bool, result="QVariant")
     @_guarded

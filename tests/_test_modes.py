@@ -41,11 +41,11 @@ class ManagerModeTest(TestCase):
         with self.agent(True):
             state = modes.manager_mode()
         self.assertEqual((state["on"], state["locked"], state["agent"]), (True, True, True))
-        self.assertIn("droidtop agent", state["reason"])
+        self.assertIn("Sync with droidtop", state["reason"])
 
     def test_turning_it_off_in_agent_mode_is_refused_and_changes_nothing(self):
         with self.agent(True):
-            with self.assertRaisesRegex(modes.ModeLocked, "droidtop agent"):
+            with self.assertRaisesRegex(modes.ModeLocked, "Sync with droidtop"):
                 modes.set_manager_mode(False)
             self.assertTrue(modes.set_manager_mode(True)["on"])
         self.assertEqual(self.stored, {modes.MANAGER_SETTING: True})
@@ -80,3 +80,39 @@ class AgentModeTest(TestCase):
             mock.patch.object(service, "serving", return_value={"state": "off"}),
         ):
             self.assertFalse(modes.agent_mode())
+
+
+class SyncWithDroidtopTest(TestCase):
+    """UX review A9: agent mode, named by its outcome."""
+
+    def test_without_the_droidtop_module_it_is_off_and_says_why(self):
+        from pythia import droidtop
+
+        with (
+            mock.patch.object(droidtop, "available", return_value=False),
+            mock.patch.object(droidtop, "why_unavailable", return_value="not built"),
+        ):
+            state = modes.sync_with_droidtop()
+        self.assertEqual((state["on"], state["available"], state["reason"]), (False, False, "not built"))
+
+    def test_on_follows_the_serve_setting_and_serving_follows_agent_mode(self):
+        from pythia import droidtop
+        from pythia.droidtop import takeover
+
+        with (
+            mock.patch.object(droidtop, "available", return_value=True),
+            mock.patch.object(takeover, "serves", return_value=True),
+            mock.patch.object(modes, "agent_mode", return_value=False),
+        ):
+            state = modes.sync_with_droidtop()
+        self.assertEqual((state["on"], state["serving"], state["available"]), (True, False, True))
+        self.assertIn("agent", state["info"])
+
+    def test_no_label_in_the_page_says_agent_mode(self):
+        from pathlib import Path
+
+        web = Path(__file__).parents[1] / "pythia/ui/desktop/web"
+        for name in ("app.js", "index.html"):
+            text = (web / name).read_text(encoding="utf-8")
+            self.assertNotIn("<strong>Agent mode</strong>", text)
+            self.assertNotIn("The droidtop agent knows", text)

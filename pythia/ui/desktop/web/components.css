@@ -147,3 +147,6 @@ body.handheld-active .console-panel.dock-right { top: 0; width: min(50vw, 600px)
 .cycle-arrow { color: var(--text-secondary); font-size: 1.125rem; line-height: 1; }
 .cycle-value { flex: 1; text-align: center; }
 .cycle:disabled { opacity: .55; cursor: not-allowed; }
+
+/* A mode's controls: Info beside its switch (UX review A9) */
+.mode-controls { display: inline-flex; align-items: center; gap: 8px; }

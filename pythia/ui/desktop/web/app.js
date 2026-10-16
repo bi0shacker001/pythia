@@ -255,7 +255,7 @@ function renderSavesTab(g, fetch = false) {
   loadInto(pane, 'get_game_saves', [g.id, fetch], (r, host) => {
     const files = r.files || [];
     if (!r.patterns) {
-      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `The droidtop agent knows where a game keeps its saves from the Ludusavi manifest, by its key (${r.key}) or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true) }] }));
+      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `droidtop knows where a game keeps its saves from the Ludusavi manifest, by its key (${r.key}) or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true) }] }));
       return;
     }
     host.appendChild(el(`<div class="kv"><div class="key">Looked for</div><div class="mono" style="word-break:break-all">${(r.patterns || []).map(esc).join('<br>')}</div></div>`));
@@ -325,17 +325,31 @@ function renderModes(host) {
   if (!host) return;
   loadInto(host, 'get_modes', [], (r, h) => {
     model.modes = r;
-    const m = r.manager || {};
-    const row = el(`<div class="form-row"><div class="form-label"><strong>Manager mode</strong><small>The library and version manager: tagging game folders, versions against the latest release, and tagging downloads with their game and kind.</small>${m.locked ? `<small class="locked-reason">${visibleStatus('Locked on', 'neutral', '🔒')} ${esc(m.reason || '')}</small>` : ''}</div><button class="toggle" data-manager-mode aria-label="Manager mode"><span></span></button></div>`);
+    const m = r.manager || {}; const sync = r.sync || {};
+    const info = (title, details) => { const b = el('<button class="btn small ghost" type="button">Info</button>'); b.onclick = () => infoSheet({ title, details }); return b; };
+    // Sync with droidtop (UX review A9): agent mode, named by its outcome; "agent" is said only in Info.
+    const syncState = !sync.available ? 'Not available' : sync.on ? (sync.serving ? 'On' : 'On from the next start') : sync.serving ? 'Off when Pythia quits' : 'Off';
+    const syncRow = el(`<div class="form-row"><div class="form-label"><strong>Sync with droidtop</strong><small>Your paired droidtop handhelds get this library, its saves and its launches from Pythia. ${esc(syncState)}.</small>${sync.available ? '' : `<small class="locked-reason">${esc(sync.reason || '')}</small>`}</div><span class="mode-controls"><button class="toggle" data-sync-mode aria-label="Sync with droidtop"><span></span></button></span></div>`);
+    $('.mode-controls', syncRow).prepend(info('Sync with droidtop', sync.info || ''));
+    const syncSwitch = $('[data-sync-mode]', syncRow);
+    bindSwitch(syncSwitch, !!sync.on, async (on) => {
+      if (!on && !(await confirm({ title: 'Turn off Sync with droidtop?', body: 'Your handhelds are served by droidtop-agent again from its next start; Pythia stops when it quits.', proceed: 'Turn off' }))) { renderModes(host); return; }
+      await act(on ? 'serve_from_pythia_again' : 'turn_agent_back_on', [], on ? 'Sync with droidtop on from the next start' : 'Sync with droidtop off', { what: 'Changing Sync with droidtop' });
+      renderModes(host);
+    });
+    if (!sync.available) { syncSwitch.disabled = true; syncSwitch.dataset.reason = sync.reason || ''; }
+    h.appendChild(syncRow);
+    const row = el(`<div class="form-row"><div class="form-label"><strong>Manager mode</strong><small>The library and version manager: tagging game folders, versions against the latest release, and tagging downloads with their game and kind.</small>${m.locked ? `<small class="locked-reason">${visibleStatus('Locked on by Sync with droidtop', 'neutral', '🔒')}</small>` : ''}</div><span class="mode-controls"><button class="toggle" data-manager-mode aria-label="Manager mode"><span></span></button></span></div>`);
+    if (m.locked) $('.mode-controls', row).prepend(info('Manager mode is locked on', m.reason || ''));
     const sw = $('[data-manager-mode]', row);
     bindSwitch(sw, !!m.on, async (on, node) => {
       const r2 = await act('set_manager_mode', [on], on ? 'Manager mode on' : 'Manager mode off', { what: 'Changing manager mode' });
       if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); }
       renderModes(host);
     });
-    if (m.locked) { sw.disabled = true; sw.setAttribute('aria-disabled', 'true'); sw.title = m.reason || ''; }
+    if (m.locked) { sw.disabled = true; sw.dataset.reason = 'Locked on by Sync with droidtop.'; }
     h.appendChild(row);
-    h.appendChild(el(`<div class="form-row"><div class="form-label"><strong>Agent mode</strong><small>Pythia serves your droidtop handhelds as this computer's agent. Change it in Systems &amp; sync.</small></div><span class="status-inline ${r.agent ? '' : 'neutral'}">${r.agent ? `${routineStatus('On')} On` : 'Off'}</span></div>`));
+    if (state.shell === 'handheld') hhKeepDisabledReachable();
   }, { what: 'Modes' });
 }
 function renderDownloads() {

@@ -27,8 +27,17 @@ MANAGER_SETTING = "manager_mode"
 # The pages manager mode turning off pauses (see the docstring).
 MANAGER_PAGES = ("downloads",)
 LOCKED_REASON = (
-    "Pythia is this computer's droidtop agent, and the agent syncs the library that manager mode keeps, "
-    "so manager mode stays on while Pythia serves your handhelds."
+    "Sync with droidtop is on, and it syncs the library that manager mode keeps with your handhelds, "
+    "so manager mode stays on while it is."
+)
+# What "Sync with droidtop" is, for its Info row (UX review A9: no label says "agent"; Info does).
+SYNC_INFO = (
+    "Sync with droidtop is droidtop's agent mode: Pythia serves your paired droidtop handhelds as this "
+    "computer's droidtop agent, syncing the library, saves and launches with them, and turns the separate "
+    "droidtop-agent program off so the two never serve at once. While it is on, manager mode stays on, "
+    "because what syncs is the library manager mode keeps. Turning it off puts droidtop-agent's start at "
+    "sign-in back as it was, with Pythia's state written into its folder; Pythia stops serving when it quits. "
+    "Pythia still reads what droidtop-agent records."
 )
 
 
@@ -52,6 +61,25 @@ def agent_mode() -> bool:
         return service.serving().get("state") == "serving"
     except droidtop.AgentError:
         return False
+
+
+def sync_with_droidtop() -> dict:
+    """ "Sync with droidtop" (agent mode): ``on`` (Pythia serves from its
+    start, setting droidtop_serve), ``serving`` (it serves now), and
+    ``available`` with the ``reason`` when its droidtop module is missing."""
+    from pythia import droidtop  # noqa: PLC0415
+
+    if not droidtop.available():
+        return {
+            "on": False,
+            "serving": False,
+            "available": False,
+            "reason": droidtop.why_unavailable(),
+            "info": SYNC_INFO,
+        }
+    from pythia.droidtop import takeover  # noqa: PLC0415
+
+    return {"on": takeover.serves(), "serving": agent_mode(), "available": True, "reason": None, "info": SYNC_INFO}
 
 
 def manager_mode() -> dict:

@@ -186,3 +186,49 @@ def _rom_folders(root: Path) -> dict[Path, dict]:
     except AgentError as ex:
         logger.warning("ROM folders are scanned as games: the droidtop agent's scanner failed: %s", ex)
         return {}
+
+
+# ---- a scan's decisions -----------------------------------------------------
+# A scan records every folder it finds; one whose name looks like a game already
+# tracked is recorded as a new game and also asked about (the Reconcile page).
+# These keep that record and the answer consistent: the folder ends up in the
+# library once, under the game the person chose.
+
+
+def decision_for(result: dict) -> dict:
+    """A scan's result that needs a decision, as the decision card reads it:
+    the game folder (onboard()'s own "path" is the datadir file), the name,
+    the scan's candidates, what was detected and the version label, and the
+    game id the scan recorded the folder under (``recorded_game_id``)."""
+    decision = {
+        "path": result["game_path"],
+        "name": result["name"],
+        "candidates": result["candidates"],
+        "recorded_game_id": result.get("game_id"),
+    }
+    # What was detected, without writing anything; the candidates stay the
+    # scan's (a new preview would offer the scan's own record as a match).
+    pv = onboarding.preview(result["game_path"])
+    if pv.get("status") == "ok":
+        decision["detection"] = pv.get("detection")
+        decision["version_label"] = pv.get("version_label")
+    return decision
+
+
+def keeps_scan_record(decision: dict | None, recorded_game_id: str | None) -> bool:
+    """Whether the answer is "a new game", which the scan's record already is:
+    recording the folder again would make a second one."""
+    return bool(recorded_game_id) and (decision or {}).get("action") == "new"
+
+
+def resolve_decision(path: str, decision: dict | None, recorded_game_id: str | None) -> dict:
+    """Records ``path`` as the person decided; once linked to another game,
+    the scan's own record of it (``recorded_game_id``) is removed, so the
+    folder is in the library once. Returns onboard()'s result."""
+    from pythia.database import games as games_db  # noqa: PLC0415
+
+    result = onboarding.onboard(path, decision=decision)
+    if result.get("status") == "ok" and recorded_game_id and result.get("game_id") != recorded_game_id:
+        games_db.delete_game(recorded_game_id)
+        logger.info("Linked %s to %s; removed the scan's record %s", path, result.get("game_id"), recorded_game_id)
+    return result

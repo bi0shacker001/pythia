@@ -400,13 +400,7 @@ class Backend(QObject):
 
         for r in results:
             if r["status"] == "ok" and r["candidates"]["suggested"]:
-                # Normalized to the same {"path", "name", "candidates"} shape
-                # _ask_live's preview dict uses -- onboard()'s own result dict has
-                # "path" meaning the *datadir JSON file*, not the game folder
-                # (game_path), so it can't be forwarded as-is here.
-                self._queue_decision(
-                    _jsonable({"path": r["game_path"], "name": r["name"], "candidates": r["candidates"]})
-                )
+                self._queue_decision(_jsonable(scanning.decision_for(r)))
 
     def _queue_decision(self, preview: dict):
         with self._lock:
@@ -434,21 +428,26 @@ class Backend(QObject):
         # by disabling its Start button mid-run. Not safe for concurrent operations.
         decision = dict(decision) if decision else None
         with self._lock:
+            pending = next((d for d in self._decisions if d.get("path") == path_str), {})
             self._decisions = [d for d in self._decisions if d.get("path") != path_str]
         self._emit_intake()
         if self._awaiting_live_decision:
             self._decision_result = decision
             self._decision_event.set()
             return
-        # No live onboard is waiting -- this is a post-scan review item. Resolving it
-        # re-onboards that path directly with the corrected decision.
+        # No live onboard is waiting -- this is a post-scan review item, which the
+        # scan already recorded as a new game (`recorded`, the game id it made).
+        recorded = (decision or {}).pop("recorded_game_id", None) or pending.get("recorded_game_id")
+        if scanning.keeps_scan_record(decision, recorded):
+            self._record("info", "pythia", f"Kept {Path(path_str).name} as a new game", "resolveDecision")
+            return
         job = self._job_start("onboard", f"Record {Path(path_str).name}", path_str)
-        threading.Thread(target=self._reonboard_worker, args=(path_str, decision, job), daemon=True).start()
+        threading.Thread(target=self._reonboard_worker, args=(path_str, decision, job, recorded), daemon=True).start()
 
-    def _reonboard_worker(self, path_str, decision, job):
-        result = onboarding.onboard(path_str, decision=decision)
-        self.refresh_games()
+    def _reonboard_worker(self, path_str, decision, job, recorded=None):
+        result = scanning.resolve_decision(path_str, decision, recorded)
         ok = result.get("status") == "ok"
+        self.refresh_games()
         self._job_finish(
             job, f"Recorded {result.get('name') or Path(path_str).name}" if ok else result.get("message", ""), ok
         )

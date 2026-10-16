@@ -1,4 +1,6 @@
 line-length = 120
+# Session hooks are tooling, not Pythia, and are kept as written.
+extend-exclude = [".claude"]
 
 [lint]
 select = ["A", "ARG", "B", "E", "F", "I", "W", "PERF", "RUF"]

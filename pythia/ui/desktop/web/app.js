@@ -134,7 +134,7 @@ function adaptPlugin(real) {
   };
 }
 
-let state = { view: 'library', history: [], selected: null, filterStatus: 'all', density: localStorage.getItem('pythia-density') || 'comfortable', libraryMode: localStorage.getItem('pythia-desktop-library') || 'list', search: '', source: 'all', engine: 'all', sort: 'name', bulk: new Set(), selectionMode: false, shell: 'desktop', hhPage: 'home', hhHistory: [], hhLibraryMode: localStorage.getItem('pythia-handheld-library') || 'list', hhSearch: '', hhSelected: null, hhSource: 'all', hhSettingsPage: 'root', detailTab: 'overview', settingsPane: 'general' };
+let state = { view: 'library', history: [], selected: null, filterStatus: 'all', density: localStorage.getItem('pythia-density') || 'comfortable', libraryMode: localStorage.getItem('pythia-desktop-library') || 'list', search: '', source: 'all', engine: 'all', sort: 'name', bulk: new Set(), selectionMode: false, shell: 'desktop', hhPage: 'home', hhHistory: [], hhLibraryMode: localStorage.getItem('pythia-handheld-library') || 'list', hhSearch: '', hhSelected: null, hhSource: 'all', hhSettingsPage: 'root', detailTab: 'overview', settingsPane: 'general', libraryPlace: { search: '', scroll: 0 } };
 const initials = (n) => String(n).split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase();
 // List-level version-count affordance -- only worth a mention when there's more than one.
 const versionsBadge = (g) => (g.versionCount > 1 ? ` · ${g.versionCount} versions` : '');
@@ -147,6 +147,7 @@ const fileName = (p) => String(p || '').split(/[\\/]/).pop();
 // ---- Navigation ----------------------------------------------------------------------
 function navigate(view, push = true) {
   if (view === state.view) { renderCurrent(); return; }
+  if (state.view === 'library') saveLibraryPlace();
   if (push) state.history.push(state.view);
   state.view = view;
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
@@ -154,17 +155,20 @@ function navigate(view, push = true) {
   $('#backButton').disabled = !state.history.length;
   const titles = { library: 'Search games, engines, versions, paths…', downloads: 'Search intake queue…', reconcile: 'Search possible duplicates…', systems: 'Search systems…', launcher: 'Search launcher entries…', saves: 'Search save backups…', activity: 'Search jobs and events…', settings: 'Search settings…' };
   $('#globalSearch').placeholder = titles[view] || 'Search…';
-  $('#globalSearch').value = ''; state.search = '';
+  // The library keeps its place (query, selection, scroll, collection) across navigation (UX review A11).
+  state.search = view === 'library' ? state.libraryPlace.search : '';
+  $('#globalSearch').value = state.search;
   renderCurrent();
   window.scrollTo({ top: 0, behavior: 'instant' });
+  if (view === 'library') restoreLibraryPlace();
 }
 function renderCurrent() {
   ({ library: renderLibrary, downloads: renderDownloads, reconcile: renderReconcile, systems: renderSystems, launcher: renderLauncher, saves: renderSaves, activity: renderJobs, settings: renderSettings })[state.view]?.();
 }
 function filteredGames() {
-  const q = state.search.toLowerCase();
+  const q = PythiaQuery.parse(state.search);
   const list = games.filter((g) => {
-    const matches = !q || [g.name, g.source, g.engine, g.version, g.path, g.note, ...g.platforms, ...g.systems].join(' ').toLowerCase().includes(q);
+    const matches = PythiaQuery.matches(g, q);
     return matches && (state.filterStatus === 'all' || (state.filterStatus === 'pending' ? g.status !== 'ok' : g.status === state.filterStatus)) && (state.source === 'all' || g.source === state.source) && (state.engine === 'all' || g.engine === state.engine);
   });
   const rank = { critical: 0, pending: 1, ok: 2 };
@@ -189,19 +193,115 @@ function renderLibrary() {
   if (!model.ready) { host.innerHTML = ''; host.appendChild(stateBlock({ kind: 'loading' })); $('#gameDetail').innerHTML = ''; return; }
   if (!games.length) { host.innerHTML = ''; host.appendChild(stateBlock({ glyph: '▦', title: 'No games yet', body: 'Add a game folder or scan a library folder; Pythia records what it finds and never moves files.', actions: [{ label: 'Add folder', primary: true, run: addFolder }, { label: 'Scan library', run: scanLibrary }] })); $('#gameDetail').innerHTML = ''; return; }
   if (!list.length) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Nothing matches', body: 'Try fewer filters or another search.', actions: [{ label: 'Clear filters', run: () => $('#clearFilters').click() }] })); }
-  else if (state.libraryMode === 'grid') {
-    host.innerHTML = list.map((g) => `<article class="game-card ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0" aria-label="${esc(g.name)}">
-      <div class="game-card-art art-${g.art}"><label class="bulk-hit" style="position:absolute;z-index:3;right:0;bottom:0;width:48px;height:48px;align-items:center;justify-content:center;cursor:pointer"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}" style="width:22px;height:22px;margin:0"></label><span class="game-card-source">${esc(g.source)}</span>${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" title="${esc(g.statusText)}"></span>` : ''}<strong>${esc(g.name)}</strong></div>
-      <div class="game-card-copy"><div class="game-card-meta">${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</div>${g.status !== 'ok' ? `<div class="game-card-state ${g.status}">${esc(g.statusText)}</div>` : ''}</div>
-    </article>`).join('');
-  } else {
-    host.innerHTML = list.map((g) => `<article class="game-row ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}"><div class="cover-mini art-${g.art}">${esc(initials(g.name))}</div><div><h3>${esc(g.name)}</h3><div class="game-meta"><span>${esc(g.source)}</span><span>·</span><span>${esc(g.engine)}</span><span>·</span><span>${esc(versionText(g))}${versionsBadge(g)}</span></div></div><div class="status-text ${g.status}">${g.status === 'ok' ? '' : esc(g.statusText)}</div></article>`).join('');
-  }
-  $$('[data-game]').forEach((row) => { const choose = () => { const id = row.dataset.game; if (state.selectionMode) { state.bulk.has(id) ? state.bulk.delete(id) : state.bulk.add(id); updateBulkToolbar(); renderLibrary(); return; } state.selected = id; state.detailTab = 'overview'; renderLibrary(); }; row.onclick = choose; row.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } }; });
-  $$('.bulk-hit').forEach((hit) => (hit.onclick = (e) => e.stopPropagation()));
-  $$('[data-bulk-check]').forEach((cb) => { cb.onclick = (e) => e.stopPropagation(); cb.onchange = () => { const id = cb.dataset.bulkCheck; cb.checked ? state.bulk.add(id) : state.bulk.delete(id); updateBulkToolbar(); }; });
+  else drawGameList(host, list);
   renderDetail(games.find((g) => g.id === state.selected) || list[0]);
 }
+// ---- Library: list, place and query models (UX review A11) ------------------------------------
+// The list redraws only when what it shows changes; a click changes the selection and the detail pane.
+// Longer lists draw only the rows near the viewport.
+const SEARCH_DEBOUNCE_MS = 150;
+const VIRTUAL_MIN = 150;
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+function gameItemHtml(g) {
+  if (state.libraryMode === 'grid') return `<article class="game-card ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0" aria-label="${esc(g.name)}">
+      <div class="game-card-art art-${g.art}"><label class="bulk-hit" style="position:absolute;z-index:3;right:0;bottom:0;width:48px;height:48px;align-items:center;justify-content:center;cursor:pointer"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}" style="width:22px;height:22px;margin:0"></label><span class="game-card-source">${esc(g.source)}</span>${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" title="${esc(g.statusText)}"></span>` : ''}<strong>${esc(g.name)}</strong></div>
+      <div class="game-card-copy"><div class="game-card-meta">${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</div>${g.status !== 'ok' ? `<div class="game-card-state ${g.status}">${esc(g.statusText)}</div>` : ''}</div>
+    </article>`;
+  return `<article class="game-row ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}"><div class="cover-mini art-${g.art}">${esc(initials(g.name))}</div><div><h3>${esc(g.name)}</h3><div class="game-meta"><span>${esc(g.source)}</span><span>·</span><span>${esc(g.engine)}</span><span>·</span><span>${esc(versionText(g))}${versionsBadge(g)}</span></div></div><div class="status-text ${g.status}">${g.status === 'ok' ? '' : esc(g.statusText)}</div></article>`;
+}
+function drawGameList(host, list) {
+  host._list = list;
+  const before = host._virtual;
+  const same = before && before.mode === state.libraryMode && before.width === host.clientWidth;
+  host._virtual = list.length >= VIRTUAL_MIN ? { rowH: same ? before.rowH : 0, cols: same ? before.cols : 1, gap: same ? before.gap : 0, first: -1, mode: state.libraryMode, width: host.clientWidth } : null;
+  if (!host._virtual) { host.innerHTML = list.map(gameItemHtml).join(''); return; }
+  drawGameWindow(host, true);
+}
+function drawGameWindow(host, force = false) {
+  const v = host._virtual; const list = host._list; if (!v || !list) return;
+  const grid = v.mode === 'grid';
+  if (!v.rowH) {
+    const keep = host.scrollTop;
+    host.innerHTML = list.slice(0, 40).map(gameItemHtml).join('');
+    const items = $$('[data-game]', host);
+    const top = (x) => x.getBoundingClientRect().top;
+    v.cols = grid ? Math.max(1, getComputedStyle(host).gridTemplateColumns.split(' ').filter(Boolean).length) : 1;
+    v.gap = grid ? parseFloat(getComputedStyle(host).rowGap) || 0 : 0;
+    v.rowH = items[v.cols] ? top(items[v.cols]) - top(items[0]) : (items[0]?.offsetHeight || 64) + v.gap;
+    if (!v.rowH || v.rowH < 8) v.rowH = 64;
+    host.innerHTML = `<div style="height:${Math.ceil(list.length / v.cols) * v.rowH}px"></div>`;
+    host.scrollTop = keep;
+  }
+  const rows = Math.ceil(list.length / v.cols);
+  const first = Math.max(0, Math.floor(host.scrollTop / v.rowH) - 4);
+  if (!force && first === v.first) return;
+  v.first = first;
+  const last = Math.min(rows, first + Math.ceil((host.clientHeight || 600) / v.rowH) + 8);
+  const span = grid ? 'grid-column:1/-1;' : '';
+  const gapFix = (h) => Math.max(0, h - (grid && h ? v.gap : 0));
+  host.innerHTML = `<div class="v-spacer" aria-hidden="true" style="${span}height:${gapFix(first * v.rowH)}px"></div>${list.slice(first * v.cols, last * v.cols).map(gameItemHtml).join('')}<div class="v-spacer" aria-hidden="true" style="${span}height:${gapFix((rows - last) * v.rowH)}px"></div>`;
+}
+// A click changes only the selection: the old and new rows and the detail pane.
+function chooseGame(id) {
+  const g = games.find((x) => x.id === id); if (!g) return;
+  if (state.selectionMode) {
+    state.bulk.has(id) ? state.bulk.delete(id) : state.bulk.add(id);
+    $$(`[data-bulk-check="${id}"]`).forEach((cb) => (cb.checked = state.bulk.has(id)));
+    updateBulkToolbar(); return;
+  }
+  if (state.selected !== id) { $$(`#gameList [data-game="${state.selected}"]`).forEach((r) => r.classList.remove('active')); }
+  state.selected = id; state.detailTab = 'overview';
+  $$(`#gameList [data-game="${id}"]`).forEach((r) => r.classList.add('active'));
+  renderDetail(g);
+}
+function bindGameList() {
+  const host = $('#gameList');
+  host.addEventListener('click', (e) => { if (e.target.closest('.bulk-hit, [data-bulk-check]')) { e.stopPropagation(); return; } const row = e.target.closest('[data-game]'); if (row) chooseGame(row.dataset.game); });
+  host.addEventListener('keydown', (e) => { const row = e.target.closest('[data-game]'); if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); chooseGame(row.dataset.game); } });
+  host.addEventListener('change', (e) => { const cb = e.target.closest('[data-bulk-check]'); if (!cb) return; const id = cb.dataset.bulkCheck; cb.checked ? state.bulk.add(id) : state.bulk.delete(id); updateBulkToolbar(); });
+  host.addEventListener('contextmenu', (e) => { const row = e.target.closest('[data-game]'); const g = row && games.find((x) => x.id === row.dataset.game); if (!g) return; e.preventDefault(); chooseGame(g.id); openActionMenu('game', row, g); });
+  host.addEventListener('scroll', () => requestAnimationFrame(() => drawGameWindow(host)), { passive: true });
+}
+// Place: the query, selection, scroll and collection (the sidebar's filter) survive leaving the library.
+function saveLibraryPlace() { state.libraryPlace = { search: state.search, scroll: $('#gameList').scrollTop }; }
+function restoreLibraryPlace() {
+  const host = $('#gameList'); host.scrollTop = state.libraryPlace.scroll || 0; drawGameWindow(host, true);
+  host.scrollTop = state.libraryPlace.scroll || 0;
+}
+// Back on the desktop: the ‹ button, Alt+Left, the mouse's back button, and Backspace outside a text field.
+function goBack() { if (state.shell === 'desktop' && !$('#backButton').disabled) $('#backButton').click(); }
+
+// One action menu per kind of item (UX review A11): the game page's •••, a right-click on a row and the
+// handheld X all read these.
+const goTo = (desktopView, handheldPage) => (state.shell === 'handheld' ? navigateHandheld(handheldPage) : navigate(desktopView));
+const ACTION_MENUS = {
+  game: (g, { open } = {}) => [
+    ...(open ? [{ label: 'Open', run: open }] : []),
+    ...(g.path ? [{ label: 'Rescan', run: () => (state.shell === 'handheld' ? rescanHH(g) : rescan(g)) }, { label: 'Open folder', run: () => openFolder(g.path) }] : []),
+    { label: 'Rename', disabled: !g.mine, run: () => detailAction('rename', g) },
+    { label: 'Find duplicates', run: () => goTo('reconcile', 'duplicates') },
+    { label: 'Save backups', run: () => goTo('saves', 'saves') },
+    { label: 'Launcher entries', run: () => goTo('launcher', 'launcher') },
+    { label: 'Info', run: () => infoSheet({ title: g.name, details: [`Game ID: ${g.id}`, `Source: ${g.source}`, `Engine: ${g.engine}`, `Version: ${versionText(g)}`, `Folder: ${g.path || 'Not installed here'}`, `Systems: ${g.systems.join(', ')}`, '', JSON.stringify(g.own, null, 2)].join('\n'), wide: true }) },
+    { rule: true },
+    { label: 'Remove from library', danger: true, run: () => removeGame(g) },
+  ],
+  variant: (g, path) => [
+    { label: 'Rescan', run: () => rescan(g, path) },
+    { label: 'Open folder', run: () => openFolder(path) },
+    { label: 'Info', run: () => infoSheet({ title: `${g.name}: folder`, details: path }) },
+  ],
+  review: (g) => [
+    { label: 'Decide…', run: () => (state.shell === 'handheld' ? leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Reconciliation page.', then: () => navigate('reconcile'), remember: false }) : navigate('reconcile')) },
+    ...(g.path ? [{ label: 'Rescan', run: () => (state.shell === 'handheld' ? rescanHH(g) : rescan(g)) }, { label: 'Open folder', run: () => openFolder(g.path) }] : []),
+    { label: 'Info', run: () => infoSheet({ title: g.name, details: `${g.statusText}\nFolder: ${g.path || 'Not installed here'}` }) },
+  ],
+};
+function openActionMenu(type, anchor, ...args) { menu(anchor, ACTION_MENUS[type](...args), { returnTo: anchor }); }
+async function removeGame(g) {
+  if (await confirmDanger({ title: `Remove ${g.name}?`, body: 'Its record leaves the library. Files on disk stay where they are.', recommendation: 'We recommend Cancel unless the entry is wrong.', items: g.path ? [g.path] : [], proceed: 'Remove' })) act('forget_game', [g.id], 'Removed from library', { what: 'Remove' });
+}
+
 function updateBulkToolbar() { const n = state.bulk.size; document.body.classList.toggle('selection-mode', state.selectionMode); $('#bulkToolbar').classList.toggle('hidden', !state.selectionMode); $('#bulkCount').textContent = n ? `${n} selected` : 'Select games'; $('#selectionModeButton').classList.toggle('primary', state.selectionMode); $('#selectionModeButton').setAttribute('aria-pressed', String(state.selectionMode)); $$('[data-bulk-action]').forEach((b) => (b.disabled = n === 0)); }
 async function bulkAction(a) {
   const ids = [...state.bulk]; const names = ids.map((id) => games.find((g) => g.id === id)?.name).filter(Boolean);
@@ -233,7 +333,7 @@ function renderDetail(g) {
   $$('[data-tab]', host).forEach((t) => (t.onclick = () => openTab(t.dataset.tab)));
   $$('[data-detail-tab]', host).forEach((t) => (t.onclick = () => openTab(t.dataset.detailTab)));
   $$('[data-detail-action]', host).forEach((b) => (b.onclick = () => detailAction(b.dataset.detailAction, g, b)));
-  $$('[data-variant-menu]', host).forEach((b) => (b.onclick = () => menu(b, [{ label: 'Rescan', run: () => rescan(g, b.dataset.variantMenu) }, { label: 'Open folder', run: () => openFolder(b.dataset.variantMenu) }])));
+  $$('[data-variant-menu]', host).forEach((b) => (b.onclick = () => openActionMenu('variant', b, g, b.dataset.variantMenu)));
   openTab(state.detailTab || 'overview');
   // Asked for after the page is drawn, so the list never waits on a plugin.
   call('find_manager_for_game', g.id).then((r) => {
@@ -295,17 +395,7 @@ async function detailAction(a, g, btn) {
   if (a === 'save-note') act('save_notes', [g.id, $('#notesArea').value], 'Note saved', { what: 'Saving the note' });
   if (a === 'add-folder') addFolder();
   if (a === 'apply-update') { const r = await call('apply_update', g.id, btn.dataset.version || ''); infoSheet({ title: `Update ${btn.dataset.version || ''} for ${g.name}`, details: ok(r) ? 'Started' : r.message }); }
-  if (a === 'more') {
-    menu(btn, [
-      { label: 'Rename', disabled: !g.mine, run: () => detailAction('rename', g) },
-      { label: 'Find duplicates', run: () => navigate('reconcile') },
-      { label: 'Review save backup', run: () => navigate('saves') },
-      { label: 'Review launcher entry', run: () => navigate('launcher') },
-      { label: 'Record details', run: () => infoSheet({ title: g.name, details: JSON.stringify(g.own, null, 2), wide: true }) },
-      { rule: true },
-      { label: 'Remove from library', danger: true, run: async () => { if (await confirmDanger({ title: `Remove ${g.name}?`, body: 'Its record leaves the library. Files on disk stay where they are.', recommendation: 'We recommend Cancel unless the entry is wrong.', items: g.path ? [g.path] : [], proceed: 'Remove' })) act('forget_game', [g.id], 'Removed from library', { what: 'Remove' }); } },
-    ]);
-  }
+  if (a === 'more') openActionMenu('game', btn, g);
 }
 
 // ---- Downloads & intake ---------------------------------------------------------------
@@ -871,7 +961,7 @@ function renderHHHome() {
   const j = $('#hhJobs', host); j.innerHTML = jobs.map(hhJob).join(''); if (!jobs.length) j.appendChild(stateBlock({ title: 'Nothing has run yet', body: 'Scans and adds show here.', actions: [{ label: 'Scan library', run: scanLibrary }] }));
   const r = $('#hhRecent', host); r.innerHTML = recent.map(hhSummaryGame).join(''); if (!games.length) r.appendChild(stateBlock({ glyph: '▦', title: 'No games yet', body: 'Add a folder or scan a library.', actions: [{ label: 'Add folder', primary: true, run: addFolder }] }));
 }
-function handheldGames(q = '') { return games.filter((g) => !q || [g.name, g.source, g.engine, g.version, g.statusText, ...g.systems].join(' ').toLowerCase().includes(q)); }
+function handheldGames(q = '') { const query = PythiaQuery.parse(q); return games.filter((g) => PythiaQuery.matches(g, query) || (!query.filters.length && PythiaQuery.norm(g.statusText).includes(PythiaQuery.norm(q)))); }
 function renderHHLibrary(q = '') {
   const sources = [...new Set(games.map((g) => g.source))].sort();
   const list = handheldGames(q).filter((g) => state.hhSource === 'all' || g.source === state.hhSource).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
@@ -1170,12 +1260,9 @@ function hhStrip() {
 }
 // X: the focused item's action menu, which holds Info (SPEC 2.2; the shared menu model is A11).
 function hhItemMenu(node) {
-  const id = node?.dataset?.hhGame; const g = id && games.find((x) => x.id === id); if (!g) return null;
-  return () => menu(node, [
-    { label: 'Open', run: () => node.click() },
-    ...(g.path ? [{ label: 'Rescan', run: () => rescanHH(g) }, { label: 'Open folder', run: () => openFolder(g.path) }] : []),
-    { label: 'Info', run: () => infoSheet({ title: g.name, details: [`Game ID: ${g.id}`, `Source: ${g.source}`, `Engine: ${g.engine}`, `Version: ${versionText(g)}`, `Folder: ${g.path || 'Not installed here'}`, `Systems: ${g.systems.join(', ')}`].join('\n') }) },
-  ], { returnTo: node });
+  const gameId = node?.dataset?.hhGame; const reviewId = node?.dataset?.hhDecision;
+  const g = games.find((x) => x.id === (gameId || reviewId)); if (!g) return null;
+  return gameId ? () => openActionMenu('game', node, g, { open: () => node.click() }) : () => openActionMenu('review', node, g);
 }
 // Start: the Pythia menu (SPEC 2.2).
 function hhMenu(anchor) {
@@ -1377,8 +1464,16 @@ function setup() {
   $$('[data-open-path]:not(#handheldShell [data-open-path])').forEach((b) => (b.onclick = () => openKnownPath(b.dataset.openPath)));
   $$('[data-option]:not(#handheldShell [data-option])').forEach(bindOption);
   $$('[data-option-action]').forEach((b) => (b.onclick = async () => { const r = await call(b.dataset.optionAction, ''); infoSheet({ title: b.textContent.replace(/…$/, ''), node: fromResult(r, { what: b.textContent.replace(/…$/, '') }) }); }));
+  bindGameList();
+  document.addEventListener('keydown', (e) => {
+    const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+    if (state.shell !== 'desktop' || $('.scrim')) return;
+    if ((e.altKey && e.key === 'ArrowLeft') || (e.key === 'Backspace' && !typing)) { e.preventDefault(); goBack(); }
+  });
+  window.addEventListener('mouseup', (e) => { if (e.button === 3) { e.preventDefault(); goBack(); } });
   $('#backButton').onclick = () => { const prev = state.history.pop(); if (prev) navigate(prev, false); $('#backButton').disabled = !state.history.length; };
-  $('#globalSearch').addEventListener('input', (e) => { state.search = e.target.value; renderCurrent(); });
+  const searchSoon = debounce(() => renderCurrent(), SEARCH_DEBOUNCE_MS);
+  $('#globalSearch').addEventListener('input', (e) => { state.search = e.target.value; searchSoon(); });
   document.addEventListener('keydown', (e) => {
     if (state.shell === 'handheld') {
       if (e.defaultPrevented) return; // a dialog or menu already handled this key (its Escape, say)
@@ -1413,7 +1508,8 @@ function setup() {
   $$('.hh-hint').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
   $$('[data-hh-nav]').forEach((b) => (b.onclick = () => navigateHandheld(b.dataset.hhNav)));
   $('#hhBack').onclick = () => hhBack();
-  $('#hhSearch').oninput = (e) => { state.hhSearch = e.target.value; renderHandheld(); };
+  const hhSearchSoon = debounce(() => renderHandheld(), SEARCH_DEBOUNCE_MS);
+  $('#hhSearch').oninput = (e) => { state.hhSearch = e.target.value; hhSearchSoon(); };
   $('#hhAdd').onclick = addFolder;
   $$('[data-bulk-action]').forEach((b) => (b.onclick = () => bulkAction(b.dataset.bulkAction)));
   $('#selectionModeButton').onclick = () => { state.selectionMode = !state.selectionMode; if (!state.selectionMode) state.bulk.clear(); updateBulkToolbar(); renderLibrary(); };

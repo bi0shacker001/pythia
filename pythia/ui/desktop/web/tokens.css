@@ -5,9 +5,13 @@
 
 :root {
   /* Text size: Settings > Interface > Text size sets --text-scale (1.0 to 1.5).
-     Every font size in index.html is in rem, so one value reflows the whole UI. */
+     Every font size in index.html is in rem, so one value reflows the whole UI.
+     --hh-scale is the handheld shell's own factor from the window's short side
+     (1 on the desktop; about 1.35 at 1080p, so 0.75rem is still 16 px there), and
+     the text size multiplies on top (UX review A6). */
   --text-scale: 1;
-  font-size: calc(16px * var(--text-scale));
+  --hh-scale: 1;
+  font-size: calc(16px * var(--text-scale) * var(--hh-scale));
 
   /* Motion: every animation reads these; Reduce motion sets them to 0. */
   --motion-fast: 150ms;

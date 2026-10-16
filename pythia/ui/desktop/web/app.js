@@ -191,13 +191,14 @@ function renderLibrary() {
   if (!list.length) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Nothing matches', body: 'Try fewer filters or another search.', actions: [{ label: 'Clear filters', run: () => $('#clearFilters').click() }] })); }
   else if (state.libraryMode === 'grid') {
     host.innerHTML = list.map((g) => `<article class="game-card ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0" aria-label="${esc(g.name)}">
-      <div class="game-card-art art-${g.art}"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}" style="position:absolute;z-index:3;right:8px;bottom:8px;width:17px;height:17px;"><span class="game-card-source">${esc(g.source)}</span>${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" title="${esc(g.statusText)}"></span>` : ''}<strong>${esc(g.name)}</strong></div>
+      <div class="game-card-art art-${g.art}"><label class="bulk-hit" style="position:absolute;z-index:3;right:0;bottom:0;width:48px;height:48px;align-items:center;justify-content:center;cursor:pointer"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}" style="width:22px;height:22px;margin:0"></label><span class="game-card-source">${esc(g.source)}</span>${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" title="${esc(g.statusText)}"></span>` : ''}<strong>${esc(g.name)}</strong></div>
       <div class="game-card-copy"><div class="game-card-meta">${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</div>${g.status !== 'ok' ? `<div class="game-card-state ${g.status}">${esc(g.statusText)}</div>` : ''}</div>
     </article>`).join('');
   } else {
     host.innerHTML = list.map((g) => `<article class="game-row ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}"><div class="cover-mini art-${g.art}">${esc(initials(g.name))}</div><div><h3>${esc(g.name)}</h3><div class="game-meta"><span>${esc(g.source)}</span><span>·</span><span>${esc(g.engine)}</span><span>·</span><span>${esc(versionText(g))}${versionsBadge(g)}</span></div></div><div class="status-text ${g.status}">${g.status === 'ok' ? '' : esc(g.statusText)}</div></article>`).join('');
   }
   $$('[data-game]').forEach((row) => { const choose = () => { const id = row.dataset.game; if (state.selectionMode) { state.bulk.has(id) ? state.bulk.delete(id) : state.bulk.add(id); updateBulkToolbar(); renderLibrary(); return; } state.selected = id; state.detailTab = 'overview'; renderLibrary(); }; row.onclick = choose; row.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } }; });
+  $$('.bulk-hit').forEach((hit) => (hit.onclick = (e) => e.stopPropagation()));
   $$('[data-bulk-check]').forEach((cb) => { cb.onclick = (e) => e.stopPropagation(); cb.onchange = () => { const id = cb.dataset.bulkCheck; cb.checked ? state.bulk.add(id) : state.bulk.delete(id); updateBulkToolbar(); }; });
   renderDetail(games.find((g) => g.id === state.selected) || list[0]);
 }
@@ -785,8 +786,16 @@ function resolveInitialShell() {
 }
 // The remembered shell (Settings > Interface > Remember last shell) changes only on a deliberate switch (UX review A4).
 function rememberShell(shell) { try { localStorage.setItem('pythia-last-shell', shell); } catch (e) { /* storage may be unavailable */ } }
-function enterHandheld(page = 'home', { remember = false } = {}) { state.shell = 'handheld'; state.hhPage = page; state.hhHistory = []; if (remember) rememberShell('handheld'); document.body.classList.add('handheld-active'); $('#handheldShell').classList.remove('hidden'); renderHandheld(); setTimeout(() => $('.hh-nav.active')?.focus(), 0); }
-function exitHandheld({ remember = false } = {}) { state.shell = 'desktop'; if (remember) rememberShell('desktop'); document.body.classList.remove('handheld-active'); $('#handheldShell').classList.add('hidden'); setTimeout(() => $('#enterHandheldButton')?.focus(), 0); }
+// The handheld shell's size from the window's short side (UX review A6): 800 px is 1, 1080 px about
+// 1.35, at most 1.6. Text size multiplies on top (tokens.css). The desktop stays at 1.
+function applyHandheldScale() {
+  const short = Math.min(window.innerWidth, window.innerHeight);
+  const scale = state.shell === 'handheld' ? Math.min(1.6, Math.max(1, short / 800)) : 1;
+  document.documentElement.style.setProperty('--hh-scale', scale.toFixed(3));
+}
+window.addEventListener('resize', applyHandheldScale);
+function enterHandheld(page = 'home', { remember = false } = {}) { state.shell = 'handheld'; state.hhPage = page; state.hhHistory = []; if (remember) rememberShell('handheld'); applyHandheldScale(); document.body.classList.add('handheld-active'); $('#handheldShell').classList.remove('hidden'); renderHandheld(); setTimeout(() => $('.hh-nav.active')?.focus(), 0); }
+function exitHandheld({ remember = false } = {}) { state.shell = 'desktop'; if (remember) rememberShell('desktop'); applyHandheldScale(); document.body.classList.remove('handheld-active'); $('#handheldShell').classList.add('hidden'); setTimeout(() => $('#enterHandheldButton')?.focus(), 0); }
 // Leaving the handheld shell is only ever deliberate (the rail's Desktop, the top bar's, Menu > Desktop,
 // or a page only the desktop has), and asks first with Cancel focused. Back never leaves it.
 async function leaveHandheld({ body = 'The desktop layout needs a mouse or touch; the pad does not drive it.', then = null, remember = true } = {}) {

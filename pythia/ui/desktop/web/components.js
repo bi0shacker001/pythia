@@ -134,6 +134,7 @@
     return new Promise((resolve) => {
       let inputHtml;
       if (multiline) inputHtml = `<textarea class="notes-area" id="prompt-field" style="min-height:140px">${esc(value)}</textarea>`;
+      else if (kind === 'select' && document.body.classList.contains('handheld-active')) inputHtml = cycleRow({ id: 'prompt-field', label: title, options, value });
       else if (kind === 'select') inputHtml = `<select class="field" id="prompt-field">${options.map((o) => `<option value="${esc(o.value)}" ${o.value === value ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
       else inputHtml = `<input class="field ${kind === 'path' ? 'mono' : ''}" id="prompt-field" type="${kind === 'number' ? 'number' : 'text'}" value="${esc(value)}" placeholder="${esc(hint)}" autocomplete="off">`;
       openDialog({
@@ -287,5 +288,29 @@
     ago(iso) { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); if (s < 60) return `${Math.round(s)}s ago`; if (s < 3600) return `${Math.round(s / 60)}m ago`; if (s < 86400) return `${Math.round(s / 3600)}h ago`; return fmt.date(iso); },
   };
 
-  window.UI = { esc, el, $, $$, notice, confirm, confirmDanger, prompt, infoSheet, flash, stateBlock, fromResult, bindSwitch, menu, fmt };
+  // cycleRow: the handheld shell's choice control (UX review A5), in place of a native <select>, which a
+  // D-pad cannot open. Left and Right (the pad's mapping) step through the options; A (a click) steps
+  // forward. It is a button whose .value is the chosen value and fires 'change' like a select.
+  function cycleRow({ id = '', label, options, value }) {
+    const current = options.find((o) => String(o.value) === String(value)) || options[0];
+    return `<button type="button" class="cycle" ${id ? `id="${esc(id)}"` : ''} value="${esc(current.value)}" data-cycle="${esc(JSON.stringify(options))}" data-label="${esc(label)}" aria-label="${esc(`${label}: ${current.label}`)}" aria-roledescription="choice, Left and Right change it"><span class="cycle-arrow" aria-hidden="true">‹</span><span class="cycle-value">${esc(current.label)}</span><span class="cycle-arrow" aria-hidden="true">›</span></button>`;
+  }
+  function cycle(node, step) {
+    const options = JSON.parse(node.dataset.cycle || '[]');
+    if (!options.length || node.disabled) return;
+    const at = Math.max(0, options.findIndex((o) => String(o.value) === node.value));
+    const next = options[(at + step + options.length) % options.length];
+    node.value = String(next.value);
+    $('.cycle-value', node).textContent = next.label;
+    node.setAttribute('aria-label', `${node.dataset.label}: ${next.label}`);
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  document.addEventListener('click', (e) => { const node = e.target.closest?.('.cycle'); if (node) cycle(node, 1); });
+  document.addEventListener('keydown', (e) => {
+    const node = document.activeElement;
+    if (!node?.classList?.contains('cycle') || !['ArrowLeft', 'ArrowRight'].includes(e.key) || e.defaultPrevented) return;
+    e.preventDefault(); e.stopImmediatePropagation(); cycle(node, e.key === 'ArrowLeft' ? -1 : 1);
+  }, true);
+
+  window.UI = { esc, el, $, $$, notice, confirm, confirmDanger, prompt, infoSheet, flash, stateBlock, fromResult, bindSwitch, menu, fmt, cycleRow };
 })();

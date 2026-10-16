@@ -96,3 +96,17 @@ class HandOffTest(TestCase):
                     self.assertTrue("handOff(" in line or "run: () =>" in line, line[:160])
         self.assertNotIn('class="btn primary" type="button">Open in', app)
         self.assertNotIn('class="hh-action primary" ${m.available', app)
+
+
+class HandheldSelectsTest(TestCase):
+    """UX review A5: no native <select> in the handheld shell (a D-pad cannot open one); its
+    choices are cycleRow buttons that Left and Right change."""
+
+    def test_handheld_pages_draw_no_select(self):
+        web = Path(__file__).parents[1] / "pythia/ui/desktop/web"
+        app = (web / "app.js").read_text(encoding="utf-8")
+        start, end = app.index("function renderHandheld("), app.index("function hhKeepFocus(")
+        self.assertNotIn("<select", app[start:end])
+        html = (web / "index.html").read_text(encoding="utf-8")
+        shell = html[html.index('id="handheldShell"') :]
+        self.assertNotIn("<select", shell)

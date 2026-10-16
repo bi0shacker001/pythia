@@ -139,3 +139,11 @@ body.handheld-active .console-panel.dock-right { top: 0; width: min(50vw, 600px)
 @media (max-width: 820px) { .console-panel.dock-right { top: auto; left: 0; right: 0; bottom: 0; width: auto; height: min(45vh, 360px); border-width: 1px 0 0; } }
 .status-button { border: 0; background: transparent; padding: 0; cursor: pointer; color: inherit; font: inherit; }
 .status-quiet { color: var(--text-secondary); }
+
+/* cycleRow: a choice the D-pad changes with Left and Right (UX review A5) */
+.cycle { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; min-width: 200px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text-primary); font: inherit; cursor: pointer; }
+.cycle:hover { background: var(--surface-3); }
+.cycle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cycle-arrow { color: var(--text-secondary); font-size: 1.125rem; line-height: 1; }
+.cycle-value { flex: 1; text-align: center; }
+.cycle:disabled { opacity: .55; cursor: not-allowed; }

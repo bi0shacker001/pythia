@@ -94,6 +94,21 @@ the droidtop coordinator for this lane. Later sections follow them.
    - Save copies and the plugin adapters: any file Pythia lacks is
      copied; none is replaced or deleted.
 
+9. **Syncthing rides the existing device pairing.** Owner, 2026-10-16:
+   "We control an existing one if it exists, or spawn our own if one
+   doesn't. We use the standard syncthing config location regardless, to
+   make sure the user can switch to or from a dedicated instance if they
+   want". droidtop's Syncthing plugin (`droidtop.syncthing`,
+   Droidtop/tracker#553) accepts exactly the Syncthing IDs its paired
+   counterparts announce, and names Pythia as one. While Pythia serves, the
+   service it runs from droidtop-agent's crates (droidtop-agent DESIGN.md
+   section 18) does this: it uses the Syncthing answering in Syncthing's
+   standard folder or starts one there, announces its device ID and LAN
+   addresses as `droidtop.syncthing`, and adds each paired device's
+   announced ID to it (removing only the ones it added once a device is
+   forgotten). There is no Syncthing pairing step for the person. The
+   agent's `syncthing` setting turns it off.
+
 ## 2. The pad model (handheld shell)
 
 From UX review A7 (HH2, HH10, HH11; conflicts C2 and C3). A4, A5 and A6

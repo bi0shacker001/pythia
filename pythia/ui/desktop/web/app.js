@@ -783,9 +783,21 @@ function resolveInitialShell() {
   const compact = window.innerWidth <= 900 || (coarse && window.innerWidth <= 1400) || (window.innerHeight <= 650 && window.innerWidth <= 1200);
   return compact ? 'handheld' : 'desktop';
 }
-function enterHandheld(page = 'home') { state.shell = 'handheld'; state.hhPage = page; localStorage.setItem('pythia-last-shell', 'handheld'); document.body.classList.add('handheld-active'); $('#handheldShell').classList.remove('hidden'); renderHandheld(); setTimeout(() => $('.hh-nav.active')?.focus(), 0); }
-function exitHandheld() { state.shell = 'desktop'; localStorage.setItem('pythia-last-shell', 'desktop'); document.body.classList.remove('handheld-active'); $('#handheldShell').classList.add('hidden'); setTimeout(() => $('#enterHandheldButton')?.focus(), 0); }
-function navigateHandheld(page, push = true) { if (page === state.hhPage) { renderHandheld(); return; } if (push) state.hhHistory.push(state.hhPage); state.hhPage = page; state.hhSelected = null; if (page !== 'settings') state.hhSettingsPage = 'root'; renderHandheld(); }
+// The remembered shell (Settings > Interface > Remember last shell) changes only on a deliberate switch (UX review A4).
+function rememberShell(shell) { try { localStorage.setItem('pythia-last-shell', shell); } catch (e) { /* storage may be unavailable */ } }
+function enterHandheld(page = 'home', { remember = false } = {}) { state.shell = 'handheld'; state.hhPage = page; state.hhHistory = []; if (remember) rememberShell('handheld'); document.body.classList.add('handheld-active'); $('#handheldShell').classList.remove('hidden'); renderHandheld(); setTimeout(() => $('.hh-nav.active')?.focus(), 0); }
+function exitHandheld({ remember = false } = {}) { state.shell = 'desktop'; if (remember) rememberShell('desktop'); document.body.classList.remove('handheld-active'); $('#handheldShell').classList.add('hidden'); setTimeout(() => $('#enterHandheldButton')?.focus(), 0); }
+// Leaving the handheld shell is only ever deliberate (the rail's Desktop, the top bar's, Menu > Desktop,
+// or a page only the desktop has), and asks first with Cancel focused. Back never leaves it.
+async function leaveHandheld({ body = 'The desktop layout needs a mouse or touch; the pad does not drive it.', then = null, remember = true } = {}) {
+  if (!(await confirm({ title: 'Leave handheld mode?', body, proceed: 'Switch to desktop' }))) return;
+  exitHandheld({ remember });
+  if (then) then();
+}
+const HH_RAIL_PAGES = ['home', 'library', 'attention', 'downloads', 'systems', 'activity', 'settings'];
+// A subpage's parent when it was reached without history (a deep link, a refresh).
+const HH_PARENTS = { detail: 'library', decision: 'attention', plan: 'attention', saves: 'home', launcher: 'home', duplicates: 'home' };
+function navigateHandheld(page, push = true) { if (page === state.hhPage) { renderHandheld(); return; } if (HH_RAIL_PAGES.includes(page)) state.hhHistory = []; else if (push) state.hhHistory.push(state.hhPage); state.hhPage = page; state.hhSelected = null; if (page !== 'settings') state.hhSettingsPage = 'root'; renderHandheld(); }
 function handheldTitle() {
   if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') {
     const labels = { general: 'General', library: 'Library', capabilities: 'Plugin capabilities', plugins: 'Installed plugins', sync: 'Systems & sync', interface: 'Interface', advanced: 'Advanced', sources: 'Sources', downloaders: 'Downloaders', metadata: 'Metadata', managers: 'Managers', engines: 'Engine detection', mods: 'Mods', patchers: 'Patchers' };
@@ -797,7 +809,7 @@ function handheldTitle() {
 }
 function renderHandheld() {
   const [title, sub] = handheldTitle(); $('#hhTitle').textContent = title; $('#hhSubtitle').textContent = sub;
-  $('#hhBack').disabled = !state.hhHistory.length && !['detail', 'decision', 'plan'].includes(state.hhPage) && !(state.hhPage === 'settings' && state.hhSettingsPage !== 'root');
+  $('#hhBack').disabled = state.hhPage === 'home';
   $$('[data-hh-nav]').forEach((b) => b.classList.toggle('active', b.dataset.hhNav === state.hhPage));
   const running = model.jobs.filter((j) => j.state === 'running').length;
   $('#hhFooterRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(running, 'job')} running` : 'Connecting';
@@ -980,7 +992,7 @@ function bindHandheldActions() {
   $$('[data-hh-settings-page]', host).forEach((b) => (b.onclick = () => { state.hhSettingsPage = b.dataset.hhSettingsPage; renderHandheld(); }));
   $$('[data-hh-choice]', host).forEach((b) => (b.onclick = async () => {
     const g = games.find((x) => x.id === state.hhSelected); const k = b.dataset.hhChoice;
-    if (k === 'decide') { exitHandheld(); navigate('reconcile'); }
+    if (k === 'decide') leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Reconciliation page.', then: () => navigate('reconcile'), remember: false });
     else if (k === 'plan') { state.hhHistory.push('decision'); state.hhPage = 'plan'; renderHandheld(); }
     else if (k === 'rescan') rescanHH(g);
     else if (k === 'open') openFolder(g.path);
@@ -990,7 +1002,7 @@ function bindHandheldActions() {
   $$('[data-hh-open]', host).forEach((b) => (b.onclick = () => openFolder(b.dataset.hhOpen)));
   $$('[data-hh-rescan]', host).forEach((b) => (b.onclick = () => rescanHH(games.find((x) => x.id === b.dataset.hhRescan))));
   $$('[data-hh-onboard]', host).forEach((b) => (b.onclick = () => { pythia.start_onboard(b.dataset.hhOnboard); pythia.forget_detected(b.dataset.hhOnboard, () => {}); flash('Adding'); }));
-  $$('[data-hh-review]', host).forEach((b) => (b.onclick = () => { exitHandheld(); navigate('reconcile'); }));
+  $$('[data-hh-review]', host).forEach((b) => (b.onclick = () => leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Reconciliation page.', then: () => navigate('reconcile'), remember: false })));
   $$('[data-hh-watch]', host).forEach((b) => (b.onclick = () => (model.intake.watcher ? stopWatching() : watchFolder())));
   $$('[data-hh-add]', host).forEach((b) => (b.onclick = addFolder));
   $$('[data-hh-scan]', host).forEach((b) => (b.onclick = scanLibrary));
@@ -1003,7 +1015,7 @@ function bindHandheldActions() {
   $('#hhLibraryDefault')?.addEventListener('change', (e) => { state.hhLibraryMode = e.target.value; localStorage.setItem('pythia-handheld-library', e.target.value); });
   $('#hhTheme')?.addEventListener('change', (e) => applyTheme(e.target.value));
   $('#hhTextScale')?.addEventListener('change', (e) => { prefs.set('text-scale', e.target.value); applyInterface(); });
-  $('#hhSettingsDesktop')?.addEventListener('click', exitHandheld);
+  $('#hhSettingsDesktop')?.addEventListener('click', () => leaveHandheld());
 }
 function rescanHH(g) { if (!g || !g.path) return; pythia.start_onboard(g.path); flash('Rescanning'); navigateHandheld('home', false); }
 // Handheld focus (Droidtop/tracker#538): the D-pad moves within one zone (the rail, the top bar, the page, or an open
@@ -1041,7 +1053,19 @@ function hhKeepFocus() {
   if (current && current.isConnected && zones.some((z) => z.contains(current))) return;
   if (!hhFocusPage()) hhFocusRail();
 }
-function hhBack() { if (state.hhHistory.length) { state.hhPage = state.hhHistory.pop(); renderHandheld(); } else if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') { state.hhSettingsPage = 'root'; renderHandheld(); } else exitHandheld(); }
+// The one Back (UX review A4): B, Escape, the footer's Back and the on-screen ‹. A settings subpage goes
+// to the settings root, a subpage to where it was opened from (or its parent), a rail page to Home, and
+// Home stays. It never leaves the shell.
+function hhBack() {
+  if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') { state.hhSettingsPage = 'root'; renderHandheld(); return; }
+  if (state.hhPage === 'home') return;
+  if (!HH_RAIL_PAGES.includes(state.hhPage)) {
+    const back = state.hhHistory.pop() || HH_PARENTS[state.hhPage] || 'home';
+    state.hhPage = back; if (HH_RAIL_PAGES.includes(back)) state.hhSelected = null; if (back !== 'settings') state.hhSettingsPage = 'root';
+    renderHandheld(); return;
+  }
+  state.hhHistory = []; state.hhPage = 'home'; state.hhSelected = null; state.hhSettingsPage = 'root'; renderHandheld();
+}
 function hhMenu(anchor) {
   const before = document.activeElement;
   const returnTo = before && [$('.hh-rail'), $('.hh-topbar'), $('#hhContent')].some((z) => z.contains(before)) ? before : hhFocusables($('#hhContent'))[0];
@@ -1053,7 +1077,7 @@ function hhMenu(anchor) {
     { label: 'Launcher entries', run: () => navigateHandheld('launcher') },
     { label: 'Duplicates', run: () => navigateHandheld('duplicates') },
     { rule: true },
-    { label: 'Switch to the desktop layout', run: () => exitHandheld() },
+    { label: 'Switch to the desktop layout', run: () => leaveHandheld() },
   ], { returnTo });
 }
 // Gamepads (the Web Gamepad API, standard mapping): D-pad or left stick moves, A selects, B goes back, Start opens the
@@ -1087,7 +1111,7 @@ async function menuAction(a) {
   if (a === 'preferences') navigate('settings');
   if (a === 'rename') { const g = games.find((x) => x.id === state.selected); if (g) detailAction('rename', g); }
   if (a === 'notes') { navigate('library'); openTab('notes'); }
-  if (a === 'handheld') enterHandheld('home');
+  if (a === 'handheld') enterHandheld('home', { remember: true });
   if (a === 'refresh-all') { const r = await call('sync_all_accounts'); if (ok(r)) { flash(r.started.length ? `Syncing ${fmt.n(r.started.length, 'source')}` : 'No connected source to refresh', r.started.length ? 'info' : 'caution'); if (r.started.length) navigate('activity'); } else flash(`Refresh failed: ${r.message}`, 'caution'); }
   if (a === 'check-updates') { pythia.check_updates(); flash('Checking for updates'); navigate('activity'); }
   if (a === 'duplicates') { navigate('reconcile'); $('#mergePanel').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
@@ -1255,14 +1279,14 @@ function setup() {
   $('#logLevelSelect').onchange = (e) => act('set_log_level', [e.target.value], 'Log level saved', { what: 'Log level' });
   document.addEventListener('click', (e) => { if (!e.target.closest('#themePopover') && !e.target.closest('#themeButton')) toggleThemePopover(false); if (!e.target.closest('#addPopover') && !e.target.closest('#addButton')) { $('#addPopover').classList.add('hidden'); $('#addButton').setAttribute('aria-expanded', 'false'); } if (!e.target.closest('.menu-item')) closeAllMenus(); });
   $('#recentButton').onclick = (e) => { e.stopPropagation(); const existing = $('.recent-popover'); if (existing) { existing.remove(); return; } const pop = el('<div class="recent-popover" role="dialog" aria-label="Recent"></div>'); if (!flash.recent.length) pop.appendChild(stateBlock({ title: 'Nothing recent', body: 'Acknowledgements show here for a while.' })); else flash.recent.forEach((r) => pop.appendChild(el(`<div class="line"><span>${esc(r.text)}</span><time>${esc(fmt.time(r.at))}</time></div>`))); document.body.appendChild(pop); const close = (ev) => { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('mousedown', close); } }; setTimeout(() => document.addEventListener('mousedown', close), 0); };
-  $('#enterHandheldButton').onclick = () => enterHandheld('home'); $('#exitHandheldRail').onclick = exitHandheld; $('#exitHandheldTop').onclick = exitHandheld;
+  $('#enterHandheldButton').onclick = () => enterHandheld('home', { remember: true }); $('#exitHandheldRail').onclick = () => leaveHandheld(); $('#exitHandheldTop').onclick = () => leaveHandheld();
   // The footer's hints are buttons too (touch and mouse); pressing one keeps focus where it was, so Select acts on it.
   $$('.hh-hint').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
   $('#hhSelectHint').onclick = () => { const f = document.activeElement; if (f && f !== document.body && !f.classList.contains('hh-hint')) f.click(); };
   $('#hhBackHint').onclick = () => hhBack();
   $('#hhMenuHint').onclick = (e) => hhMenu(e.currentTarget);
   $$('[data-hh-nav]').forEach((b) => (b.onclick = () => navigateHandheld(b.dataset.hhNav)));
-  $('#hhBack').onclick = () => { if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') { state.hhSettingsPage = 'root'; renderHandheld(); return; } if (state.hhHistory.length) { state.hhPage = state.hhHistory.pop(); renderHandheld(); } else if (['detail', 'decision', 'plan'].includes(state.hhPage)) navigateHandheld('library', false); };
+  $('#hhBack').onclick = () => hhBack();
   $('#hhSearch').oninput = (e) => { state.hhSearch = e.target.value; renderHandheld(); };
   $('#hhAdd').onclick = addFolder;
   $$('[data-bulk-action]').forEach((b) => (b.onclick = () => bulkAction(b.dataset.bulkAction)));
@@ -1291,5 +1315,5 @@ setup();
 
 // A read-only view of the model for the screenshot driver and the console; never written to.
 window.pythiaDebug = () => ({ ready: model.ready, connected: !!pythia, games: games.length, attention: games.filter((g) => g.status !== 'ok').length, jobs: model.jobs.length, decisions: model.intake.decisions.length, merges: Array.isArray(model.merges) ? model.merges.length : model.merges, events: model.events.length, errorConsole: !!model.config?.error_console, view: state.view, shell: state.shell });
-window.pythiaUI = { navigate, enterHandheld, exitHandheld, navigateHandheld, openSettingsPane, openTab, state, call };
+window.pythiaUI = { navigate, enterHandheld, exitHandheld, leaveHandheld, hhBack, navigateHandheld, openSettingsPane, openTab, state, call };
 })();

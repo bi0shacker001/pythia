@@ -271,3 +271,5 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
 .cluster-member{display:flex;gap:10px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);cursor:pointer}
 .cluster-member small{color:var(--text-secondary)}
 .cluster .choice-row{display:flex;gap:8px;flex-wrap:wrap}
+/* Review (UX review A18): one queue in sections */
+.review-section+.review-section,#reviewEmpty+.review-section{margin-top:13px}.review-section[hidden]{display:none}.review-row{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:11px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}.review-row:last-child{border-bottom:0}.review-row .art{display:grid;place-items:center;width:40px;height:40px;border-radius:7px;font:600 0.75rem var(--sans);color:var(--on-art)}.review-copy{min-width:0}.review-copy strong{display:block;font-size:0.75rem}.review-copy small{display:block;color:var(--muted);font-size:0.625rem;overflow-wrap:anywhere}.review-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}

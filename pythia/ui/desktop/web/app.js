@@ -119,7 +119,7 @@ function adaptGame(real) {
     ...versionModel(own, name),
     parts: [...new Set(variants.map((v) => v.part).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
     partsInstalled: variants.filter((v) => v.part).every((v) => v.path),
-    status, statusText, installed, ownedOn, knownOn, updates, added, platforms,
+    status, statusText, installed, ownedOn, knownOn, updates, added, platforms, unidentified: !!(installed && unknown && !engineKind),
     updated: own.updated_at ? Date.parse(own.updated_at) || 0 : 0,
     art: ART_CLASSES[strHash(real.game_id) % ART_CLASSES.length],
     systems: systemIds.map(systemName), systemIds,
@@ -142,7 +142,7 @@ function adaptPlugin(real) {
   };
 }
 
-let state = { view: 'library', history: [], selected: null, filterStatus: 'all', density: localStorage.getItem('pythia-density') || 'comfortable', libraryMode: localStorage.getItem('pythia-desktop-library') || 'list', search: '', source: 'all', engine: 'all', sort: 'name', bulk: new Set(), selectionMode: false, shell: 'desktop', hhPage: 'home', hhHistory: [], hhLibraryMode: localStorage.getItem('pythia-handheld-library') || 'list', hhSearch: '', hhSelected: null, hhSource: 'all', hhSettingsPage: 'root', detailTab: 'overview', settingsPane: 'general', libraryPlace: { search: '', scroll: 0 } };
+let state = { view: 'library', history: [], selected: null, filterStatus: 'all', density: localStorage.getItem('pythia-density') || 'comfortable', libraryMode: localStorage.getItem('pythia-desktop-library') || 'list', search: '', source: 'all', engine: 'all', sort: 'name', bulk: new Set(), selectionMode: false, shell: 'desktop', hhPage: 'home', hhHistory: [], hhLibraryMode: localStorage.getItem('pythia-handheld-library') || 'list', hhSearch: '', hhSelected: null, hhSource: 'all', hhSettingsPage: 'root', hhReviewSection: '', detailTab: 'overview', settingsPane: 'general', libraryPlace: { search: '', scroll: 0 } };
 const initials = (n) => String(n).split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase();
 // List-level version-count affordance -- only worth a mention when there's more than one.
 // Parts (Part1, Week 2: droidtop's segments, UX review A16) are counted apart from versions.
@@ -195,7 +195,7 @@ function navigate(view, push = true) {
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
   $$('.nav-row[data-nav]').forEach((n) => n.classList.toggle('active', n.dataset.nav === view));
   $('#backButton').disabled = !state.history.length;
-  const titles = { look: 'Search…', library: 'Search games, engines, versions, paths…', downloads: 'Search intake queue…', reconcile: 'Search possible duplicates…', systems: 'Search systems…', launcher: 'Search launcher entries…', saves: 'Search save backups…', activity: 'Search jobs and events…', settings: 'Search settings…' };
+  const titles = { look: 'Search…', library: 'Search games, engines, versions, paths…', downloads: 'Search…', reconcile: 'Search possible duplicates…', systems: 'Search systems…', launcher: 'Search launcher entries…', saves: 'Search save backups…', activity: 'Search jobs and events…', settings: 'Search settings…' };
   $('#globalSearch').placeholder = titles[view] || 'Search…';
   // The library keeps its place (query, selection, scroll, collection) across navigation (UX review A11).
   state.search = view === 'library' ? state.libraryPlace.search : '';
@@ -221,12 +221,10 @@ function filteredGames() {
 // ---- Library -------------------------------------------------------------------------
 function renderLibrary() {
   const list = filteredGames();
-  const attention = games.filter((g) => g.status !== 'ok').length;
   const nSystems = new Set(games.flatMap((g) => g.systemIds)).size || 1;
-  $('#librarySummary').textContent = model.ready ? `${list.length} of ${games.length} shown · ${attention} need attention · ${fmt.n(nSystems, 'system')}` : '';
+  $('#librarySummary').textContent = model.ready ? `${list.length} of ${games.length} shown · ${fmt.n(nSystems, 'system')}` : '';
   const noticeHost = $('#libraryNotice'); noticeHost.innerHTML = '';
   if (!model.ready) noticeHost.appendChild(stateBlock({ kind: 'loading' }));
-  else if (attention) noticeHost.appendChild(notice({ tone: 'caution', title: `${fmt.n(attention, 'game')} need attention`, body: 'Not identified, a newer version, or a scan waiting for your decision.', action: { label: 'Show', run: () => { state.filterStatus = 'pending'; renderLibrary(); } } }));
   if (!list.some((g) => g.id === state.selected) && list[0]) state.selected = list[0].id;
   const host = $('#gameList'); const layout = $('#libraryLayout');
   host.classList.toggle('grid-mode', state.libraryMode === 'grid');
@@ -324,7 +322,7 @@ const ACTION_MENUS = {
     { label: 'Manage versions', run: () => (state.shell === 'handheld' ? hhJumpSection('versions') : openTab('versions')) },
     ...(g.knownOn.length ? [{ label: 'Open store page', run: () => openStorePage(g) }] : []),
     { label: 'Rename', disabled: !g.mine, run: () => detailAction('rename', g) },
-    { label: 'Find duplicates', run: () => goTo('reconcile', 'duplicates') },
+    { label: 'Find duplicates', run: () => (state.shell === 'handheld' ? hhOpenReview('duplicates') : navigate('reconcile')) },
     { label: 'Save backups', run: () => goTo('saves', 'saves') },
     { label: 'Launcher entries', run: () => goTo('launcher', 'launcher') },
     { label: 'Info', run: () => infoSheet({ title: g.name, details: [`Game ID: ${g.id}`, `Source: ${g.source}`, `Engine: ${g.engine}`, `Version: ${versionText(g)}`, `Folder: ${g.path || 'Not installed here'}`, `Systems: ${g.systems.join(', ')}`, '', JSON.stringify(g.own, null, 2)].join('\n'), wide: true }) },
@@ -339,7 +337,7 @@ const ACTION_MENUS = {
     { label: 'Info', run: () => infoSheet({ title: `${g.name}: folder`, details: path }) },
   ],
   review: (g) => [
-    { label: 'Decide…', run: () => (state.shell === 'handheld' ? leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Reconciliation page.', then: () => navigate('reconcile'), remember: false }) : navigate('reconcile')) },
+    { label: 'Decide…', run: () => (state.shell === 'handheld' ? leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Review page.', then: () => navigate('reconcile'), remember: false }) : navigate('reconcile')) },
     ...(g.path ? [{ label: 'Rescan', run: () => (state.shell === 'handheld' ? rescanHH(g) : rescan(g)) }, { label: 'Open folder', run: () => openFolder(g.path) }] : []),
     { label: 'Info', run: () => infoSheet({ title: g.name, details: `${g.statusText}\nFolder: ${g.path || 'Not installed here'}` }) },
   ],
@@ -533,27 +531,14 @@ function renderModes(host) {
   }, { what: 'Modes' });
 }
 function renderDownloads() {
-  const q = state.view === 'downloads' ? state.search.toLowerCase() : '';
-  const { detected, decisions, watcher } = model.intake;
+  const { watcher } = model.intake;
   const running = model.jobs.filter((j) => j.state === 'running').length;
-  $('#downloadsSummary').textContent = `${fmt.n(detected.length + decisions.length, 'intake item')} · ${watcher ? `watching ${watcher.folder}` : 'no folder watched'} · ${fmt.n(running, 'job')} running`;
+  $('#downloadsSummary').textContent = `${watcher ? `Watching ${watcher.folder}` : 'No folder watched'} · ${fmt.n(running, 'job')} running · new downloads wait in Review`;
   $('#watchButton').textContent = watcher ? 'Stop watching' : 'Watch a folder';
   const paused = managerPaused('downloads');
   $('#watchButton').disabled = paused && !watcher;
   const dn = $('#downloadsNotice'); dn.innerHTML = '';
   if (paused) dn.appendChild(managerOffBlock('Watching download folders and tagging what arrives'));
-  $('#intakeCount').textContent = fmt.n(detected.length + decisions.length, 'item');
-  const rows = [];
-  decisions.forEach((d) => { const s = (d.candidates?.suggested || [])[0]; rows.push({ cells: [fileName(d.path), 'Scan', s ? `${s.canonical_name} · similar name` : 'New game', 'pending', 'Needs decision'], action: '<button class="btn small primary" data-nav="reconcile">Review</button>', text: `${d.path} ${d.name}` }); });
-  detected.forEach((d) => rows.push({ cells: [fileName(d.path), 'Watched folder', '—', 'info', `Seen ${fmt.time(d.at)}`], action: `<button class="btn small primary" data-onboard="${esc(d.path)}">Add to library</button> <button class="btn small ghost" data-forget-detected="${esc(d.path)}">Dismiss</button>`, text: d.path }));
-  const shown = rows.filter((r) => !q || r.text.toLowerCase().includes(q));
-  $('#downloadRows').innerHTML = shown.map((r) => `<tr><td class="primary-cell"><strong>${esc(r.cells[0])}</strong><small>${esc(r.text.split(' ')[0])}</small></td><td>${esc(r.cells[1])}</td><td>${esc(r.cells[2])}</td><td><span class="state-pill ${r.cells[3]}">${esc(r.cells[4])}</span></td><td>${r.action}</td></tr>`).join('');
-  const st = $('#intakeState'); st.innerHTML = '';
-  if (!rows.length) st.appendChild(stateBlock({ glyph: '⇩', title: 'Nothing waiting', body: watcher ? `New files in ${watcher.folder} show here.` : 'Watch a download folder, or scan a library; anything uncertain lands here.', actions: [{ label: watcher ? 'Scan library' : 'Watch a folder', primary: true, run: watcher ? scanLibrary : watchFolder }] }));
-  else if (!shown.length) st.appendChild(stateBlock({ title: 'No intake items match', actions: [{ label: 'Clear search', run: () => { $('#globalSearch').value = ''; state.search = ''; renderDownloads(); } }] }));
-  $$('[data-nav="reconcile"]', $('#view-downloads')).forEach((b) => (b.onclick = () => navigate('reconcile')));
-  $$('[data-onboard]', $('#view-downloads')).forEach((b) => (b.onclick = () => { pythia.start_onboard(b.dataset.onboard); pythia.forget_detected(b.dataset.onboard, () => {}); flash('Adding'); navigate('activity'); }));
-  $$('[data-forget-detected]', $('#view-downloads')).forEach((b) => (b.onclick = () => call('forget_detected', b.dataset.forgetDetected)));
   loadInto($('#downloaderCards'), 'get_downloader_plugins', [], (list, host) => {
     const ds = Array.isArray(list) ? list : [];
     if (!ds.length) { host.appendChild(stateBlock({ title: 'No downloader plugins', body: 'A downloader plugin adds a card here.' })); return; }
@@ -567,19 +552,43 @@ function renderDownloads() {
 }
 function stopWatching() { pythia.stop_watch(); flash('Stopped watching'); }
 
-// ---- Reconciliation: scan decisions and possible duplicates ---------------------------
+// ---- Review: everything waiting on the person, in one queue (UX review A18; review.js) --------
 let decisionIndex = 0, chosenCandidate = null;
+const reviewQueue = () => PythiaReview.queue({ games, decisions: model.intake.decisions, clusters: Array.isArray(model.merges) ? mergeClusters() : [], detected: model.intake.detected });
+function reviewSection(id, items, fill) {
+  const sec = $(id); sec.hidden = !items.length;
+  const count = $('[data-count]', sec); if (count) count.textContent = items.length ? String(items.length) : '';
+  if (items.length && fill) { const body = $('[data-body]', sec); body.innerHTML = ''; fill(body); }
+}
+function reviewGameRow(g, sub, actions) {
+  const row = el(`<div class="review-row"><span class="art art-${g.art}">${esc(initials(g.name))}</span><span class="review-copy"><strong>${esc(g.name)}</strong><small>${esc(sub)}</small></span><span class="review-actions"><button class="btn small ghost" data-show>Show</button></span></div>`);
+  $('[data-show]', row).onclick = () => { state.filterStatus = 'all'; state.selected = g.id; navigate('library'); };
+  (actions || []).forEach((x) => { const b = el(`<button class="btn small${x.primary ? ' primary' : ''}">${esc(x.label)}</button>`); b.onclick = x.run; $('.review-actions', row).prepend(b); });
+  return row;
+}
 function renderReconcile() {
+  const q = reviewQueue();
   const { decisions } = model.intake;
   const merges = Array.isArray(model.merges) ? model.merges : [];
-  const open = merges.filter((c) => !dismissed(c));
-  $('#reconcileSummary').textContent = `${fmt.n(decisions.length, 'decision')} queued · ${fmt.n(open.length, 'possible duplicate')} · no files changed`;
-  $('#reconcileCount').textContent = decisions.length + open.length ? String(decisions.length + open.length) : '';
-  const steps = $$('#reconcileStepper .step');
-  steps.forEach((s, i) => { s.classList.toggle('done', decisions.length ? i < 2 : false); s.classList.toggle('active', decisions.length ? i === 2 : false); });
+  const loadingMerges = model.merges === null || model.merges === undefined;
+  const sections = [[q.decisions, 'scan decision'], [q.clusters, 'possible duplicate'], [q.unidentified, 'game not identified', 'games not identified'], [q.updates, 'update seen', 'updates seen'], [q.downloads, 'new download']].filter(([list]) => list.length);
+  $('#reviewSummary').textContent = !model.ready ? '' : q.affected ? `${fmt.n(q.affected, 'game')} affected · ${sections.map(([list, one, many]) => (list.length === 1 ? `1 ${one}` : `${list.length} ${many || `${one}s`}`)).join(' · ')} · nothing changes until you decide` : 'Nothing waiting';
+  const empty = $('#reviewEmpty'); empty.innerHTML = '';
+  if (!model.ready) empty.appendChild(stateBlock({ kind: 'loading' }));
+  else if (!q.affected && !loadingMerges && !(model.merges && model.merges.status)) empty.appendChild(stateBlock({ glyph: '✓', title: 'Nothing to review', body: 'Scan decisions, possible duplicates, games not identified, updates seen and new downloads land here. Save sync conflicts will too, once save sync is built.', actions: [{ label: 'Scan library', run: scanLibrary }] }));
+  reviewSection('#reviewDecisions', model.ready ? decisions : []);
+  $('#reviewDuplicates').hidden = !model.ready || (!loadingMerges && !(model.merges && model.merges.status) && !q.clusters.length);
+  reviewSection('#reviewUnidentified', model.ready ? q.unidentified : [], (body) => q.unidentified.forEach((g) => body.appendChild(reviewGameRow(g, `${g.source} · ${g.path ? PythiaVersions.middleEllipsis(g.path, 64) : 'no folder'}`, g.path ? [{ label: 'Rescan', run: () => rescan(g) }] : []))));
+  reviewSection('#reviewUpdates', model.ready ? q.updates : [], (body) => q.updates.forEach((g) => body.appendChild(reviewGameRow(g, `${g.updates.map((u) => u.version || 'A newer version').join(', ')} seen via ${g.updates[0].source || 'a store'} · installed ${versionText(g)}`, [{ label: 'Review update', primary: true, run: () => { state.selected = g.id; state.detailTab = 'versions'; navigate('library'); } }]))));
+  reviewSection('#reviewDownloads', model.ready ? q.downloads : [], (body) => q.downloads.forEach((d) => {
+    const row = el(`<div class="review-row"><span class="art art-d">⇩</span><span class="review-copy"><strong>${esc(fileName(d.path))}</strong><small>${esc(PythiaVersions.middleEllipsis(d.path, 64))} · seen ${esc(fmt.time(d.at))}</small></span><span class="review-actions"><button class="btn small primary" data-add>Add to library</button><button class="btn small ghost" data-forget>Forget</button></span></div>`);
+    $('[data-add]', row).onclick = () => { pythia.start_onboard(d.path); pythia.forget_detected(d.path, () => {}); flash('Adding'); navigate('activity'); };
+    $('[data-forget]', row).onclick = () => call('forget_detected', d.path);
+    body.appendChild(row);
+  }));
+  reviewSection('#reviewConflicts', q.conflicts);
   const area = $('#decisionArea'); area.innerHTML = '';
-  if (!decisions.length) area.appendChild(stateBlock({ glyph: '⇄', title: 'No decisions waiting', body: 'When a scan finds a folder that may be a game you already have, it lands here.', actions: [{ label: 'Scan library', run: scanLibrary }] }));
-  else {
+  if (decisions.length) {
     if (decisionIndex >= decisions.length) decisionIndex = 0;
     const d = decisions[decisionIndex]; const suggested = d.candidates?.suggested || [];
     if (!chosenCandidate || !suggested.some((s) => s.game_id === chosenCandidate)) chosenCandidate = suggested[0]?.game_id || 'new';
@@ -596,18 +605,18 @@ function renderReconcile() {
       const target = suggested.find((s) => s.game_id === chosenCandidate);
       const decision = target ? { action: 'link', game_id: target.game_id } : { action: 'new' };
       const plan = el(`<table class="table"><tbody><tr><td>Identity</td><td>${target ? `Link to ${esc(target.canonical_name)}` : 'Create a new game'}</td></tr><tr><td>Version</td><td>${esc(d.version_label || 'No version number')}</td></tr><tr><td>Filesystem</td><td>Leave the folder where it is</td></tr><tr><td>Launcher changes</td><td>None</td></tr></tbody></table>`);
-      if (await confirm({ title: 'Commit this decision?', node: plan, proceed: 'Commit' })) { steps[3].classList.add('active'); pythia.resolveDecision(d.path, decision); chosenCandidate = null; flash('Committed'); }
+      if (await confirm({ title: 'Commit this decision?', node: plan, proceed: 'Commit' })) { pythia.resolveDecision(d.path, decision); chosenCandidate = null; flash('Committed'); }
     };
   }
   const panel = $('#mergePanel'); panel.innerHTML = '';
-  const groups = mergeClusters();
-  $('#mergeCount').textContent = model.merges === null ? '' : fmt.n(groups.length, 'possible duplicate');
+  const groups = q.clusters;
+  $('#mergeCount').textContent = model.merges === null || !groups.length ? '' : String(groups.length);
   if (model.merges === null) panel.appendChild(stateBlock({ kind: 'loading' }));
   else if (model.merges && model.merges.status) panel.appendChild(fromResult(model.merges, { what: 'The duplicate search', retry: () => { model.merges = null; renderReconcile(); pythia.refresh_merge_candidates(); } }));
   else if (!groups.length) panel.appendChild(stateBlock({ glyph: '✓', title: 'No possible duplicates', body: merges.length ? 'Those found are marked as not the same.' : 'Records with the same or a similar name would show here.' }));
   else {
-    const q = state.view === 'reconcile' ? state.search.toLowerCase() : '';
-    groups.filter((c) => !q || c.members.some((m) => `${m.name} ${m.path}`.toLowerCase().includes(q))).forEach((c) => panel.appendChild(clusterCard(c)));
+    const needle = state.view === 'reconcile' ? state.search.toLowerCase() : '';
+    groups.filter((c) => !needle || c.members.some((m) => `${m.name} ${m.path}`.toLowerCase().includes(needle))).forEach((c) => panel.appendChild(clusterCard(c)));
   }
 }
 // One card per cluster of possible duplicates (UX review A16; reconcile.js): why they look like one game, the
@@ -1086,16 +1095,18 @@ async function leaveHandheld({ body = 'The desktop layout needs a mouse or touch
 }
 const HH_RAIL_PAGES = ['home', 'library', 'attention', 'downloads', 'systems', 'activity', 'settings'];
 // A subpage's parent when it was reached without history (a deep link, a refresh).
-const HH_PARENTS = { look: 'home', detail: 'library', decision: 'attention', plan: 'attention', saves: 'home', launcher: 'home', duplicates: 'home' };
-function navigateHandheld(page, push = true) { if (page === state.hhPage) { renderHandheld(); return; } if (HH_RAIL_PAGES.includes(page)) state.hhHistory = []; else if (push) state.hhHistory.push(state.hhPage); state.hhPage = page; state.hhSelected = null; if (page !== 'settings') state.hhSettingsPage = 'root'; renderHandheld(); }
+const HH_PARENTS = { look: 'home', detail: 'library', decision: 'attention', plan: 'attention', saves: 'home', launcher: 'home' };
+function navigateHandheld(page, push = true, reviewSection = '') { state.hhReviewSection = page === 'attention' ? reviewSection : ''; if (page === state.hhPage) { renderHandheld(); return; } if (HH_RAIL_PAGES.includes(page)) state.hhHistory = []; else if (push) state.hhHistory.push(state.hhPage); state.hhPage = page; state.hhSelected = null; if (page !== 'settings') state.hhSettingsPage = 'root'; renderHandheld(); }
+const hhOpenReview = (section) => navigateHandheld('attention', true, section);
 function handheldTitle() {
   if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') {
     const labels = { general: 'General', library: 'Library', capabilities: 'Plugin capabilities', plugins: 'Installed plugins', sync: 'Systems & sync', interface: 'Interface', advanced: 'Advanced', sources: 'Sources', downloaders: 'Downloaders', metadata: 'Metadata', managers: 'Managers', engines: 'Engine detection', mods: 'Mods', patchers: 'Patchers' };
     return [labels[state.hhSettingsPage] || 'Settings', 'Settings'];
   }
-  const attention = games.filter((g) => g.status !== 'ok').length; const running = model.jobs.filter((j) => j.state === 'running').length;
-  const { detected, decisions, watcher } = model.intake;
-  return { home: ['Home', model.ready ? `${attention} need attention · ${fmt.n(running, 'job')} running` : 'Connecting'], library: ['Library', `${games.length} games`], attention: ['Needs attention', `${attention} items`], downloads: ['Downloads & intake', `${fmt.n(detected.length + decisions.length, 'item')} · ${watcher ? 'watching' : 'not watching'}`], systems: ['Systems', `${fmt.n(systems.length, 'system')}`], settings: ['Settings', 'Library, plugins, systems, and interface'], look: ['Review what was found', model.look?.status === 'ok' ? model.look.summary : 'Nothing is added until you Add'], activity: ['Activity & jobs', `${fmt.n(running, 'job')} running`], saves: ['Save backups', 'Copies of saves kept on this computer'], launcher: ['Launcher entries', "What this computer's launchers list"], duplicates: ['Duplicates', 'Records that may be the same game'], detail: ['Game details', 'Versions, systems, and actions'], decision: ['Review', 'No changes applied'], plan: ['Available update', 'Review before applying'] }[state.hhPage] || ['Pythia', ''];
+  const running = model.jobs.filter((j) => j.state === 'running').length;
+  const { watcher } = model.intake; const review = model.ready ? reviewQueue().affected : 0;
+  const reviewTitles = { decisions: 'Scan decisions', duplicates: 'Possible duplicates', unidentified: 'Not identified', updates: 'Updates seen', downloads: 'New downloads' };
+  return { home: ['Home', model.ready ? `${fmt.n(review, 'game')} to review · ${fmt.n(running, 'job')} running` : 'Connecting'], library: ['Library', `${games.length} games`], attention: [reviewTitles[state.hhReviewSection] || 'Review', state.hhReviewSection ? 'Review' : `${fmt.n(review, 'game')} affected`], downloads: ['Downloads', watcher ? `Watching ${fileName(watcher.folder)}` : 'Not watching'], systems: ['Systems', `${fmt.n(systems.length, 'system')}`], settings: ['Settings', 'Library, plugins, systems, and interface'], look: ['Review what was found', model.look?.status === 'ok' ? model.look.summary : 'Nothing is added until you Add'], activity: ['Activity & jobs', `${fmt.n(running, 'job')} running`], saves: ['Save backups', 'Copies of saves kept on this computer'], launcher: ['Launcher entries', "What this computer's launchers list"], detail: ['Game details', 'Versions, systems, and actions'], decision: ['Review', 'No changes applied'], plan: ['Available update', 'Review before applying'] }[state.hhPage] || ['Pythia', ''];
 }
 function renderHandheld() {
   const [title, sub] = handheldTitle(); $('#hhTitle').textContent = title; $('#hhSubtitle').textContent = sub;
@@ -1106,7 +1117,7 @@ function renderHandheld() {
   $('#hhFooterRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(running, 'job')} running` : 'Connecting';
   const q = state.hhSearch.toLowerCase();
   const page = state.hhPage;
-  if (page === 'home') renderHHHome(); else if (page === 'library') renderHHLibrary(q); else if (page === 'attention') renderHHAttention(q); else if (page === 'downloads') renderHHDownloads(); else if (page === 'systems') renderHHSystems(); else if (page === 'settings') renderHHSettings(); else if (page === 'detail') renderHHDetail(games.find((g) => g.id === state.hhSelected)); else if (page === 'decision') renderHHDecision(games.find((g) => g.id === state.hhSelected)); else if (page === 'plan') renderHHPlan(games.find((g) => g.id === state.hhSelected)); else if (page === 'activity') renderHHActivity(); else if (page === 'saves') renderHHSaves(); else if (page === 'launcher') renderHHLauncher(); else if (page === 'duplicates') renderHHDuplicates(); else if (page === 'look') { const h = $('#hhContent'); h.innerHTML = '<div class="hh-stack"><p id="hhLookSummary"></p><div id="hhLookHost"></div></div>'; renderLook($('#hhLookHost'), $('#hhLookSummary')); }
+  if (page === 'home') renderHHHome(); else if (page === 'library') renderHHLibrary(q); else if (page === 'attention') renderHHAttention(q); else if (page === 'downloads') renderHHDownloads(); else if (page === 'systems') renderHHSystems(); else if (page === 'settings') renderHHSettings(); else if (page === 'detail') renderHHDetail(games.find((g) => g.id === state.hhSelected)); else if (page === 'decision') renderHHDecision(games.find((g) => g.id === state.hhSelected)); else if (page === 'plan') renderHHPlan(games.find((g) => g.id === state.hhSelected)); else if (page === 'activity') renderHHActivity(); else if (page === 'saves') renderHHSaves(); else if (page === 'launcher') renderHHLauncher(); else if (page === 'look') { const h = $('#hhContent'); h.innerHTML = '<div class="hh-stack"><p id="hhLookSummary"></p><div id="hhLookHost"></div></div>'; renderLook($('#hhLookHost'), $('#hhLookSummary')); }
   bindHandheldActions();
   hhKeepDisabledReachable();
   hhKeepFocus();
@@ -1116,16 +1127,16 @@ function hhJob(j) { return `<div class="hh-summary" style="cursor:default"><span
 function renderHHHome() {
   const host = $('#hhContent'); host.innerHTML = '';
   if (!model.ready) { host.appendChild(stateBlock({ kind: 'loading' })); return; }
-  const attention = games.filter((g) => g.status !== 'ok'); const decisions = model.intake.decisions.length; const jobs = model.jobs.slice(0, 4);
+  const review = reviewQueue(); const jobs = model.jobs.slice(0, 4);
   const failed = model.jobs.filter((j) => j.state === 'failed').length;
   const recent = [...games].filter((g) => g.added).sort((a, b) => (b.added > a.added ? 1 : -1)).slice(0, 3);
-  host.innerHTML = `<div class="hh-stack">${attention.length ? `<section class="hh-alert-strip"><span class="status-icon critical" aria-hidden="true">!</span><div><strong>${attention.length} items need attention</strong><small>${decisions ? `${fmt.n(decisions, 'decision')} waiting · ` : ''}${fmt.n(model.jobs.filter((j) => j.state === 'running').length, 'job')} running</small></div><button class="hh-action" style="margin-left:auto" data-hh-nav-jump="attention">Review</button></section>` : ''}
-    ${games.length ? `<section class="hh-panel"><div class="hh-panel-head"><h2>Needs attention</h2><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="attention">All ${attention.length}</button></div><div class="hh-panel-body hh-summary-list" id="hhAttention"></div></section>` : ''}
+  host.innerHTML = `<div class="hh-stack">
+    ${games.length || review.affected ? `<section class="hh-panel"><div class="hh-panel-head"><h2>Review</h2><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="attention">${review.affected ? `All ${review.affected}` : 'Open'}</button></div><div class="hh-panel-body hh-summary-list" id="hhAttention"></div></section>` : ''}
     <section class="hh-panel"><div class="hh-panel-head"><h2>Active work</h2><span class="spacer"></span><small>${fmt.n(model.jobs.filter((j) => j.state === 'running').length, 'job')} running</small></div><div class="hh-panel-body hh-summary-list" id="hhJobs"></div></section>
     <section class="hh-panel"><div class="hh-panel-head"><h2>${games.length ? 'Recently added' : 'Your library'}</h2><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="library">Library</button></div><div class="hh-panel-body hh-summary-list" id="hhRecent"></div></section>
-    <section class="hh-panel"><div class="hh-panel-head"><h2>More</h2></div><div class="hh-panel-body hh-toolbar"><button class="hh-action" data-hh-nav-jump="activity">Activity &amp; jobs</button><button class="hh-action" data-hh-nav-jump="saves">Save backups</button><button class="hh-action" data-hh-nav-jump="launcher">Launcher entries</button><button class="hh-action" data-hh-nav-jump="duplicates">Duplicates</button></div></section>
+    <section class="hh-panel"><div class="hh-panel-head"><h2>More</h2></div><div class="hh-panel-body hh-toolbar"><button class="hh-action" data-hh-nav-jump="activity">Activity &amp; jobs</button><button class="hh-action" data-hh-nav-jump="saves">Save backups</button><button class="hh-action" data-hh-nav-jump="launcher">Launcher entries</button></div></section>
     ${failed ? `<section class="hh-alert-strip" style="border-color:color-mix(in srgb,var(--warning) 45%,var(--border));background:var(--warning-soft)"><span class="status-icon pending" aria-hidden="true">!</span><div><strong>${fmt.n(failed, 'job')} failed</strong><small>${esc(model.jobs.find((j) => j.state === 'failed').summary)}</small></div><button class="hh-action" style="margin-left:auto" data-hh-jobs>Details</button></section>` : ''}</div>`;
-  const a = $('#hhAttention', host); if (a) { a.innerHTML = attention.slice(0, 4).map(hhSummaryGame).join(''); if (!attention.length) a.appendChild(stateBlock({ glyph: '✓', title: 'Nothing needs attention' })); }
+  const a = $('#hhAttention', host); if (a) { a.innerHTML = hhReviewLines(review).slice(0, 4).join(''); if (!review.affected) a.appendChild(stateBlock({ glyph: '✓', title: 'Nothing to review' })); }
   const j = $('#hhJobs', host); j.innerHTML = jobs.map(hhJob).join(''); if (!jobs.length) j.appendChild(stateBlock({ title: 'Nothing has run yet', body: 'Scans and adds show here.', actions: [{ label: 'Scan library', run: scanLibrary }] }));
   const r = $('#hhRecent', host); r.innerHTML = recent.map(hhSummaryGame).join(''); if (!games.length) r.appendChild(stateBlock({ glyph: '▦', title: 'No games yet', body: 'Add a folder or scan a library.', actions: [{ label: 'Add folder', primary: true, run: addFolder }] }));
 }
@@ -1134,21 +1145,54 @@ function renderHHLibrary(q = '') {
   const sources = [...new Set(games.map((g) => g.source))].sort();
   const list = handheldGames(q).filter((g) => state.hhSource === 'all' || g.source === state.hhSource).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
   const host = $('#hhContent');
-  host.innerHTML = `<div class="hh-toolbar"><div class="hh-seg"><button data-hh-library-mode="list" class="${state.hhLibraryMode === 'list' ? 'active' : ''}">☰ List</button><button data-hh-library-mode="grid" class="${state.hhLibraryMode === 'grid' ? 'active' : ''}">▦ Grid</button></div>${cycleRow({ id: 'hhSourceFilter', label: 'Source', options: [{ value: 'all', label: 'All sources' }, ...sources.map((s) => ({ value: s, label: s }))], value: state.hhSource })}<button class="hh-action" data-hh-nav-jump="attention">Needs attention</button><span class="spacer"></span><small>${list.length} of ${games.length}</small></div>${state.hhLibraryMode === 'grid' ? `<div class="hh-library-grid">${list.map((g) => `<button class="hh-game-card" data-hh-game="${g.id}"><div class="hh-card-art art-${g.art}"><strong>${esc(g.name)}</strong></div><div class="hh-card-copy"><small>${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</small>${gameStatus(g)}</div></button>`).join('')}</div>` : `<div class="hh-library-list">${list.map((g) => `<button class="hh-game-row" data-hh-game="${g.id}"><span class="art art-${g.art}">${esc(initials(g.name))}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.source)} · ${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</small></span><span class="system">${esc(g.systems.join(' · '))}</span><span class="state">${gameStatus(g)}</span></button>`).join('')}</div>`}`;
+  host.innerHTML = `<div class="hh-toolbar"><div class="hh-seg"><button data-hh-library-mode="list" class="${state.hhLibraryMode === 'list' ? 'active' : ''}">☰ List</button><button data-hh-library-mode="grid" class="${state.hhLibraryMode === 'grid' ? 'active' : ''}">▦ Grid</button></div>${cycleRow({ id: 'hhSourceFilter', label: 'Source', options: [{ value: 'all', label: 'All sources' }, ...sources.map((s) => ({ value: s, label: s }))], value: state.hhSource })}<button class="hh-action" data-hh-nav-jump="attention">Review</button><span class="spacer"></span><small>${list.length} of ${games.length}</small></div>${state.hhLibraryMode === 'grid' ? `<div class="hh-library-grid">${list.map((g) => `<button class="hh-game-card" data-hh-game="${g.id}"><div class="hh-card-art art-${g.art}"><strong>${esc(g.name)}</strong></div><div class="hh-card-copy"><small>${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</small>${gameStatus(g)}</div></button>`).join('')}</div>` : `<div class="hh-library-list">${list.map((g) => `<button class="hh-game-row" data-hh-game="${g.id}"><span class="art art-${g.art}">${esc(initials(g.name))}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.source)} · ${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</small></span><span class="system">${esc(g.systems.join(' · '))}</span><span class="state">${gameStatus(g)}</span></button>`).join('')}</div>`}`;
   if (!model.ready) host.appendChild(stateBlock({ kind: 'loading' }));
   else if (!games.length) host.appendChild(stateBlock({ glyph: '▦', title: 'No games yet', body: 'Add a folder or scan a library.', actions: [{ label: 'Add folder', primary: true, run: addFolder }, { label: 'Scan library', run: scanLibrary }] }));
   else if (!list.length) host.appendChild(stateBlock({ title: 'Nothing matches', actions: [{ label: 'Clear', run: () => { state.hhSource = 'all'; state.hhSearch = ''; $('#hhSearch').value = ''; renderHandheld(); } }] }));
 }
+// The handheld's Review (UX review A18): the same queue as the desktop's, one line per section, each opening its items.
+function hhReviewLines(review) {
+  const line = (key, n, title, sub, symbol, kind = 'pending') => (n ? `<button class="hh-issue ${kind}" data-hh-review-open="${key}"><span class="symbol">${symbol}</span><span><strong>${esc(title)}</strong><small>${esc(sub)}</small></span><span class="go">›</span></button>` : '');
+  return [
+    line('decisions', review.decisions.length, fmt.n(review.decisions.length, 'scan decision'), 'Folders that may be a game you already have', '?'),
+    line('duplicates', review.clusters.length, fmt.n(review.clusters.length, 'possible duplicate'), review.clusters.slice(0, 3).map((c) => c.name).join(', '), '⇄'),
+    line('unidentified', review.unidentified.length, `${review.unidentified.length} not identified`, review.unidentified.slice(0, 3).map((g) => g.name).join(', '), '!', 'critical'),
+    line('updates', review.updates.length, fmt.n(review.updates.length, 'update') + ' seen', review.updates.slice(0, 3).map((g) => g.name).join(', '), '↻'),
+    line('downloads', review.downloads.length, fmt.n(review.downloads.length, 'new download'), review.downloads.slice(0, 3).map((d) => fileName(d.path)).join(', '), '⇩'),
+  ].filter(Boolean);
+}
 function renderHHAttention(q = '') {
-  const list = handheldGames(q).filter((g) => g.status !== 'ok'); const host = $('#hhContent');
-  host.innerHTML = `<div class="hh-toolbar"><span>${list.length} items</span><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="library">Library</button></div><div class="hh-issue-list">${list.map((g) => `<button class="hh-issue ${g.status}" data-hh-decision="${g.id}"><span class="symbol">${g.status === 'critical' ? '!' : '↻'}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.statusText)} · ${esc(g.engine)} · ${esc(versionText(g))}</small></span><span class="go">›</span></button>`).join('')}</div>`;
-  if (!list.length) host.appendChild(stateBlock({ glyph: '✓', title: 'Nothing needs attention', body: 'Not identified, newer versions and scan decisions show here.' }));
+  const host = $('#hhContent');
+  if (!model.ready) { host.replaceChildren(stateBlock({ kind: 'loading' })); return; }
+  const review = reviewQueue(); const section = state.hhReviewSection;
+  const needle = PythiaQuery.norm(q);
+  const games_ = (list) => list.filter((g) => !needle || PythiaQuery.norm(`${g.name} ${g.path}`).includes(needle));
+  if (!section) {
+    host.innerHTML = `<div class="hh-toolbar"><span>${fmt.n(review.affected, 'game')} affected</span><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="library">Library</button></div><div class="hh-issue-list">${hhReviewLines(review).join('')}</div>`;
+    if (!review.affected) host.appendChild(stateBlock({ glyph: '✓', title: 'Nothing to review', body: 'Scan decisions, possible duplicates, games not identified, updates seen and new downloads land here.' }));
+    if (model.merges === null || model.merges === undefined) host.appendChild(el('<p class="look-reason">Still looking for possible duplicates.</p>'));
+    return;
+  }
+  const back = '<button class="hh-action" data-hh-review-open="">‹ Review</button>';
+  if (section === 'duplicates') { host.innerHTML = `<div class="hh-toolbar">${back}</div><div id="hhReviewBody"></div>`; renderHHDuplicates($('#hhReviewBody', host)); return; }
+  if (section === 'downloads') {
+    host.innerHTML = `<div class="hh-stack"><div class="hh-toolbar">${back}</div><div class="hh-summary-list">${review.downloads.map((d) => `<button class="hh-summary" data-hh-onboard="${esc(d.path)}"><span class="art art-d">⇩</span><span><strong>${esc(fileName(d.path))}</strong><small>Watched folder · ${esc(fmt.time(d.at))}</small></span>${visibleStatus('Add', 'pending', '＋')}</button>`).join('')}</div></div>`;
+    if (!review.downloads.length) host.appendChild(stateBlock({ glyph: '✓', title: 'No new downloads' }));
+    return;
+  }
+  if (section === 'decisions') {
+    host.innerHTML = `<div class="hh-stack"><div class="hh-toolbar">${back}</div><div class="hh-summary-list">${review.decisions.map((d) => `<button class="hh-summary" data-hh-review><span class="art art-a">${esc(initials(d.name || fileName(d.path)))}</span><span><strong>${esc(fileName(d.path))}</strong><small>${(d.candidates?.suggested || []).length ? `Similar to ${esc(d.candidates.suggested[0].canonical_name)}` : 'New game'}</small></span>${visibleStatus('Decide', 'pending')}</button>`).join('')}</div></div>`;
+    if (!review.decisions.length) host.appendChild(stateBlock({ glyph: '✓', title: 'No scan decisions waiting' }));
+    return;
+  }
+  const list = games_(section === 'updates' ? review.updates : review.unidentified);
+  host.innerHTML = `<div class="hh-toolbar">${back}<span class="spacer"></span><span>${list.length} items</span></div><div class="hh-issue-list">${list.map((g) => `<button class="hh-issue ${section === 'updates' ? 'pending' : 'critical'}" data-hh-decision="${g.id}"><span class="symbol">${section === 'updates' ? '↻' : '!'}</span><span><strong>${esc(g.name)}</strong><small>${esc(section === 'updates' ? `${g.updates.map((u) => u.version || 'Newer version').join(', ')} seen · installed ${versionText(g)}` : `Not identified · ${g.source}`)}</small></span><span class="go">›</span></button>`).join('')}</div>`;
+  if (!list.length) host.appendChild(stateBlock({ glyph: '✓', title: section === 'updates' ? 'No updates seen' : 'Every game is identified' }));
 }
 function renderHHDownloads() {
-  const { detected, decisions, watcher } = model.intake; const host = $('#hhContent');
+  const { watcher } = model.intake; const host = $('#hhContent');
   if (managerPaused('downloads')) { host.replaceChildren(managerOffBlock('Watching download folders and tagging what arrives')); return; }
-  host.innerHTML = `<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-head"><h2>Intake queue</h2><span class="spacer"></span><button class="hh-action primary" data-hh-add>＋ Add</button></div><div class="hh-panel-body hh-summary-list" id="hhIntake">${decisions.map((d) => `<button class="hh-summary" data-hh-review><span class="art art-a">${esc(initials(d.name || fileName(d.path)))}</span><span><strong>${esc(fileName(d.path))}</strong><small>Scan · ${(d.candidates?.suggested || []).length ? `similar to ${esc(d.candidates.suggested[0].canonical_name)}` : 'new game'}</small></span>${visibleStatus('Decide', 'pending')}</button>`).join('')}${detected.map((d) => `<button class="hh-summary" data-hh-onboard="${esc(d.path)}"><span class="art art-d">⇩</span><span><strong>${esc(fileName(d.path))}</strong><small>Watched folder · ${esc(fmt.time(d.at))}</small></span>${visibleStatus('Add', 'pending', '＋')}</button>`).join('')}</div></section><section class="hh-panel"><div class="hh-panel-head"><h2>Watcher</h2><span class="spacer"></span><button class="hh-action" data-hh-watch>${watcher ? 'Stop' : 'Watch a folder'}</button></div><div class="hh-panel-body hh-summary-list"><div class="hh-summary" style="cursor:default"><span class="art" style="background:${watcher ? 'var(--positive-soft)' : 'var(--surface-2)'};color:${watcher ? 'var(--positive)' : 'var(--text-secondary)'}">⇩</span><span><strong>${esc(watcher ? watcher.folder : 'Not watching')}</strong><small>${esc(watcher ? (watcher.program ? `Running ${fileName(watcher.program)}` : 'Folder only') : 'New files in a watched folder show above')}</small></span>${watcher ? routineStatus('Watching') : visibleStatus('Idle', 'neutral', '–')}</div></div></section></div>`;
-  if (!decisions.length && !detected.length) $('#hhIntake', host).appendChild(stateBlock({ title: 'Nothing waiting', body: 'Scan results needing a decision and new downloads land here.' }));
+  host.innerHTML = `<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-head"><h2>Watcher</h2><span class="spacer"></span><button class="hh-action primary" data-hh-add>＋ Add folder</button><button class="hh-action" data-hh-watch>${watcher ? 'Stop' : 'Watch a folder'}</button></div><div class="hh-panel-body hh-summary-list"><div class="hh-summary" style="cursor:default"><span class="art" style="background:${watcher ? 'var(--positive-soft)' : 'var(--surface-2)'};color:${watcher ? 'var(--positive)' : 'var(--text-secondary)'}">⇩</span><span><strong>${esc(watcher ? watcher.folder : 'Not watching')}</strong><small>${esc(watcher ? (watcher.program ? `Running ${fileName(watcher.program)}` : 'Folder only') : 'New files in a watched folder wait in Review')}</small></span>${watcher ? routineStatus('Watching') : visibleStatus('Idle', 'neutral', '–')}</div></div></section></div>`;
 }
 function renderHHSystems() {
   const host = $('#hhContent');
@@ -1226,7 +1270,7 @@ function renderHHDecision(g) {
   if (g.updates.length) choices.push({ k: 'plan', primary: !d, title: 'Review the available update', sub: `${g.updates[0].version || 'A newer version'} was seen on ${g.updates[0].source || 'a store'}.` });
   if (g.path) choices.push({ k: 'rescan', title: 'Rescan the folder', sub: 'Identify it again with the engine plugins that are on.' });
   if (g.path) choices.push({ k: 'open', title: 'Open the folder', sub: 'See what is inside.' });
-  choices.push({ k: 'remind', title: 'Remind me later', sub: 'Keep it in Needs attention.' });
+  choices.push({ k: 'remind', title: 'Remind me later', sub: 'Keep it in Review.' });
   choices.push({ k: 'remove', title: 'Remove from library', sub: 'Files stay on disk.' });
   $('#hhContent').innerHTML = `<section class="hh-decision"><div class="hh-decision-head"><div class="hh-decision-art art-${g.art}">${esc(initials(g.name))}</div><div><div class="hh-state ${g.status}">${esc(g.statusText)}</div><h1>${esc(g.name)}</h1><p>${esc(g.status === 'critical' ? 'No engine plugin recognised this folder, so Pythia cannot say what it needs to run.' : g.updates.length ? 'A newer version than the installed one was seen.' : 'A scan found a folder that may be a game you already have.')}</p><div class="hh-facts"><div class="hh-fact"><small>Installed</small><strong>${esc(versionText(g))}</strong></div><div class="hh-fact"><small>Observed</small><strong>${esc(g.updates[0]?.version || g.statusText)}</strong></div><div class="hh-fact"><small>Systems</small><strong>${g.systems.length}</strong></div></div></div></div><div class="hh-choice-grid">${choices.map((c) => `<button class="hh-choice ${c.primary ? 'primary' : ''}" data-hh-choice="${c.k}"><strong>${esc(c.title)}</strong><small>${esc(c.sub)}</small></button>`).join('')}</div></section>`;
 }
@@ -1274,10 +1318,9 @@ function renderHHLauncher() {
     if (!entries.length) h.appendChild(stateBlock({ title: 'No launcher lists a game here', body: 'Games Steam, Epic, GOG, Amazon, itch, Battle.net, Lutris, Bottles or Minigalaxy have installed show here.' }));
   }, { what: 'Launcher entries' });
 }
-function renderHHDuplicates() {
-  const host = $('#hhContent');
+function renderHHDuplicates(host = $('#hhContent')) {
   if (model.merges === null || model.merges === undefined) { host.replaceChildren(stateBlock({ kind: 'loading' })); pythia.refresh_merge_candidates(); return; }
-  if (model.merges.status) { host.replaceChildren(fromResult(model.merges, { what: 'The duplicate search', retry: () => { model.merges = null; renderHHDuplicates(); } })); return; }
+  if (model.merges.status) { host.replaceChildren(fromResult(model.merges, { what: 'The duplicate search', retry: () => { model.merges = null; renderHandheld(); } })); return; }
   const groups = mergeClusters();
   if (!groups.length) { host.replaceChildren(stateBlock({ glyph: '✓', title: 'No possible duplicates', body: 'Records with the same or a similar name would show here.' })); return; }
   const stack = el('<div class="hh-stack"></div>'); groups.forEach((c) => stack.appendChild(clusterCard(c, { handheld: true }))); host.replaceChildren(stack);
@@ -1285,6 +1328,7 @@ function renderHHDuplicates() {
 function bindHandheldActions() {
   const host = $('#handheldShell');
   $$('[data-hh-nav-jump]', host).forEach((b) => (b.onclick = () => navigateHandheld(b.dataset.hhNavJump)));
+  $$('[data-hh-review-open]', host).forEach((b) => (b.onclick = () => { state.hhReviewSection = b.dataset.hhReviewOpen; renderHandheld(); }));
   $$('[data-hh-game]', host).forEach((b) => (b.onclick = () => { state.hhHistory.push(state.hhPage); state.hhSelected = b.dataset.hhGame; state.hhPage = 'detail'; renderHandheld(); }));
   $$('[data-hh-decision]', host).forEach((b) => (b.onclick = () => { state.hhHistory.push(state.hhPage); state.hhSelected = b.dataset.hhDecision; state.hhPage = 'decision'; renderHandheld(); }));
   $$('[data-hh-plan]', host).forEach((b) => (b.onclick = () => { state.hhHistory.push(state.hhPage); state.hhSelected = b.dataset.hhPlan; state.hhPage = 'plan'; renderHandheld(); }));
@@ -1293,17 +1337,17 @@ function bindHandheldActions() {
   $$('[data-hh-settings-page]', host).forEach((b) => (b.onclick = () => { state.hhSettingsPage = b.dataset.hhSettingsPage; renderHandheld(); }));
   $$('[data-hh-choice]', host).forEach((b) => (b.onclick = async () => {
     const g = games.find((x) => x.id === state.hhSelected); const k = b.dataset.hhChoice;
-    if (k === 'decide') leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Reconciliation page.', then: () => navigate('reconcile'), remember: false });
+    if (k === 'decide') leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Review page.', then: () => navigate('reconcile'), remember: false });
     else if (k === 'plan') { state.hhHistory.push('decision'); state.hhPage = 'plan'; renderHandheld(); }
     else if (k === 'rescan') rescanHH(g);
     else if (k === 'open') openFolder(g.path);
-    else if (k === 'remind') { flash('Kept in Needs attention'); navigateHandheld('attention', false); }
+    else if (k === 'remind') { flash('Kept in Review'); navigateHandheld('attention', false); }
     else if (k === 'remove') { if (await confirmDanger({ title: `Remove ${g.name}?`, body: 'Its record leaves the library. Files on disk stay where they are.', recommendation: 'We recommend Cancel unless the entry is wrong.', items: g.path ? [g.path] : [], proceed: 'Remove' })) { await act('forget_game', [g.id], 'Removed from library', { what: 'Remove' }); navigateHandheld('attention', false); } }
   }));
   $$('[data-hh-open]', host).forEach((b) => (b.onclick = () => openFolder(b.dataset.hhOpen)));
   $$('[data-hh-rescan]', host).forEach((b) => (b.onclick = () => rescanHH(games.find((x) => x.id === b.dataset.hhRescan))));
   $$('[data-hh-onboard]', host).forEach((b) => (b.onclick = () => { pythia.start_onboard(b.dataset.hhOnboard); pythia.forget_detected(b.dataset.hhOnboard, () => {}); flash('Adding'); }));
-  $$('[data-hh-review]', host).forEach((b) => (b.onclick = () => leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Reconciliation page.', then: () => navigate('reconcile'), remember: false })));
+  $$('[data-hh-review]', host).forEach((b) => (b.onclick = () => leaveHandheld({ body: 'Deciding on a scan result is on the desktop layout\u2019s Review page.', then: () => navigate('reconcile'), remember: false })));
   $$('[data-hh-watch]', host).forEach((b) => (b.onclick = () => (model.intake.watcher ? stopWatching() : watchFolder())));
   $$('[data-hh-add]', host).forEach((b) => (b.onclick = addFolder));
   $$('[data-hh-scan]', host).forEach((b) => (b.onclick = scanLibrary));
@@ -1411,6 +1455,7 @@ document.addEventListener('focusin', (e) => { if (state.shell === 'handheld') { 
 // Home stays. It never leaves the shell.
 function hhBack() {
   if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') { state.hhSettingsPage = 'root'; renderHandheld(); return; }
+  if (state.hhPage === 'attention' && state.hhReviewSection) { state.hhReviewSection = ''; renderHandheld(); return; }
   if (state.hhPage === 'home') return;
   if (!HH_RAIL_PAGES.includes(state.hhPage)) {
     const back = state.hhHistory.pop() || HH_PARENTS[state.hhPage] || 'home';
@@ -1447,7 +1492,7 @@ function hhMenu(anchor) {
     { label: 'Activity & jobs', run: () => navigateHandheld('activity') },
     { label: 'Save backups', run: () => navigateHandheld('saves') },
     { label: 'Launcher entries', run: () => navigateHandheld('launcher') },
-    { label: 'Duplicates', run: () => navigateHandheld('duplicates') },
+    { label: 'Review', run: () => hhOpenReview('') },
     { label: 'Add a game…', run: () => $('#hhAdd').click() },
     ...(model.config?.error_console ? [{ label: 'Error console', run: () => ErrorConsole.setOpen(true) }] : []),
     { rule: true },
@@ -1528,16 +1573,15 @@ function openKnownPath(key) { const info = model.info || {}; const app = model.a
 
 // ---- Chrome: counts, the computer card, the sync indicator, the status bar -------------------
 function renderChrome() {
-  const attention = games.filter((g) => g.status !== 'ok').length;
   const running = model.jobs.filter((j) => j.state === 'running').length;
-  const { detected, decisions } = model.intake;
-  const merges = Array.isArray(model.merges) ? mergeClusters().length : 0;
   const set = (id, n) => { const x = $(id); if (x) x.textContent = n ? String(n) : ''; };
-  set('#allCount', games.length); set('#attentionCount', attention); set('#downloadsCount', detected.length + decisions.length); set('#reconcileCount', decisions.length + merges); set('#activityCount', running);
+  const review = model.ready ? reviewQueue().affected : 0;
+  set('#allCount', games.length); set('#reviewCount', review); set('#activityCount', running);
+  $('#reviewCount')?.setAttribute('aria-label', review ? `${fmt.n(review, 'game')} to review` : '');
   const jc = $('#jobsCount'); jc.textContent = running ? String(running) : ''; jc.classList.toggle('hidden', !running);
   $('#sidebarProgress').classList.toggle('hidden', !running);
   const mine = games.filter((g) => g.mine && g.installed).length;
-  $('#sidebarSystemText').innerHTML = model.ready ? `${esc(model.app?.platform || '')}<br>${esc(fmt.n(mine, 'install'))} here · ${esc(fmt.n(decisions.length, 'decision'))} waiting` : 'Connecting to Pythia…';
+  $('#sidebarSystemText').innerHTML = model.ready ? `${esc(model.app?.platform || '')}<br>${esc(fmt.n(mine, 'install'))} here` : 'Connecting to Pythia…';
   const nSystems = new Set(games.flatMap((g) => g.systemIds)).size || 1;
   $('#statusRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(nSystems, 'system')}` : '';
   $('#statusSyncLabel').textContent = !pythia ? 'Not connected' : nSystems > 1 ? `Synced across ${nSystems} systems` : 'This system only';
@@ -1588,7 +1632,7 @@ function connect() {
     pythia.gamesChanged.connect(refreshGames);
     // Controllers come from the backend only (SPEC 2.7); the page does not read the Gamepad API.
     pythia.padAction.connect(hhPadAction);
-    pythia.lookChanged.connect((r) => { model.look = r; if (state.view === 'look') renderLook(); if (state.shell === 'handheld' && state.hhPage === 'look') renderHandheld(); });
+    pythia.lookChanged.connect((r) => { model.look = r; if (r.status === 'added') pythia.refresh_merge_candidates(); if (state.view === 'look') renderLook(); if (state.shell === 'handheld' && state.hhPage === 'look') renderHandheld(); });
     call('get_look').then((r) => { if (ok(r) || r.status) model.look = r; });
     call('get_folder_vocabulary').then((r) => { if (ok(r)) { model.vocab = r; renderCurrent(); } });
     call('describe_store_links').then((r) => { if (ok(r)) model.stores = r; });
@@ -1603,10 +1647,10 @@ function connect() {
     pythia.intakeChanged.connect((i) => { model.intake = { detected: i.detected || [], decisions: i.decisions || [], watcher: i.watcher || null }; games = model.raw.map(adaptGame); renderChrome(); if (['downloads', 'reconcile', 'library'].includes(state.view)) renderCurrent(); if (state.shell === 'handheld') renderHandheld(); });
     pythia.decisionNeeded.connect((d) => flash(`${d.name || fileName(d.path)} needs a decision`, 'caution'));
     // A failure is the failed job's own critical toast (announceFailedJobs); only success is acknowledged here.
-    pythia.onboardComplete.connect((r) => { if (r.status === 'ok') flash(`Added ${r.name || ''}`.trim()); });
+    pythia.onboardComplete.connect((r) => { if (r.status === 'ok') { flash(`Added ${r.name || ''}`.trim()); pythia.refresh_merge_candidates(); } });
     pythia.scanComplete.connect((results) => { const okN = (results || []).filter((r) => r.status === 'ok').length; flash(`Scan finished: ${fmt.n(okN, 'game')} found`); pythia.refresh_merge_candidates(); });
     pythia.downloadDetected.connect((path) => flash(`New file: ${fileName(path)}`));
-    pythia.mergeCandidatesReady.connect((c) => { model.merges = c || []; renderChrome(); if (state.view === 'reconcile') renderReconcile(); });
+    pythia.mergeCandidatesReady.connect((c) => { model.merges = c || []; renderChrome(); if (state.view === 'reconcile') renderReconcile(); if (state.shell === 'handheld' && ['home', 'attention', 'duplicates'].includes(state.hhPage)) renderHandheld(); });
     pythia.mergeComplete.connect((r) => { flash(r.status === 'ok' ? 'Records folded' : `Not folded: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'); model.merges = null; if (state.view === 'reconcile') renderReconcile(); pythia.refresh_merge_candidates(); });
     pythia.accountSyncComplete.connect((pluginId, r) => { flash(r.status === 'ok' ? `Synced: ${r.linked} linked, ${r.created} new` : `Sync failed: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'); refreshPlugins(); });
     pythia.updateCheckComplete.connect((r) => flash(r.status === 'ok' ? `Update check: ${r.checked} checked, ${r.updated} with an update` : `Update check failed: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'));

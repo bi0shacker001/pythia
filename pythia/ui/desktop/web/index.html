@@ -37,8 +37,7 @@
   <div class="menu-item"><button data-menu="library">Library</button><div class="menu-dropdown hidden" id="menu-library">
     <button data-menu-action="refresh-all">Refresh all sources</button>
     <button data-menu-action="check-updates">Check all updates</button>
-    <button data-menu-nav="library" data-filter="pending">Needs attention</button>
-    <button data-menu-nav="reconcile">Reconciliation queue</button>
+    <button data-menu-nav="reconcile">Review</button>
     <button data-menu-action="duplicates">Duplicates / merge review</button>
   </div></div>
   <div class="menu-item"><button data-menu="tools">Tools</button><div class="menu-dropdown hidden" id="menu-tools">
@@ -84,13 +83,12 @@
 <aside class="sidebar" aria-label="Primary navigation">
   <div class="nav-group"><div class="nav-label">Manage</div>
     <button class="nav-row active" data-nav="library"><span class="nav-icon">▦</span>Library<span class="nav-count" id="allCount"></span></button>
-    <button class="nav-row" data-filter-nav="pending"><span class="nav-icon">●</span>Needs attention<span class="nav-count" id="attentionCount"></span></button>
-    <button class="nav-row" data-nav="downloads"><span class="nav-icon">⇩</span>Downloads &amp; intake<span class="nav-count" id="downloadsCount"></span></button>
+    <button class="nav-row" data-nav="downloads"><span class="nav-icon">⇩</span>Downloads</button>
     <button class="nav-row" data-nav="saves"><span class="nav-icon">⟲</span>Save backups</button>
     <button class="nav-row" data-nav="launcher"><span class="nav-icon">▶</span>Launcher entries</button>
   </div>
   <div class="nav-group"><div class="nav-label">Coordinate</div>
-    <button class="nav-row" data-nav="reconcile"><span class="nav-icon">⇄</span>Reconciliation<span class="nav-count" id="reconcileCount"></span></button>
+    <button class="nav-row" data-nav="reconcile"><span class="nav-icon">⇄</span>Review<span class="nav-count" id="reviewCount" aria-label=""></span></button>
     <button class="nav-row" data-nav="systems"><span class="nav-icon">◫</span>Systems &amp; sync</button>
     <button class="nav-row" data-nav="activity"><span class="nav-icon">≋</span>Activity &amp; jobs<span class="nav-count" id="activityCount"></span></button>
   </div>
@@ -133,17 +131,20 @@
   </section>
 
   <section class="view" id="view-downloads">
-    <div class="page-head"><div><h1>Downloads &amp; intake</h1><p id="downloadsSummary"></p></div><div class="head-actions"><button class="btn" data-action="add-folder">Add folder</button><button class="btn primary" id="watchButton" data-action="watch-folder">Watch a folder</button></div></div>
+    <div class="page-head"><div><h1>Downloads</h1><p id="downloadsSummary"></p></div><div class="head-actions"><button class="btn" data-action="add-folder">Add folder</button><button class="btn primary" id="watchButton" data-action="watch-folder">Watch a folder</button></div></div>
     <div id="downloadsNotice"></div>
-    <div class="panel"><div class="panel-head"><h2>Intake queue</h2><small id="intakeCount"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Detected item</th><th>Source</th><th>Match</th><th>State</th><th></th></tr></thead><tbody id="downloadRows"></tbody></table><div id="intakeState"></div></div></div>
-    <div class="cards" style="margin-top:13px" id="downloaderCards"></div>
+    <div class="cards" id="downloaderCards"></div>
   </section>
 
   <section class="view" id="view-reconcile">
-    <div class="page-head"><div><h1>Reconciliation</h1><p id="reconcileSummary"></p></div><div class="head-actions"><button class="btn" id="refreshMerges">Find duplicates again</button></div></div>
-    <div class="stepper" id="reconcileStepper"><div class="step"><span class="n">1</span><strong>Detected</strong></div><div class="step"><span class="n">2</span><strong>Analyzed</strong></div><div class="step"><span class="n">3</span><strong>Decide</strong></div><div class="step"><span class="n">4</span><strong>Commit</strong></div></div>
-    <div id="decisionArea"></div>
-    <div class="panel" style="margin-top:13px"><div class="panel-head"><h2>Possible duplicates</h2><small id="mergeCount"></small></div><div class="panel-body" id="mergePanel"></div></div>
+    <div class="page-head"><div><h1>Review</h1><p id="reviewSummary"></p></div><div class="head-actions"><button class="btn" id="refreshMerges">Find duplicates again</button></div></div>
+    <div id="reviewEmpty"></div>
+    <div class="panel review-section" id="reviewDecisions"><div class="panel-head"><h2>Scan decisions</h2><small data-count></small></div><div class="panel-body" id="decisionArea"></div></div>
+    <div class="panel review-section" id="reviewDuplicates"><div class="panel-head"><h2>Possible duplicates</h2><small id="mergeCount"></small></div><div class="panel-body" id="mergePanel"></div></div>
+    <div class="panel review-section" id="reviewUnidentified"><div class="panel-head"><h2>Not identified</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
+    <div class="panel review-section" id="reviewUpdates"><div class="panel-head"><h2>Updates seen</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
+    <div class="panel review-section" id="reviewDownloads"><div class="panel-head"><h2>New downloads</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
+    <div class="panel review-section" id="reviewConflicts"><div class="panel-head"><h2>Sync conflicts</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
   </section>
 
   <section class="view" id="view-systems">
@@ -262,7 +263,7 @@
     <div class="hh-logo">P</div>
     <button class="hh-nav active" data-hh-nav="home"><span class="ico">⌂</span><span>Home</span></button>
     <button class="hh-nav" data-hh-nav="library"><span class="ico">▦</span><span>Library</span></button>
-    <button class="hh-nav" data-hh-nav="attention"><span class="ico">!</span><span>Attention</span></button>
+    <button class="hh-nav" data-hh-nav="attention"><span class="ico">!</span><span>Review</span></button>
     <button class="hh-nav" data-hh-nav="downloads"><span class="ico">⇩</span><span>Downloads</span></button>
     <button class="hh-nav" data-hh-nav="systems"><span class="ico">◫</span><span>Systems</span></button>
     <button class="hh-nav" data-hh-nav="activity"><span class="ico">≋</span><span>Activity</span></button>
@@ -287,6 +288,7 @@
 <script src="query.js"></script>
 <script src="versions.js"></script>
 <script src="reconcile.js"></script>
+<script src="review.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

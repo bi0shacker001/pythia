@@ -951,6 +951,40 @@ class Backend(QObject):
         start_shell.remember(shell)
         return {"status": "ok"}
 
+    # ---- the game page's primary slot (pythia.play; UX review A12) -------------
+    def _entries_of(self, game_id: str) -> list[dict] | None:
+        """The game's records as the library already holds them (refresh_games),
+        or None to read them from disk."""
+        with self._lock:
+            game = next((g for g in self._games if g.get("game_id") == game_id), None)
+        return list(game["entries"]) if game else None
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def get_play_state(self, game_id: str):
+        """Play, Install or Update for the game page's primary slot, each with
+        whether it can run and why not, and the game's store page."""
+        from pythia import play
+
+        return play.state(game_id, self._entries_of(game_id))
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def play_game(self, game_id: str):
+        """Starts the game: through Steam (its steam:// link) or Pythia's runner."""
+        from PySide6.QtGui import QDesktopServices
+
+        from pythia import play
+
+        result = play.play(game_id, self._entries_of(game_id))
+        if result.get("status") == "ok" and result.get("url"):
+            if not QDesktopServices.openUrl(QUrl(result["url"])):
+                return {"status": "error", "message": "Steam did not open. Is it installed?"}
+        if result.get("status") == "ok":
+            self._record("info", "pythia", f"Started {game_id} ({result.get('via')})", "play_game")
+        return result
+
     # ---- launcher hand-off --------------------------------------------------
     @Slot(str, result="QVariant")
     @_guarded
@@ -963,8 +997,9 @@ class Backend(QObject):
         from pythia.plugins import manager as manager_plugins
         from pythia.plugins.context import PluginContext
 
-        games = datadir.list_known_games()
-        entries = games.get(game_id, [])
+        entries = self._entries_of(game_id)
+        if entries is None:
+            entries = datadir.list_known_games().get(game_id, [])
         candidates = manager_plugins.find_for_game(entries)
         ctx = PluginContext(log=self._log)
         return _jsonable(
@@ -994,8 +1029,9 @@ class Backend(QObject):
         from pythia.plugins import manager as manager_plugins
         from pythia.plugins.context import PluginContext
 
-        games = datadir.list_known_games()
-        entries = games.get(game_id, [])
+        entries = self._entries_of(game_id)
+        if entries is None:
+            entries = datadir.list_known_games().get(game_id, [])
         candidates = manager_plugins.find_for_game(entries)
         match = next((c for c in candidates if c[0].id == manager_id), None)
         if match is None:
@@ -1012,7 +1048,8 @@ class Backend(QObject):
     def _own_install(self, game_id: str):
         """This computer's first installed variant of a game: (entry, group, variant)."""
         uuid = get_system_uuid()
-        for entry in datadir.list_all_entries():
+        known = self._entries_of(game_id)
+        for entry in known if known is not None else datadir.list_all_entries():
             if entry.get("system_uuid") != uuid or entry.get("game_id") != game_id:
                 continue
             for group in entry.get("versions", []):
@@ -1624,7 +1661,9 @@ class Backend(QObject):
             return self._agent_unavailable("get_game_saves")
         from pythia.droidtop import library, saves
 
-        entries = datadir.list_known_games().get(game_id) or []
+        entries = self._entries_of(game_id)
+        if entries is None:
+            entries = datadir.list_known_games().get(game_id) or []
         if not entries:
             return {"status": "error", "message": "This game is no longer in the library."}
         mine = [e for e in entries if e.get("system_uuid") == get_system_uuid()]

@@ -20,7 +20,7 @@ const kindName = (k) => ENGINE_KINDS[k] || SOURCE_KINDS[k] || (k && k !== 'unkno
 const systemName = (uuid) => (uuid === model.mySystem ? 'This computer' : `Computer ${String(uuid || '').slice(0, 8)}`);
 
 // ---- Model: what the backend reported, nothing else ----------------------------------
-const model = { games: [], raw: [], plugins: [], accounts: [], info: null, app: null, config: null, mySystem: null, jobs: [], intake: { detected: [], decisions: [], watcher: null }, merges: null, events: [], capabilities: {}, platformStatus: {}, gamesAt: null, ready: false };
+const model = { managers: {}, storeUrls: {}, games: [], raw: [], plugins: [], accounts: [], info: null, app: null, config: null, mySystem: null, jobs: [], intake: { detected: [], decisions: [], watcher: null }, merges: null, events: [], capabilities: {}, platformStatus: {}, gamesAt: null, ready: false };
 let games = [];   // adapted rows the existing renderers read
 let plugins = []; // adapted plugin cards
 let systems = []; // from the entries' system_uuids
@@ -278,6 +278,9 @@ const ACTION_MENUS = {
   game: (g, { open } = {}) => [
     ...(open ? [{ label: 'Open', run: open }] : []),
     ...(g.path ? [{ label: 'Rescan', run: () => (state.shell === 'handheld' ? rescanHH(g) : rescan(g)) }, { label: 'Open folder', run: () => openFolder(g.path) }] : []),
+    ...(model.managers[g.id] || []).slice(0, 1).map((m) => ({ label: `Open in ${m.manager_name}`, disabled: m.available === false, run: () => openInManager(g, m) })),
+    { label: 'Manage versions', run: () => (state.shell === 'handheld' ? hhJumpSection('versions') : openTab('versions')) },
+    ...(g.knownOn.length ? [{ label: 'Open store page', run: () => openStorePage(g) }] : []),
     { label: 'Rename', disabled: !g.mine, run: () => detailAction('rename', g) },
     { label: 'Find duplicates', run: () => goTo('reconcile', 'duplicates') },
     { label: 'Save backups', run: () => goTo('saves', 'saves') },
@@ -315,47 +318,71 @@ async function bulkAction(a) {
   }
 }
 
+// One section list per game, for both shells (UX review A12): desktop tabs, one handheld scroll with LB/RB.
+const GAME_SECTIONS = [
+  { id: 'overview', title: 'Overview', html: (g, updates) => `<div class="stats-grid"><div class="stat"><div class="label">Latest installed</div><div class="value">${esc(versionText(g))}</div></div><div class="stat"><div class="label">Systems</div><div class="value">${g.systems.length}</div><div class="sub">${esc(g.systems.join(' · '))}</div></div><div class="stat"><div class="label">Status</div><div class="value" style="text-align:left;font-size:0.875rem">${gameStatus(g)}</div>${g.added ? `<div class="sub">Added ${esc(fmt.date(g.added))}</div>` : ''}</div></div><div class="kv"><div class="key">Canonical name</div><div class="value">${esc(g.name)} ${g.mine ? '<button class="row-action" style="float:right" data-detail-action="rename" aria-label="Rename">✎</button>' : ''}</div><div class="key">Game ID</div><div class="value mono">${esc(g.id)}</div><div class="key">Source</div><div class="value">${esc(g.source)}</div><div class="key">Engine</div><div class="value">${esc(g.engine)}</div><div class="key">Platforms</div><div class="value">${esc(g.platforms.map(platformName).join(' · ') || '—')}</div><div class="key">Primary path</div><div class="value mono">${esc(g.path || '—')}</div>${g.knownOn.length ? `<div class="key">Known on</div><div class="value">${esc(g.knownOn.map((k) => `${kindName(k.platform) || k.platform} (${k.id})`).join(' · '))}</div>` : ''}${g.ownedOn.length ? `<div class="key">Owned on</div><div class="value">${esc(g.ownedOn.map((k) => kindName(k) || k).join(' · '))}</div>` : ''}</div>`, bind: null },
+  { id: 'engine', title: 'Engine &amp; Compatibility', html: (g, updates) => ``, bind: (g, pane) => renderEngineTab(g, pane) },
+  { id: 'versions', title: 'Versions', html: (g, updates) => `${updates.length ? `<h3 style="font:500 1.0625rem var(--serif);margin:0 0 9px">Available, not installed</h3>${updates.map((u) => `<div class="available-update"><span class="status-icon pending" aria-hidden="true">↻</span><div><strong>${esc(u.version || 'Newer version')} · ${esc(platformName(u.platform))}</strong><br><small>Seen via ${esc(u.source || 'a store')}${u.detected_at ? ` · ${esc(fmt.date(u.detected_at))}` : ''}</small></div><button class="btn small primary" style="margin-left:auto" data-detail-action="apply-update" data-version="${esc(u.version || '')}">Review update</button></div>`).join('')}` : ''}<h3 style="font:500 1.0625rem var(--serif);margin:14px 0 9px">Installed versions</h3>${g.versions.length ? g.versions.map((v) => `<div class="version-group"><div class="version-head"><strong>${esc(v.version && v.version !== g.name ? v.version : 'No version number')}</strong><small>${(v.variants || []).length} variant${(v.variants || []).length === 1 ? '' : 's'}</small><span class="spacer"></span></div>${(v.variants || []).map((x) => `<div class="variant-row"><div><div class="variant-name">${esc(x.language && x.language !== 'unknown' ? `Language ${x.language}` : 'Default')} ${(x.mods || []).length ? '' : ''}</div><div class="variant-path">${esc(x.path || '')}</div></div><div class="platforms">${(x.platforms || []).map((p) => `<span class="platform">${esc(platformName(p))}</span>`).join('')}</div><div>${(x.mods || []).length ? x.mods.map((m) => `<span class="tag">${esc(m.name || m)}</span>`).join(' ') : '<span style="color:var(--dim);font-size:0.625rem">No mods</span>'}</div><button class="row-action" data-variant-menu="${esc(x.path || '')}" aria-label="Variant actions">•••</button></div>`).join('')}</div>`).join('') : ''}<div data-versions-state></div><div style="margin-top:10px"><button class="btn small" data-detail-action="add-folder">＋ Add another folder</button></div>`, bind: (g, pane) => { if (!g.versions.length) $('[data-versions-state]', pane).appendChild(stateBlock({ title: 'Nothing installed here', body: g.ownedOn.length ? `Owned on ${g.ownedOn.map((k) => kindName(k) || k).join(', ')}, not installed on this computer.` : 'No folder is known for this game on this computer.' })); } },
+  { id: 'devices', title: 'Devices', html: (g, updates) => `<table class="table"><thead><tr><th>System</th><th>Availability</th><th>Versions</th><th>Readiness</th><th></th></tr></thead><tbody>${g.entries.map((e) => `<tr><td class="primary-cell"><strong>${esc(systemName(e.system_uuid))}</strong><small>${e.updated_at ? `Record updated ${esc(fmt.dateTime(e.updated_at))}` : 'Synced record'}</small></td><td>${(e.versions || []).some((v) => (v.variants || []).some((x) => x.path)) ? (e.system_uuid === model.mySystem ? routineStatus('Installed here') : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">i</span>Installed there</span>`) : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not installed</span>`}</td><td>${esc((e.versions || []).map((v) => (v.version && v.version !== e.canonical_name ? v.version : 'no version')).join(', ') || '—')}</td><td data-readiness="${esc(e.system_uuid)}">${e.system_uuid === model.mySystem ? '…' : '<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not checked here</span>'}</td><td>${e.system_uuid === model.mySystem ? '<button class="btn small" data-detail-tab="engine">Inspect</button>' : ''}</td></tr>`).join('')}</tbody></table>`, bind: null },
+  { id: 'notes', title: 'Notes', html: (g, updates) => `${g.mine ? `<textarea class="notes-area" id="notesArea" aria-label="Notes">${esc(g.note)}</textarea><div style="display:flex;justify-content:flex-end;margin-top:9px"><button class="btn primary" data-detail-action="save-note">Save note</button></div>` : ''}<div data-notes-state></div>`, bind: (g, pane) => { if (!g.mine) $('[data-notes-state]', pane).appendChild(stateBlock({ title: 'Notes live on their computer', body: `This record belongs to ${g.systems.find((s) => s !== 'This computer') || 'another computer'}; notes are read-only here.${g.note ? `\n\n${g.note}` : ''}` })); } },
+  { id: 'saves', title: 'Saves', html: (g, updates) => ``, bind: (g, pane) => renderSavesTab(g, false, pane) },
+  { id: 'history', title: 'History', html: (g, updates) => `<div class="timeline">${[...g.events].reverse().map((e) => `<div class="timeline-item"><strong>${esc(EVENT_NAMES[e.type] || e.type)}</strong><p>${esc(e.detail || '')}</p><time>${esc(fmt.dateTime(e.timestamp))}</time></div>`).join('')}</div><div data-history-state></div>`, bind: (g, pane) => { if (!g.events.length) $('[data-history-state]', pane).appendChild(stateBlock({ title: 'No history yet', body: 'Events are recorded as Pythia changes this record.' })); } },
+];
+// The primary slot (UX review A12, owner decision 1): Play, Install or Update, first and largest. Its space
+// is drawn before the backend answers, so nothing in the hero moves when it does.
+function fillPrimarySlot(g, slot, cls) {
+  if (!slot) return;
+  call('get_play_state', g.id).then((r) => {
+    if (!slot.isConnected) return;
+    if (!ok(r)) { slot.innerHTML = `<button class="${cls}" type="button" disabled data-reason="${esc(r.message || '')}">Play</button>`; return; }
+    const p = r.primary; model.storeUrls[g.id] = r.store_url || null;
+    const label = p.action === 'install' ? 'Install' : 'Play';
+    slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}</button>`;
+    const b = $('button', slot);
+    if (!p.enabled) { b.title = ''; slot.insertAdjacentElement('beforeend', el(`<small class="slot-reason">${esc(p.reason || '')}</small>`)); }
+    const start = async () => { const r2 = await act('play_game', [g.id], null, { what: `Starting ${g.name}` }); if (ok(r2)) flash(`Started ${g.name}${r2.via === 'steam' ? ' in Steam' : ''}`); };
+    // Steam opens its own window: in the handheld shell that is a hand-off, asked first (UX review A3).
+    b.onclick = () => (p.via === 'steam' ? handOff({ kind: 'launcher', launcher: 'steam', title: `Play ${g.name} in Steam?`, body: 'Steam opens and starts it.', run: start }) : start());
+    if (state.shell === 'handheld') hhKeepDisabledReachable();
+  });
+}
+// Launchers that can show this game, asked for once the page is drawn; "Open in <launcher>" is in its menu.
+function loadManagers(g) {
+  call('find_manager_for_game', g.id).then((r) => { if (ok(r)) model.managers[g.id] = r.managers || []; else ErrorConsole.reportWeb('warn', `find_manager_for_game: ${r.message}`, 'find_manager_for_game'); });
+}
+function openStorePage(g) {
+  const url = model.storeUrls[g.id];
+  if (!url) { infoSheet({ title: 'No store page known', details: `${g.name} has store ids (${g.knownOn.map((k) => `${k.platform}: ${k.id}`).join(', ')}) but no page Pythia knows how to open.` }); return; }
+  handOff({ kind: 'link', title: 'Open the store page?', body: 'Your web browser opens.', run: () => act('open_url', [url], null, { what: 'Opening the browser' }) });
+}
+function updateSlotHtml(g) {
+  // Owner decision 2 (docs/SPEC.md 1.2): an update Pythia cannot apply yet is shown, disabled, with why.
+  if (!g.updates.length) return '';
+  return `<button class="btn" type="button" disabled data-reason="Pythia records updates but does not download them yet.">Update to ${esc(g.updates[0].version || 'the newer version')} <span class="reason">· not built yet</span></button>`;
+}
 function renderDetail(g) {
   const host = $('#gameDetail');
   if (!g) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Pick a game', body: 'Its details open here.' })); return; }
   const updates = g.updates || [];
-  host.innerHTML = `<div class="detail-hero"><div class="cover-large art-${g.art}">${esc(initials(g.name))}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${gameStatus(g)}<span class="tag">${g.version ? `Version ${esc(g.version)}` : 'No version number'}</span><span class="tag">${g.systems.length} system${g.systems.length === 1 ? '' : 's'}</span>${g.managed ? '<span class="tag">Externally managed</span>' : ''}</div><p>${esc(g.note.split('\n')[0] || '')}</p><div class="detail-actions" id="detailActions">${g.path ? '<button class="btn" data-detail-action="scan">Rescan install</button><button class="btn" data-detail-action="open-folder">Open folder</button>' : ''}<button class="btn" data-detail-tab="versions">Manage versions</button><button class="icon-btn" data-detail-action="more" aria-label="More actions">•••</button></div></div></div><div class="detail-tabs"><button class="tab" data-tab="overview">Overview</button><button class="tab" data-tab="engine">Engine &amp; Compatibility</button><button class="tab" data-tab="versions">Versions</button><button class="tab" data-tab="systems">Systems</button><button class="tab" data-tab="notes">Notes</button><button class="tab" data-tab="saves">Saves</button><button class="tab" data-tab="history">History</button></div>
-<div class="tab-pane" data-pane="overview"><div class="stats-grid"><div class="stat"><div class="label">Latest installed</div><div class="value">${esc(versionText(g))}</div></div><div class="stat"><div class="label">Systems</div><div class="value">${g.systems.length}</div><div class="sub">${esc(g.systems.join(' · '))}</div></div><div class="stat"><div class="label">Status</div><div class="value" style="text-align:left;font-size:0.875rem">${gameStatus(g)}</div>${g.added ? `<div class="sub">Added ${esc(fmt.date(g.added))}</div>` : ''}</div></div><div class="kv"><div class="key">Canonical name</div><div class="value">${esc(g.name)} ${g.mine ? '<button class="row-action" style="float:right" data-detail-action="rename" aria-label="Rename">✎</button>' : ''}</div><div class="key">Game ID</div><div class="value mono">${esc(g.id)}</div><div class="key">Source</div><div class="value">${esc(g.source)}</div><div class="key">Engine</div><div class="value">${esc(g.engine)}</div><div class="key">Platforms</div><div class="value">${esc(g.platforms.map(platformName).join(' · ') || '—')}</div><div class="key">Primary path</div><div class="value mono">${esc(g.path || '—')}</div>${g.knownOn.length ? `<div class="key">Known on</div><div class="value">${esc(g.knownOn.map((k) => `${kindName(k.platform) || k.platform} (${k.id})`).join(' · '))}</div>` : ''}${g.ownedOn.length ? `<div class="key">Owned on</div><div class="value">${esc(g.ownedOn.map((k) => kindName(k) || k).join(' · '))}</div>` : ''}</div></div>
-<div class="tab-pane" data-pane="engine" id="engineTab"></div>
-<div class="tab-pane" data-pane="versions">${updates.length ? `<h3 style="font:500 1.0625rem var(--serif);margin:0 0 9px">Available, not installed</h3>${updates.map((u) => `<div class="available-update"><span class="status-icon pending" aria-hidden="true">↻</span><div><strong>${esc(u.version || 'Newer version')} · ${esc(platformName(u.platform))}</strong><br><small>Seen via ${esc(u.source || 'a store')}${u.detected_at ? ` · ${esc(fmt.date(u.detected_at))}` : ''}</small></div><button class="btn small primary" style="margin-left:auto" data-detail-action="apply-update" data-version="${esc(u.version || '')}">Review update</button></div>`).join('')}` : ''}<h3 style="font:500 1.0625rem var(--serif);margin:14px 0 9px">Installed versions</h3>${g.versions.length ? g.versions.map((v) => `<div class="version-group"><div class="version-head"><strong>${esc(v.version && v.version !== g.name ? v.version : 'No version number')}</strong><small>${(v.variants || []).length} variant${(v.variants || []).length === 1 ? '' : 's'}</small><span class="spacer"></span></div>${(v.variants || []).map((x) => `<div class="variant-row"><div><div class="variant-name">${esc(x.language && x.language !== 'unknown' ? `Language ${x.language}` : 'Default')} ${(x.mods || []).length ? '' : ''}</div><div class="variant-path">${esc(x.path || '')}</div></div><div class="platforms">${(x.platforms || []).map((p) => `<span class="platform">${esc(platformName(p))}</span>`).join('')}</div><div>${(x.mods || []).length ? x.mods.map((m) => `<span class="tag">${esc(m.name || m)}</span>`).join(' ') : '<span style="color:var(--dim);font-size:0.625rem">No mods</span>'}</div><button class="row-action" data-variant-menu="${esc(x.path || '')}" aria-label="Variant actions">•••</button></div>`).join('')}</div>`).join('') : ''}<div id="versionsState"></div><div style="margin-top:10px"><button class="btn small" data-detail-action="add-folder">＋ Add another folder</button></div></div>
-<div class="tab-pane" data-pane="systems"><table class="table"><thead><tr><th>System</th><th>Availability</th><th>Versions</th><th>Readiness</th><th></th></tr></thead><tbody>${g.entries.map((e) => `<tr><td class="primary-cell"><strong>${esc(systemName(e.system_uuid))}</strong><small>${e.updated_at ? `Record updated ${esc(fmt.dateTime(e.updated_at))}` : 'Synced record'}</small></td><td>${(e.versions || []).some((v) => (v.variants || []).some((x) => x.path)) ? (e.system_uuid === model.mySystem ? routineStatus('Installed here') : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">i</span>Installed there</span>`) : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not installed</span>`}</td><td>${esc((e.versions || []).map((v) => (v.version && v.version !== e.canonical_name ? v.version : 'no version')).join(', ') || '—')}</td><td data-readiness="${esc(e.system_uuid)}">${e.system_uuid === model.mySystem ? '…' : '<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not checked here</span>'}</td><td>${e.system_uuid === model.mySystem ? '<button class="btn small" data-detail-tab="engine">Inspect</button>' : ''}</td></tr>`).join('')}</tbody></table></div>
-<div class="tab-pane" data-pane="notes">${g.mine ? `<textarea class="notes-area" id="notesArea" aria-label="Notes">${esc(g.note)}</textarea><div style="display:flex;justify-content:flex-end;margin-top:9px"><button class="btn primary" data-detail-action="save-note">Save note</button></div>` : ''}<div id="notesState"></div></div>
-<div class="tab-pane" data-pane="saves" id="savesTab"></div>
-<div class="tab-pane" data-pane="history"><div class="timeline">${[...g.events].reverse().map((e) => `<div class="timeline-item"><strong>${esc(EVENT_NAMES[e.type] || e.type)}</strong><p>${esc(e.detail || '')}</p><time>${esc(fmt.dateTime(e.timestamp))}</time></div>`).join('')}</div><div id="historyState"></div></div>`;
-  if (!g.versions.length) $('#versionsState', host).appendChild(stateBlock({ title: 'Nothing installed here', body: g.ownedOn.length ? `Owned on ${g.ownedOn.map((k) => kindName(k) || k).join(', ')}, not installed on this computer.` : 'No folder is known for this game on this computer.' }));
-  if (!g.mine) $('#notesState', host).appendChild(stateBlock({ title: 'Notes live on their computer', body: `This record belongs to ${g.systems.find((s) => s !== 'This computer') || 'another computer'}; notes are read-only here.${g.note ? `\n\n${g.note}` : ''}` }));
-  if (!g.events.length) $('#historyState', host).appendChild(stateBlock({ title: 'No history yet', body: 'Events are recorded as Pythia changes this record.' }));
+  if (state.detailTab === 'systems') state.detailTab = 'devices';
+  host.innerHTML = `<div class="detail-hero"><div class="cover-large art-${g.art}">${esc(initials(g.name))}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${gameStatus(g)}<span class="tag">${g.version ? `Version ${esc(g.version)}` : 'No version number'}</span><span class="tag">${g.systems.length} system${g.systems.length === 1 ? '' : 's'}</span>${g.managed ? '<span class="tag">Externally managed</span>' : ''}</div><p>${esc(g.note.split('\n')[0] || '')}</p><div class="detail-actions" id="detailActions"><span class="primary-slot" data-primary-slot><button class="btn primary big" type="button" disabled>Checking…</button></span>${updateSlotHtml(g)}${g.knownOn.length ? '<button class="btn" type="button" data-detail-action="store-page">Open store page</button>' : ''}<button class="icon-btn" data-detail-action="more" aria-label="More actions">•••</button></div></div></div><div class="detail-tabs">${GAME_SECTIONS.map((sec) => `<button class="tab" data-tab="${sec.id}">${sec.title}</button>`).join('')}</div>
+${GAME_SECTIONS.map((sec) => `<div class="tab-pane" data-pane="${sec.id}">${sec.html(g, updates)}</div>`).join('')}`;
+  GAME_SECTIONS.forEach((sec) => sec.bind && sec.bind(g, $(`[data-pane="${sec.id}"]`, host)));
   $$('[data-tab]', host).forEach((t) => (t.onclick = () => openTab(t.dataset.tab)));
   $$('[data-detail-tab]', host).forEach((t) => (t.onclick = () => openTab(t.dataset.detailTab)));
   $$('[data-detail-action]', host).forEach((b) => (b.onclick = () => detailAction(b.dataset.detailAction, g, b)));
   $$('[data-variant-menu]', host).forEach((b) => (b.onclick = () => openActionMenu('variant', b, g, b.dataset.variantMenu)));
   openTab(state.detailTab || 'overview');
-  // Asked for after the page is drawn, so the list never waits on a plugin.
-  call('find_manager_for_game', g.id).then((r) => {
-    const managers = ok(r) ? r.managers || [] : [];
-    if (!ok(r)) ErrorConsole.reportWeb('warn', `find_manager_for_game: ${r.message}`, 'find_manager_for_game');
-    if (!managers.length || !$('#detailActions', host)) return;
-    const m = managers[0];
-    const b = el(`<button class="btn" type="button">Open in ${esc(m.manager_name)}${m.available === false ? ' <span class="reason">· not installed</span>' : ''}</button>`);
-    if (m.available === false) b.disabled = true;
-    b.onclick = () => openInManager(g, m);
-    $('#detailActions', host).insertBefore(b, $('[data-detail-action="open-folder"]', host) || $('[data-detail-action="more"]', host));
-  });
-  renderEngineTab(g);
-  renderSavesTab(g);
+  fillPrimarySlot(g, $('[data-primary-slot]', host), 'btn primary big');
+  loadManagers(g);
 }
 // Where the droidtop agent finds this game's saves (backend: get_game_saves, the agent's saves crate).
-function renderSavesTab(g, fetch = false) {
-  const pane = $('#savesTab'); if (!pane) return;
+function renderSavesTab(g, fetch = false, pane = $('#gameDetail [data-pane="saves"]')) {
+  if (!pane) return;
   loadInto(pane, 'get_game_saves', [g.id, fetch], (r, host) => {
     const files = r.files || [];
     if (!r.patterns) {
-      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `droidtop knows where a game keeps its saves from the Ludusavi manifest, by its key (${r.key}) or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true) }] }));
+      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `droidtop knows where a game keeps its saves from the Ludusavi manifest, by its key (${r.key}) or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true, pane) }] }));
       return;
     }
     host.appendChild(el(`<div class="kv"><div class="key">Looked for</div><div class="mono" style="word-break:break-all">${(r.patterns || []).map(esc).join('<br>')}</div></div>`));
@@ -364,8 +391,8 @@ function renderSavesTab(g, fetch = false) {
     $$('[data-open-save]', host).forEach((b) => (b.onclick = () => openFolder(b.dataset.openSave.replace(/[\\/][^\\/]*$/, ''), 'Opening the folder')));
   }, { what: "This game's saves" });
 }
-function renderEngineTab(g) {
-  const pane = $('#engineTab'); if (!pane) return;
+function renderEngineTab(g, pane = $('#gameDetail [data-pane="engine"]')) {
+  if (!pane) return;
   if (!g.path) { pane.appendChild(stateBlock({ title: 'Not installed on this computer', body: 'Engine and platform checks need a folder here.' })); return; }
   loadInto(pane, 'get_platform_status', [g.id], (r, host) => {
     model.platformStatus[g.id] = r;
@@ -390,6 +417,7 @@ function openTab(name) { state.detailTab = name; $$('.tab', $('#gameDetail')).fo
 function rescan(g, path) { pythia.start_onboard(path || g.path); flash('Rescanning'); navigate('activity'); }
 async function detailAction(a, g, btn) {
   if (a === 'open-folder') openFolder(g.path);
+  if (a === 'store-page') openStorePage(g);
   if (a === 'scan') rescan(g);
   if (a === 'rename') { const v = await prompt({ title: 'Rename game', value: g.name }); if (v && v.trim() && v.trim() !== g.name) act('rename_game', [g.id, v.trim()], 'Renamed', { what: 'Rename' }); }
   if (a === 'save-note') act('save_notes', [g.id, $('#notesArea').value], 'Note saved', { what: 'Saving the note' });
@@ -1036,9 +1064,19 @@ function renderHHSettings() {
 function renderHHDetail(g) {
   if (!g) { navigateHandheld('library', false); return; }
   const host = $('#hhContent');
-  host.innerHTML = `<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-body"><div class="hh-decision-head"><div class="hh-decision-art art-${g.art}">${esc(initials(g.name))}</div><div><h1 style="margin:0">${esc(g.name)}</h1><div class="meta">${esc(g.source)} · ${esc(g.engine)} · ${esc(versionText(g))}</div><div style="margin-top:10px">${gameStatus(g)}</div></div></div><div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px" id="hhDetailActions">${g.status !== 'ok' ? `<button class="hh-action" data-hh-decision="${g.id}">Review</button>` : ''}${g.path ? `<button class="hh-action" data-hh-rescan="${g.id}">Rescan</button>` : ''}<button class="hh-action" data-hh-nav-jump="systems">Systems</button>${g.path ? `<button class="hh-action" data-hh-open="${esc(g.path)}">Open folder</button>` : ''}</div></div></section><section class="hh-detail-section"><h2>Overview</h2><p style="margin:0;color:var(--text-secondary);line-height:1.5">${esc(g.note || '')}</p><div class="hh-plan" style="margin-top:10px"><div class="hh-plan-row"><b>Path</b><span class="mono">${esc(g.path || 'Not installed here')}</span></div><div class="hh-plan-row"><b>Platforms</b><span>${esc(g.platforms.map(platformName).join(' · ') || '—')}</span></div><div class="hh-plan-row"><b>Systems</b><span>${esc(g.systems.join(' · '))}</span></div>${g.added ? `<div class="hh-plan-row"><b>Added</b><span>${esc(fmt.date(g.added))}</span></div>` : ''}</div></section><section class="hh-detail-section"><h2>Versions</h2><div class="hh-summary-list">${g.versions.map((v) => `<div class="hh-summary" style="cursor:default"><span class="art art-${g.art}">${esc((v.version && v.version !== g.name ? v.version : '?').slice(0, 4))}</span><span><strong>${esc(v.version && v.version !== g.name ? v.version : 'No version number')}</strong><small>${(v.variants || []).length} installed variant(s)</small></span>${routineStatus('Installed')}</div>`).join('')}${g.updates.map((u) => `<button class="hh-summary" data-hh-plan="${g.id}"><span class="art" style="background:var(--warning-soft);color:var(--warning)">＋</span><span><strong>${esc(u.version || 'Newer version')}</strong><small>${esc(u.source || '')} · ${esc(platformName(u.platform))}</small></span>${visibleStatus('Available', 'pending', '↻')}</button>`).join('')}</div></section></div>`;
-  if (!g.versions.length) $('.hh-summary-list', host).appendChild(stateBlock({ title: 'Nothing installed here' }));
-  call('find_manager_for_game', g.id).then((r) => { const managers = ok(r) ? r.managers || [] : []; if (!managers.length) return; const m = managers[0]; const b = el(`<button class="hh-action" data-reason="${esc(m.manager_name)} is not installed on this computer." ${m.available === false ? 'disabled' : ''}>Open in ${esc(m.manager_name)}${m.available === false ? ' · not installed' : ''}</button>`); b.onclick = () => openInManager(g, m); $('#hhDetailActions', host)?.appendChild(b); hhKeepDisabledReachable(); });
+  // The same primary slot and sections as the desktop page (UX review A12); LB/RB jump between sections.
+  host.innerHTML = `<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-body"><div class="hh-decision-head"><div class="hh-decision-art art-${g.art}">${esc(initials(g.name))}</div><div><h1 style="margin:0">${esc(g.name)}</h1><div class="meta">${esc(g.source)} · ${esc(g.engine)} · ${esc(versionText(g))}</div><div style="margin-top:10px">${gameStatus(g)}</div></div></div><div class="actions hh-detail-actions" id="hhDetailActions"><span class="primary-slot" data-primary-slot><button class="hh-action primary" type="button" disabled>Checking…</button></span>${g.status !== 'ok' ? `<button class="hh-action" data-hh-decision="${g.id}">Review</button>` : ''}${g.updates.length ? `<button class="hh-action" disabled data-reason="Pythia records updates but does not download them yet.">Update to ${esc(g.updates[0].version || 'the newer version')}</button>` : ''}${g.knownOn.length ? '<button class="hh-action" data-hh-store>Open store page</button>' : ''}<button class="hh-action" data-hh-actions>Actions</button></div></div></section>${GAME_SECTIONS.map((sec) => `<section class="hh-detail-section" data-hh-section="${sec.id}"><h2>${sec.title}</h2><div class="hh-section-body">${sec.html(g, g.updates)}</div></section>`).join('')}</div>`;
+  GAME_SECTIONS.forEach((sec) => sec.bind && sec.bind(g, $(`[data-hh-section="${sec.id}"] .hh-section-body`, host)));
+  $$('[data-detail-action]', host).forEach((b) => (b.onclick = () => detailAction(b.dataset.detailAction, g, b)));
+  $$('[data-variant-menu]', host).forEach((b) => (b.onclick = () => openActionMenu('variant', b, g, b.dataset.variantMenu)));
+  $('[data-hh-actions]', host).onclick = (e) => openActionMenu('game', e.currentTarget, g);
+  const store = $('[data-hh-store]', host); if (store) store.onclick = () => openStorePage(g);
+  fillPrimarySlot(g, $('[data-primary-slot]', host), 'hh-action primary');
+  loadManagers(g);
+}
+function hhJumpSection(id) {
+  const sec = $(`#hhContent [data-hh-section="${id}"]`); if (!sec) return;
+  sec.setAttribute('tabindex', '-1'); sec.scrollIntoView({ block: 'start' }); (hhFocusables(sec)[0] || sec).focus();
 }
 function renderHHDecision(g) {
   if (!g) { navigateHandheld('attention', false); return; }

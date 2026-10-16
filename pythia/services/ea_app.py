@@ -10,17 +10,17 @@ from xml.etree import ElementTree
 import requests
 import urllib3
 
-from pythia.util.app_singleton import get_default as get_default_application
 from pythia import settings
 from pythia.config import PythiaConfig, write_game_config
 from pythia.database.games import add_game, get_game_by_field
 from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
-from pythia.util.image_utils import Image, thumbnail_image
 from pythia.services.base import SERVICE_LOGIN, AuthTokenExpiredError, OnlineService
 from pythia.services.lutris import sync_media
 from pythia.services.service_game import ServiceGame
 from pythia.services.service_media import ServiceMedia
+from pythia.util.app_singleton import get_default as get_default_application
+from pythia.util.image_utils import Image, thumbnail_image
 from pythia.util.log import logger
 from pythia.util.strings import slugify
 

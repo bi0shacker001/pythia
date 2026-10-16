@@ -1,12 +1,11 @@
 import os
 from gettext import gettext as _
 
-
-from pythia.util.app_singleton import get_default as get_default_application
 from pythia.database.games import get_game_by_field, get_games
 from pythia.game import Game
 from pythia.services.steam import SteamGame, SteamService
 from pythia.util import system
+from pythia.util.app_singleton import get_default as get_default_application
 from pythia.util.log import logger
 from pythia.util.strings import slugify
 

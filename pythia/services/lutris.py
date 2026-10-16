@@ -4,14 +4,11 @@ from collections.abc import Iterable
 from gettext import gettext as _
 from typing import Any
 
-
 from pythia import settings
 from pythia.api import get_api_games, get_game_installers, read_api_key
 from pythia.database.games import get_games
 from pythia.database.services import ServiceGameCollection
 from pythia.game import Game
-from pythia.util.app_singleton import get_default as get_default_application
-from pythia.util.media_loader import download_media
 from pythia.services.base import (
     SERVICE_LOGIN,
     LutrisBanner,
@@ -22,8 +19,10 @@ from pythia.services.base import (
 )
 from pythia.services.service_game import ServiceGame
 from pythia.util import http
+from pythia.util.app_singleton import get_default as get_default_application
 from pythia.util.busy import BusyAsyncCall
 from pythia.util.log import logger
+from pythia.util.media_loader import download_media
 
 
 class LutrisGame(ServiceGame):

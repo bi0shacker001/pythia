@@ -27,9 +27,7 @@ class AugustEnginePlugin(DetectOnlyEnginePlugin):
 
     def _signature_present(self, game_root: Path) -> bool:
         try:
-            marker_dirs = [
-                p for p in game_root.iterdir() if p.is_dir() and p.name.lower().startswith(_MARKER_PREFIX)
-            ]
+            marker_dirs = [p for p in game_root.iterdir() if p.is_dir() and p.name.lower().startswith(_MARKER_PREFIX)]
         except OSError:
             return False
         return len(marker_dirs) >= _MIN_MARKER_DIRS

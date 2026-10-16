@@ -20,6 +20,7 @@ from pathlib import Path
 
 from pythia import onboarding
 from pythia.plugins import engine, library
+from pythia.util.log import logger
 
 
 def _shortcut_roots(path: Path, plugins):
@@ -48,7 +49,7 @@ def _marker_roots(path: Path, plugins):
             return
 
     try:
-        children = sorted(p for p in path.iterdir() if p.is_dir())
+        children = sorted(p for p in path.iterdir() if p.is_dir() and not _hidden(p))
     except OSError:
         children = []
     for child in children:
@@ -76,30 +77,52 @@ def _generic_roots(path: Path, generic):
         yield path
 
 
-def _discover_roots(scan_root: Path, plugins, generic):
+def _hidden(folder: Path) -> bool:
+    """A folder no person puts a game in: a dot-folder (Syncthing's `.stfolder`
+    and `.stversions`, `.git`, `.Trash-1000`...) or Windows' own
+    (`$RECYCLE.BIN`, `System Volume Information`). Droidtop/tracker#538: a
+    scan took `.stfolder` for a game."""
+    name = folder.name
+    return name.startswith((".", "$")) or name.casefold() == "system volume information"
+
+
+def _discover_roots(scan_root: Path, plugins, generic, skipped: list | None = None):
     """Full discovery: marker-based roots anywhere in the tree, plus a generic
-    fallback -- but *only* for direct children of `scan_root` that had no marker-
-    based root anywhere inside them. See the plan's Detection + scanning section for
-    why generic is restricted this way."""
+    fallback for every folder that holds no marker-based root, at whatever depth
+    a container of games puts it. UX review A16/A17: a mixed folder ("Loose/"
+    with a Ren'Py game beside a Godot demo, an RPG Maker game and an unknown
+    program) kept only its recognised game when scanned from above, though
+    scanning it directly found all four. ``skipped`` collects the folders that
+    turned out to hold no game, as (path, reason)."""
     if _shortcut_roots(scan_root, plugins) is not None or any(p.is_root(scan_root) for p in plugins):
         yield from _marker_roots(scan_root, plugins)
         return
+    yield from _container_roots(scan_root, plugins, generic, skipped)
 
+
+def _container_roots(path: Path, plugins, generic, skipped: list | None):
+    """The game roots in the folders of ``path``, a folder that is not itself a
+    game: a folder holding recognised games is looked into the same way; one
+    holding none is given to the generic fallback."""
     try:
-        children = sorted(p for p in scan_root.iterdir() if p.is_dir())
+        children = sorted(p for p in path.iterdir() if p.is_dir() and not _hidden(p))
     except OSError:
         children = []
-
     for child in children:
-        found_any = False
-        for marker_root in _marker_roots(child, plugins):
-            found_any = True
-            yield marker_root
-        if not found_any and generic is not None:
-            yield from _generic_roots(child, generic)
+        if _shortcut_roots(child, plugins) is not None or any(p.is_root(child) for p in plugins):
+            yield from _marker_roots(child, plugins)
+        elif next(_marker_roots(child, plugins), None) is not None:
+            yield from _container_roots(child, plugins, generic, skipped)
+        elif generic is not None:
+            found = False
+            for root in _generic_roots(child, generic):
+                found = True
+                yield root
+            if not found and skipped is not None:
+                skipped.append((child, "no game found in it"))
 
 
-def scan_library(root: Path):
+def scan_library(root: Path | str):
     """Discover and onboard every game root under `root`. Returns the list of
     onboarding result dicts (see onboarding.onboard)."""
     root = Path(root).resolve()
@@ -113,7 +136,121 @@ def scan_library(root: Path):
     # the user hasn't disabled it.
     generic = library.generic_plugin if library.generic_plugin in library.enabled_plugins() else None
 
+    roms = _rom_folders(root)
+    is_launcher = _launcher_rule()
     results = []
     for discovered in _discover_roots(root, enabled, generic):
+        # The walk can go below a launcher's folder (Epic's Launcher/Portal):
+        # it, or any folder between it and the scanned one, counts.
+        launcher = next(
+            (f for f in (discovered, *discovered.parents) if f != root and root in f.parents and is_launcher(f)), None
+        )
+        if launcher is not None:
+            results.append(
+                {
+                    "status": "skipped",
+                    "game_path": str(discovered),
+                    "message": f"{launcher.name} is a launcher's own folder, not a game.",
+                }
+            )
+            continue
+        rom = roms.get(discovered)
+        if rom is not None:
+            results.append(
+                {
+                    "status": "skipped",
+                    "game_path": str(discovered),
+                    "message": f"{discovered.name} is a ROM folder ({', '.join(rom['systems'])}: "
+                    f"{rom['roms']} ROM{'' if rom['roms'] == 1 else 's'}), "
+                    "not a PC game; the droidtop agent lists its ROMs.",
+                }
+            )
+            continue
         results.append(onboarding.onboard(discovered))
     return results
+
+
+def _launcher_rule():
+    """droidtop-agent's rule for a launcher's own folder (Battle.net, the EA
+    app, Origin, GOG Galaxy, Epic's Launcher; pythia.droidtop.scan), or one
+    that knows none, with a warning, without the agent module or with one
+    from before the rule."""
+    from pythia import droidtop  # noqa: PLC0415
+    from pythia.droidtop import AgentError  # noqa: PLC0415
+
+    if not droidtop.available():
+        logger.warning("Launcher folders are scanned as games: %s", droidtop.why_unavailable())
+        return lambda path: False
+    from pythia.droidtop import scan  # noqa: PLC0415
+
+    try:
+        scan.launcher_folder(Path("."))
+    except AgentError as ex:
+        logger.warning("Launcher folders are scanned as games: %s", ex)
+        return lambda path: False
+    return scan.launcher_folder
+
+
+def _rom_folders(root: Path) -> dict[Path, dict]:
+    """The ROM system folders under `root`, by droidtop-agent's scanner rules
+    (pythia.droidtop.scan): Pythia's own walk would track `psx/` or `3ds/` as
+    a game. Without the agent module, none are known and a warning says so."""
+    from pythia import droidtop  # noqa: PLC0415
+    from pythia.droidtop import AgentError  # noqa: PLC0415
+
+    if not droidtop.available():
+        logger.warning("ROM folders are scanned as games: %s", droidtop.why_unavailable())
+        return {}
+    from pythia.droidtop import scan  # noqa: PLC0415
+
+    try:
+        return scan.rom_folders(root)
+    except AgentError as ex:
+        logger.warning("ROM folders are scanned as games: the droidtop agent's scanner failed: %s", ex)
+        return {}
+
+
+# ---- a scan's decisions -----------------------------------------------------
+# A scan records every folder it finds; one whose name looks like a game already
+# tracked is recorded as a new game and also asked about (the Reconcile page).
+# These keep that record and the answer consistent: the folder ends up in the
+# library once, under the game the person chose.
+
+
+def decision_for(result: dict) -> dict:
+    """A scan's result that needs a decision, as the decision card reads it:
+    the game folder (onboard()'s own "path" is the datadir file), the name,
+    the scan's candidates, what was detected and the version label, and the
+    game id the scan recorded the folder under (``recorded_game_id``)."""
+    decision = {
+        "path": result["game_path"],
+        "name": result["name"],
+        "candidates": result["candidates"],
+        "recorded_game_id": result.get("game_id"),
+    }
+    # What was detected, without writing anything; the candidates stay the
+    # scan's (a new preview would offer the scan's own record as a match).
+    pv = onboarding.preview(result["game_path"])
+    if pv.get("status") == "ok":
+        decision["detection"] = pv.get("detection")
+        decision["version_label"] = pv.get("version_label")
+    return decision
+
+
+def keeps_scan_record(decision: dict | None, recorded_game_id: str | None) -> bool:
+    """Whether the answer is "a new game", which the scan's record already is:
+    recording the folder again would make a second one."""
+    return bool(recorded_game_id) and (decision or {}).get("action") == "new"
+
+
+def resolve_decision(path: str, decision: dict | None, recorded_game_id: str | None) -> dict:
+    """Records ``path`` as the person decided; once linked to another game,
+    the scan's own record of it (``recorded_game_id``) is removed, so the
+    folder is in the library once. Returns onboard()'s result."""
+    from pythia.database import games as games_db  # noqa: PLC0415
+
+    result = onboarding.onboard(path, decision=decision)
+    if result.get("status") == "ok" and recorded_game_id and result.get("game_id") != recorded_game_id:
+        games_db.delete_game(recorded_game_id)
+        logger.info("Linked %s to %s; removed the scan's record %s", path, result.get("game_id"), recorded_game_id)
+    return result

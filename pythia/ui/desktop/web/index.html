@@ -1,257 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="ink">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pythia — Pass 5 final mockup</title>
-<style>
-:root,html[data-theme="ink"]{
-  color-scheme:dark;
-  --page:#12111a;--chrome:#181722;--sidebar-surface:#15141e;
-  --surface-0:#191824;--surface-1:#201e2d;--surface-2:#282537;--surface-3:#302c42;
-  --border:#39364d;--border-strong:#4a4661;
-  --text-primary:#eeeaf5;--text-secondary:#aaa5bc;--text-tertiary:#767188;
-  --accent:#d9a441;--accent-hover:#ebba63;--accent-soft:#39301d;--on-accent:#251b08;
-  --positive:#63bd91;--positive-soft:#192c24;--warning:#d9a441;--warning-soft:#342a18;
-  --critical-token:#df6976;--critical-soft-token:#351d25;--informational:#78a9dc;--informational-soft:#182a3c;
-  --selection:#332c20;--focus:#f4c56e;--overlay:rgba(5,4,9,.76);
-  --shadow:0 18px 48px rgba(0,0,0,.34);
-  --bg0:var(--page);--bg1:var(--surface-0);--bg2:var(--surface-1);--bg3:var(--surface-2);--bg4:var(--surface-3);
-  --line:var(--border);--line2:var(--border-strong);--text:var(--text-primary);--muted:var(--text-secondary);--dim:var(--text-tertiary);
-  --amber:var(--accent);--amber2:var(--accent-hover);--amber-bg:var(--accent-soft);
-  --ok:var(--positive);--ok-bg:var(--positive-soft);--pending:var(--warning);--pending-bg:var(--warning-soft);
-  --critical:var(--critical-token);--critical-bg:var(--critical-soft-token);--info:var(--informational);--info-bg:var(--informational-soft);
-  --sidebar:236px;--top:58px;--menu:28px;--status:32px;--radius:10px;
-  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"Cascadia Code","SFMono-Regular",Consolas,monospace;
-}
-html[data-theme="parchment"]{
-  color-scheme:light;
-  --page:#ece7da;--chrome:#f7f4ec;--sidebar-surface:#e7e1d2;
-  --surface-0:#faf8f2;--surface-1:#ffffff;--surface-2:#f3eee2;--surface-3:#e9e1d0;
-  --border:#d5ccb8;--border-strong:#bdb19a;
-  --text-primary:#28241f;--text-secondary:#6b6356;--text-tertiary:#948a78;
-  --accent:#a8672a;--accent-hover:#bd7a36;--accent-soft:#f0dfc2;--on-accent:#fff9ed;
-  --positive:#2f8f5e;--positive-soft:#e2f2e7;--warning:#a8672a;--warning-soft:#f4e5cc;
-  --critical-token:#b8433f;--critical-soft-token:#f7e2df;--informational:#356f9c;--informational-soft:#e0edf6;
-  --selection:#eee1c8;--focus:#8f561e;--overlay:rgba(49,42,32,.42);
-  --shadow:0 18px 48px rgba(73,55,31,.16);
-}
-html[data-theme="cobalt"]{
-  color-scheme:dark;
-  --page:#0e141d;--chrome:#121b26;--sidebar-surface:#101823;
-  --surface-0:#151f2b;--surface-1:#1a2634;--surface-2:#223142;--surface-3:#293b4e;
-  --border:#314559;--border-strong:#466078;
-  --text-primary:#e7edf3;--text-secondary:#9cacbc;--text-tertiary:#64778a;
-  --accent:#5fa9d8;--accent-hover:#7dbce2;--accent-soft:#1b3446;--on-accent:#07141f;
-  --positive:#63bd91;--positive-soft:#173128;--warning:#d4a95d;--warning-soft:#302819;
-  --critical-token:#df6976;--critical-soft-token:#391e27;--informational:#78a9dc;--informational-soft:#182c40;
-  --selection:#203a4d;--focus:#8fd0f4;--overlay:rgba(2,8,14,.76);
-  --shadow:0 18px 48px rgba(0,0,0,.38);
-}
-*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg0);color:var(--text);font-family:var(--sans)}
-button,input,select,textarea{font:inherit}button{color:inherit}a{color:inherit}::selection{background:#6a4b23;color:#fff}
-:focus-visible{outline:3px solid var(--amber2);outline-offset:2px}.hidden{display:none!important}
-.skip{position:fixed;left:12px;top:-70px;z-index:999;background:var(--amber2);color:#181109;padding:10px 14px;border-radius:6px}.skip:focus{top:12px}
-.menu-bar{height:var(--menu);position:fixed;z-index:100;inset:0 0 auto 0;display:flex;align-items:center;gap:18px;padding:0 13px;background:#07090c;border-bottom:1px solid #171c22;color:#abb4be;font-size:12px}
-.menu-bar button{border:0;background:transparent;padding:3px 2px;cursor:pointer}.menu-bar button:hover{color:var(--text)}
-.topbar{height:var(--top);position:fixed;z-index:90;left:0;right:0;top:var(--menu);display:flex;align-items:center;gap:10px;padding:0 14px;background:linear-gradient(#191e26,#12161c);border-bottom:1px solid var(--line);box-shadow:0 7px 22px #0008}
-.brand{display:flex;align-items:center;gap:10px;min-width:214px}.brand-mark{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--amber);border-radius:50%;font:700 20px var(--serif);color:var(--amber2);box-shadow:inset 0 0 18px #d69a4518}.brand-name{font:500 22px var(--serif);letter-spacing:.05em}.brand-sub{display:block;margin-top:1px;color:var(--dim);font-size:9px;letter-spacing:.13em;text-transform:uppercase}
-.btn,.icon-btn,.seg button,.chip,.nav-row,.tab,.row-action{border:1px solid var(--line);background:var(--bg3);border-radius:6px;min-height:36px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}.btn:hover,.icon-btn:hover,.seg button:hover,.chip:hover,.row-action:hover{background:var(--bg4);border-color:var(--line2)}.btn.primary{background:var(--amber);border-color:var(--amber2);color:#181109;font-weight:750}.btn.danger{border-color:#733e3c;color:#f0aba8}.btn.ghost{background:transparent}.btn.small,.row-action{min-height:30px;padding:0 9px;font-size:12px}.icon-btn{width:38px;padding:0;font-size:17px}.icon-btn:disabled{opacity:.35;cursor:not-allowed}
-.search{position:relative;flex:1;max-width:760px}.search input{width:100%;height:40px;border:1px solid var(--line);border-radius:6px;background:#0b0e12;color:var(--text);padding:0 74px 0 38px}.search .mag{position:absolute;left:13px;top:10px;color:var(--dim)}.search kbd{position:absolute;right:10px;top:9px;padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg2);color:var(--dim);font-size:10px}.top-spacer{flex:1}.sync-indicator{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px #63c18d18}.dot.pending{background:var(--pending);box-shadow:0 0 0 3px #e0aa5018}.dot.critical{background:var(--critical);box-shadow:0 0 0 3px #dd706d18}
-.shell{padding-top:calc(var(--menu) + var(--top));padding-bottom:var(--status);min-height:100%}.sidebar{position:fixed;z-index:70;left:0;top:calc(var(--menu) + var(--top));bottom:var(--status);width:var(--sidebar);overflow:auto;padding:12px 10px 30px;background:#0e1217;border-right:1px solid var(--line)}
-.nav-group{margin-bottom:14px}.nav-label{padding:7px 10px 5px;color:var(--dim);font-size:10px;letter-spacing:.14em;text-transform:uppercase}.nav-row{width:100%;min-height:38px;border:0;background:transparent;color:#b7c0ca;justify-content:flex-start;padding:0 10px;margin:1px 0;text-align:left}.nav-row:hover{background:#192028}.nav-row.active{color:var(--amber2);background:linear-gradient(90deg,#d69a4533,#d69a4508);box-shadow:inset 2px 0 var(--amber)}.nav-icon{width:20px;text-align:center;color:#84909e}.nav-row.active .nav-icon{color:var(--amber2)}.nav-count{margin-left:auto;color:var(--dim);font-size:11px}.nav-status{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--ok)}
-.sidebar-system{margin:14px 5px 0;padding:12px;border:1px solid var(--line);border-radius:7px;background:#11161d}.sidebar-system strong{display:block;font-size:12px}.sidebar-system small{display:block;color:var(--muted);margin-top:4px;line-height:1.35}.mini-progress{height:4px;margin-top:10px;border-radius:99px;background:#29313c;overflow:hidden}.mini-progress span{display:block;width:68%;height:100%;background:var(--amber)}
-.workspace{margin-left:var(--sidebar);min-height:calc(100vh - var(--menu) - var(--top) - var(--status));padding:20px 22px 44px}.view{display:none}.view.active{display:block}.page-head{display:flex;align-items:flex-end;gap:16px;margin-bottom:16px}.page-head .title-block{min-width:0}.eyebrow{color:var(--amber);font-size:10px;letter-spacing:.15em;text-transform:uppercase}.page-head h1{margin:3px 0 0;font:500 31px var(--serif)}.page-head p{margin:4px 0 0;color:var(--muted);font-size:13px}.head-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}.seg button{border:0;border-radius:0;min-height:34px;background:#141922;padding:0 10px;font-size:12px}.seg button+button{border-left:1px solid var(--line)}.seg button.active{background:#34302a;color:var(--amber2);box-shadow:inset 0 -2px var(--amber)}
-.notice{display:flex;align-items:flex-start;gap:12px;padding:13px 14px;border:1px solid var(--line);border-radius:7px;background:var(--bg2);margin-bottom:15px}.notice.pending{background:linear-gradient(90deg,var(--pending-bg),var(--bg2));border-color:#634e25}.notice.critical{background:linear-gradient(90deg,var(--critical-bg),var(--bg2));border-color:#673332}.notice.info{background:linear-gradient(90deg,var(--info-bg),var(--bg2));border-color:#31516f}.notice strong{font-size:13px}.notice p{margin:3px 0 0;color:var(--muted);font-size:12px}.notice .notice-actions{margin-left:auto;display:flex;gap:7px}
-.panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--bg1);box-shadow:0 10px 24px #0003;overflow:hidden}.panel-head{min-height:46px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line);background:#151a21}.panel-head h2,.panel-head h3{margin:0;font:500 18px var(--serif)}.panel-head small{color:var(--muted)}.panel-actions{margin-left:auto;display:flex;gap:7px}.panel-body{padding:14px}.empty{padding:36px;text-align:center;color:var(--muted)}
-.statusbar{height:var(--status);position:fixed;z-index:100;left:0;right:0;bottom:0;display:flex;align-items:center;gap:16px;padding:0 12px;background:#080a0d;border-top:1px solid #222a33;color:#87919e;font-size:11px}.statusbar .right{margin-left:auto}.status-track{width:110px;height:4px;background:#27303a;border-radius:9px;overflow:hidden}.status-track span{display:block;width:36%;height:100%;background:var(--amber);animation:pulseWidth 4s ease-in-out infinite}@keyframes pulseWidth{50%{width:72%}}
-/* Library */
-.library-layout{display:grid;grid-template-columns:minmax(330px,43%) minmax(420px,1fr);gap:14px;min-height:690px}.library-master{min-width:0}.library-tools{display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--line);background:#11161d}.library-tools select{height:34px;border:1px solid var(--line);border-radius:6px;background:#0c1015;color:var(--text);padding:0 10px}.game-list{max-height:calc(100vh - 280px);overflow:auto}.game-row{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:11px;align-items:center;padding:var(--row-pad,10px) 12px;border-bottom:1px solid #222934;cursor:pointer}.game-row:hover{background:#181e27}.game-row.active{background:linear-gradient(90deg,#d69a4524,#1a2028);box-shadow:inset 3px 0 var(--amber)}.cover-mini{width:46px;height:62px;border-radius:4px;display:grid;place-items:center;font:700 18px var(--serif);color:#f5e5c9;border:1px solid #ffffff18;text-shadow:0 2px 5px #000}.game-row h3{margin:0;font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.game-meta{display:flex;gap:7px;margin-top:5px;color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden}.game-meta span{overflow:hidden;text-overflow:ellipsis}.status-text{font-size:10px;font-weight:700;text-align:right}.status-text.ok{color:var(--ok)}.status-text.pending{color:var(--pending)}.status-text.critical{color:var(--critical)}
-
-/* Pass 2 iteration: List, Grid, and Handheld are three peer presentation modes. */
-.presentation-switch button{min-width:72px}.presentation-switch button:last-child{min-width:118px}
-.game-list.grid-mode{display:grid;grid-template-columns:repeat(auto-fill,minmax(154px,1fr));gap:12px;padding:12px;align-content:start}
-.game-card{min-width:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface-1);cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.10);transition:transform .12s ease,border-color .12s ease,background .12s ease}
-.game-card:hover{transform:translateY(-2px);border-color:var(--border-strong);background:var(--surface-2)}
-.game-card.active{outline:2px solid var(--accent);outline-offset:2px;background:var(--selection)}
-.game-card-art{position:relative;aspect-ratio:3/4;display:flex;align-items:flex-end;overflow:hidden;padding:10px;color:#fff}
-.game-card-art:after{content:"";position:absolute;inset:40% 0 0;background:linear-gradient(transparent,rgba(5,7,11,.88))}
-.game-card-art strong{position:relative;z-index:1;font-size:13px;line-height:1.25;text-shadow:0 2px 8px rgba(0,0,0,.65)}
-.game-card-source{position:absolute;z-index:2;left:8px;top:8px;max-width:calc(100% - 16px);padding:3px 6px;border:1px solid rgba(255,255,255,.24);border-radius:5px;background:rgba(8,11,16,.62);font:700 8px var(--mono);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.game-card-attention{position:absolute;z-index:2;right:8px;top:8px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 3px rgba(8,11,16,.55)}
-.game-card-attention.pending{background:var(--warning)}.game-card-attention.critical{background:var(--critical-token)}
-.game-card-copy{padding:8px 9px 10px}.game-card-meta{font:10px var(--mono);color:var(--text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.game-card-state{margin-top:4px;font-size:10.5px;font-weight:700}.game-card-state.pending{color:var(--warning)}.game-card-state.critical{color:var(--critical-token)}
-.library-layout.grid-presentation{grid-template-columns:minmax(540px,1fr) minmax(350px,420px)}
-.library-layout.grid-presentation .game-list{max-height:calc(100vh - 280px)}
-@media(max-width:1100px){.library-layout.grid-presentation{grid-template-columns:1fr}.game-list.grid-mode{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}}
-@media(max-width:760px){.presentation-switch button{min-width:44px}.presentation-switch button span,.density-switch{display:none}.game-list.grid-mode{grid-template-columns:repeat(2,minmax(120px,1fr));padding:8px;gap:8px}}
-.library-detail{min-width:0}.detail-hero{position:relative;min-height:194px;padding:22px 22px 18px 162px;border-bottom:1px solid var(--line);overflow:hidden;background:linear-gradient(120deg,#242b35,#12161d 68%)}.detail-hero:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 80% 10%,#d69a4522,transparent 38%);pointer-events:none}.cover-large{position:absolute;z-index:1;left:20px;top:18px;width:118px;height:158px;border:1px solid #ffffff25;border-radius:6px;display:grid;place-items:center;font:700 40px var(--serif);color:#f4e3c6;text-shadow:0 4px 10px #000;box-shadow:0 14px 34px #0008}.detail-copy{position:relative;z-index:2}.detail-copy h2{margin:4px 0 7px;font:500 29px var(--serif);line-height:1.08}.detail-copy p{margin:9px 0 0;color:#b6bec8;font-size:12px;line-height:1.5;max-width:740px}.tag-row{display:flex;gap:6px;flex-wrap:wrap}.tag{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:0 8px;border:1px solid var(--line);border-radius:99px;background:#141a21;color:#bdc5cf;font-size:10px}.tag.ok{color:var(--ok);border-color:#28553e;background:var(--ok-bg)}.tag.pending{color:var(--pending);border-color:#624d25;background:var(--pending-bg)}.tag.critical{color:var(--critical);border-color:#663433;background:var(--critical-bg)}.detail-actions{display:flex;gap:7px;margin-top:15px;flex-wrap:wrap}.detail-tabs{display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--line);background:#11161d}.tab{border:0;border-radius:0;background:transparent;min-height:43px;padding:0 13px;color:var(--muted);font-size:12px}.tab:hover{color:var(--text);background:#1a2028}.tab.active{color:var(--amber2);box-shadow:inset 0 -2px var(--amber)}.tab-pane{display:none;padding:15px;max-height:calc(100vh - 510px);overflow:auto}.tab-pane.active{display:block}.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}.stat{padding:12px;border:1px solid var(--line);border-radius:7px;background:#11161c}.stat .label{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.09em}.stat .value{margin-top:5px;font-size:14px;font-weight:700}.stat .sub{margin-top:4px;color:var(--muted);font-size:10px}.kv{display:grid;grid-template-columns:150px 1fr;gap:0;border:1px solid var(--line);border-radius:7px;overflow:hidden}.kv div{padding:9px 11px;border-bottom:1px solid var(--line);font-size:11px}.kv div:nth-last-child(-n+2){border-bottom:0}.kv .key{background:#151a21;color:var(--muted)}.kv .value{background:#10141a;min-width:0;overflow-wrap:anywhere}.mono{font-family:var(--mono);font-size:10px}.version-group{border:1px solid var(--line);border-radius:7px;margin-bottom:10px;overflow:hidden}.version-head{display:flex;align-items:center;gap:9px;padding:10px 12px;background:#171d25;border-bottom:1px solid var(--line)}.version-head strong{font-size:13px}.version-head small{color:var(--muted)}.version-head .spacer{flex:1}.variant-row{display:grid;grid-template-columns:1fr 140px 110px auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #252d38;background:#10151b}.variant-row:last-child{border-bottom:0}.variant-name{font-size:12px}.variant-path{color:var(--muted);font:10px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.platforms{display:flex;gap:4px;flex-wrap:wrap}.platform{padding:3px 6px;border-radius:4px;background:#242c37;color:#bcc5cf;font-size:9px}.available-update{padding:11px 12px;border:1px dashed #6d5327;border-radius:7px;background:#241d11;display:flex;align-items:center;gap:10px;margin-bottom:9px}.available-update strong{font-size:12px}.available-update small{color:var(--muted)}.notes-area{width:100%;min-height:220px;resize:vertical;border:1px solid var(--line);border-radius:7px;background:#0c1015;color:var(--text);padding:12px;line-height:1.5}.timeline{position:relative;padding-left:18px}.timeline:before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:1px;background:var(--line)}.timeline-item{position:relative;padding:0 0 15px 13px}.timeline-item:before{content:"";position:absolute;left:-16px;top:4px;width:7px;height:7px;border-radius:50%;background:var(--amber)}.timeline-item strong{font-size:11px}.timeline-item p{margin:4px 0 0;color:var(--muted);font-size:11px}.timeline-item time{display:block;margin-top:3px;color:var(--dim);font-size:9px}
-/* Tables/cards */
-.table{width:100%;border-collapse:collapse}.table th{text-align:left;padding:9px 11px;background:#151a21;border-bottom:1px solid var(--line);color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.08em}.table td{padding:10px 11px;border-bottom:1px solid #252c36;font-size:11px;vertical-align:middle}.table tr:hover td{background:#161c23}.table tr:last-child td{border-bottom:0}.table .primary-cell strong{display:block;font-size:12px}.table .primary-cell small{display:block;color:var(--muted);margin-top:3px}.state-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 7px;border:1px solid var(--line);border-radius:99px;font-size:9px;font-weight:700}.state-pill.ok{color:var(--ok);background:var(--ok-bg);border-color:#28553e}.state-pill.pending{color:var(--pending);background:var(--pending-bg);border-color:#624d25}.state-pill.critical{color:var(--critical);background:var(--critical-bg);border-color:#663433}.state-pill.info{color:var(--info);background:var(--info-bg);border-color:#31516f}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.card{border:1px solid var(--line);border-radius:8px;background:var(--bg1);overflow:hidden}.card-head{display:flex;align-items:center;gap:10px;padding:13px;border-bottom:1px solid var(--line);background:#151a21}.card-icon{width:35px;height:35px;border-radius:7px;display:grid;place-items:center;background:#252d38;border:1px solid #3a4553;color:var(--amber2);font-weight:800}.card-head strong{font-size:13px}.card-head small{display:block;color:var(--muted);margin-top:3px}.card-body{padding:13px}.card-body p{margin:0;color:var(--muted);font-size:11px;line-height:1.5}.card-foot{display:flex;align-items:center;gap:7px;padding:10px 13px;border-top:1px solid var(--line);background:#10151a}.card-foot .spacer{flex:1}.progress{height:7px;border-radius:99px;background:#252e39;overflow:hidden}.progress span{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--amber2));border-radius:99px}.progress.ok span{background:var(--ok)}.progress.critical span{background:var(--critical)}
-/* Onboarding */
-.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}.step{padding:10px 12px;border:1px solid var(--line);border-radius:7px;background:#11161c}.step .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#252d38;color:var(--muted);font-size:10px;margin-right:7px}.step strong{font-size:11px}.step.active{border-color:#71562b;background:#211a10}.step.active .n{background:var(--amber);color:#181109}.step.done .n{background:var(--ok);color:#08130d}.onboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.candidate{padding:12px;border:1px solid var(--line);border-radius:7px;background:#11161c;cursor:pointer}.candidate:hover{border-color:var(--line2)}.candidate.selected{border-color:var(--amber);background:#211a10;box-shadow:inset 0 0 0 1px #d69a4544}.candidate-top{display:flex;align-items:center;gap:9px}.candidate h3{margin:0;font-size:12px}.candidate p{margin:7px 0 0;color:var(--muted);font-size:10px;line-height:1.45}.confidence{margin-left:auto;font-size:9px;color:var(--pending)}.path-box{padding:11px;border:1px solid var(--line);border-radius:6px;background:#0c1015;font:10px var(--mono);overflow-wrap:anywhere}.choice-row{display:flex;gap:9px;margin-top:12px}.check-row{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:11px;margin-top:10px}.check-row input{accent-color:var(--amber)}
-/* Forms/settings */
-.settings-layout{display:grid;grid-template-columns:220px 1fr;gap:13px}.settings-nav{padding:8px}.settings-nav button{width:100%;border:0;background:transparent;color:var(--muted);padding:9px 10px;text-align:left;border-radius:5px;cursor:pointer}.settings-nav button:hover{background:#181e26;color:var(--text)}.settings-nav button.active{background:#2a261f;color:var(--amber2)}.settings-pane{display:none}.settings-pane.active{display:block}.form-section{padding:14px;border-bottom:1px solid var(--line)}.form-section:last-child{border-bottom:0}.form-section h3{margin:0 0 4px;font:500 18px var(--serif)}.form-section>p{margin:0 0 14px;color:var(--muted);font-size:11px}.form-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(260px,1.2fr);gap:20px;align-items:center;padding:10px 0;border-top:1px solid #252d37}.form-row:first-of-type{border-top:0}.form-label strong{font-size:11px}.form-label small{display:block;color:var(--muted);margin-top:3px;line-height:1.4}.field,input.field,select.field{width:100%;height:36px;border:1px solid var(--line);border-radius:6px;background:#0c1015;color:var(--text);padding:0 10px}.toggle{width:42px;height:23px;padding:2px;border:1px solid var(--line2);border-radius:99px;background:#202731;cursor:pointer;display:flex;align-items:center}.toggle span{width:17px;height:17px;border-radius:50%;background:#7a8591;transition:.15s}.toggle.on{background:#5d431e;border-color:#936a2c}.toggle.on span{transform:translateX(17px);background:var(--amber2)}
-/* Modal/toast */
-.modal-backdrop{position:fixed;z-index:300;inset:0;background:#000a;display:grid;place-items:center;padding:20px}.modal{width:min(620px,100%);border:1px solid var(--line2);border-radius:10px;background:#11161d;box-shadow:0 30px 90px #000;overflow:hidden}.modal-head{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);background:#181e26}.modal-head h2{margin:0;font:500 20px var(--serif)}.modal-body{padding:16px}.modal-body p{color:var(--muted);font-size:12px;line-height:1.5}.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--line);background:#0f141a}.toast-stack{position:fixed;z-index:400;right:16px;bottom:50px;display:flex;flex-direction:column;gap:8px}.toast{min-width:290px;max-width:420px;padding:11px 13px;border:1px solid var(--line2);border-radius:7px;background:#1a2028;box-shadow:0 16px 40px #0009;animation:toastIn .2s ease}.toast strong{display:block;font-size:11px}.toast span{display:block;margin-top:3px;color:var(--muted);font-size:10px}@keyframes toastIn{from{transform:translateY(8px);opacity:0}}
-/* Big picture */
-#bigPicture{position:fixed;z-index:250;inset:0;background:radial-gradient(circle at 70% 5%,#43321e 0,transparent 35%),linear-gradient(135deg,#0b0e12,#161b23);overflow:auto;padding:28px 42px 54px}.bp-top{display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:3;padding:4px 0 18px;background:linear-gradient(#0c0f14ee,#0c0f1400)}.bp-brand{font:500 32px var(--serif);letter-spacing:.06em}.bp-search{flex:1;max-width:650px;height:50px;border:1px solid #465262;border-radius:9px;background:#10151bd9;color:var(--text);padding:0 18px;font-size:16px}.bp-button{min-height:50px;border:1px solid #465262;border-radius:9px;background:#1b222c;color:var(--text);padding:0 18px;font-weight:700;cursor:pointer}.bp-button.primary{background:var(--amber);border-color:var(--amber2);color:#181109}.bp-button:focus,.bp-card:focus{outline:4px solid var(--amber2);outline-offset:4px}.bp-section{margin-top:24px}.bp-section h2{margin:0 0 12px;font:500 25px var(--serif)}.bp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}.bp-card{border:1px solid #394453;border-radius:10px;background:#151b23;overflow:hidden;text-align:left;color:var(--text);padding:0;cursor:pointer}.bp-art{height:190px;display:grid;place-items:center;font:700 50px var(--serif);color:#f2e3ca;text-shadow:0 5px 14px #000}.bp-copy{padding:13px}.bp-copy strong{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bp-copy span{display:block;margin-top:6px;font-size:11px}.bp-footer{position:fixed;left:0;right:0;bottom:0;height:38px;display:flex;align-items:center;gap:18px;padding:0 30px;background:#090c10ee;border-top:1px solid #2d3641;color:#a5afba;font-size:11px}.bp-footer .right{margin-left:auto}
-/* color art */
-.art-a{background:linear-gradient(145deg,#643838,#1d1820)}.art-b{background:linear-gradient(145deg,#2c506a,#18232c)}.art-c{background:linear-gradient(145deg,#5a4830,#1e1b17)}.art-d{background:linear-gradient(145deg,#4d3762,#201926)}.art-e{background:linear-gradient(145deg,#365b4b,#17211d)}.art-f{background:linear-gradient(145deg,#745a2c,#241d13)}.art-g{background:linear-gradient(145deg,#3d5360,#172027)}.art-h{background:linear-gradient(145deg,#5a323d,#21171b)}.art-i{background:linear-gradient(145deg,#354260,#171b26)}.art-j{background:linear-gradient(145deg,#24556a,#142128)}.art-k{background:linear-gradient(145deg,#65506f,#241d29)}.art-l{background:linear-gradient(145deg,#66523d,#261f18)}
-@media(max-width:1100px){:root{--sidebar:208px}.library-layout{grid-template-columns:1fr}.game-list{max-height:420px}.tab-pane{max-height:none}.settings-layout{grid-template-columns:1fr}.settings-nav{display:flex;overflow:auto}.settings-nav button{width:auto;white-space:nowrap}.onboard-grid{grid-template-columns:1fr}}
-@media(max-width:760px){.sync-indicator span,.menu-bar{display:none}:root{--menu:0px;--sidebar:0px}.topbar{top:0}.sidebar{display:none}.workspace{margin-left:0;padding:14px 12px 48px}.brand{min-width:auto}.brand-name{display:none}.search kbd{display:none}.search input{padding-right:12px}.page-head{align-items:flex-start;flex-direction:column}.head-actions{margin-left:0}.stats-grid{grid-template-columns:1fr}.variant-row{grid-template-columns:1fr}.kv{grid-template-columns:1fr}.kv .key{border-bottom:0}.form-row{grid-template-columns:1fr;gap:8px}.stepper{grid-template-columns:1fr 1fr}.statusbar span:nth-child(n+3):not(.right){display:none}.library-detail{min-width:0}.detail-hero{padding:188px 15px 15px}.cover-large{left:15px}.bp-grid{grid-template-columns:repeat(2,minmax(130px,1fr))}#bigPicture{padding:18px 18px 54px}.bp-search{display:none}}
-
-/* Pass 2 hybrid: Claude-informed palette discipline applied to the richer prototype. */
-html,body{background:var(--page)}
-body{accent-color:var(--accent)}
-::selection{background:var(--accent-soft);color:var(--text-primary)}
-:focus-visible{outline-color:var(--focus)}
-.menu-bar{background:color-mix(in srgb,var(--chrome) 92%,black);border-color:var(--border);color:var(--text-secondary)}
-.topbar{background:color-mix(in srgb,var(--chrome) 96%,transparent);border-color:var(--border);box-shadow:0 8px 28px rgba(0,0,0,.18);backdrop-filter:blur(14px)}
-.brand{min-width:150px}.brand-mark{border-radius:9px;background:var(--accent-soft);box-shadow:none}.brand-name{font-size:20px}.brand-sub{display:none}
-.btn,.icon-btn,.seg button,.chip,.nav-row,.tab,.row-action{border-radius:8px;background:var(--surface-2)}
-.btn:hover,.icon-btn:hover,.seg button:hover,.chip:hover,.row-action:hover{background:var(--surface-3)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.search input,.field,input.field,select.field,.library-tools select,.notes-area,.path-box{background:var(--surface-0);border-color:var(--border);color:var(--text-primary)}
-.search input{border-radius:9px}.search input:focus{border-color:var(--accent)}
-.sidebar{background:var(--sidebar-surface);border-color:var(--border)}
-.nav-row{background:transparent}.nav-row:hover{background:var(--surface-1)}
-.nav-row.active{color:var(--accent-hover);background:var(--accent-soft);box-shadow:inset 3px 0 var(--accent)}
-.sidebar-system{background:var(--surface-0);border-color:var(--border)}
-.workspace{background:linear-gradient(180deg,color-mix(in srgb,var(--page) 96%,var(--accent) 4%),var(--page) 220px)}
-.page-head{align-items:center}.page-head h1{font-size:29px}.eyebrow{display:none}.page-head p{font-size:12px;color:var(--text-secondary)}
-.notice{background:var(--surface-0);box-shadow:none}.notice.pending{background:linear-gradient(90deg,var(--warning-soft),var(--surface-0) 52%)}.notice.info{background:linear-gradient(90deg,var(--informational-soft),var(--surface-0) 52%)}.notice.critical{background:linear-gradient(90deg,var(--critical-soft-token),var(--surface-0) 52%)}
-.panel{background:var(--surface-0);box-shadow:var(--shadow);border-color:var(--border)}
-.panel-head,.library-tools,.detail-tabs,.version-head,.table th,.kv .key,.settings-nav{background:var(--surface-1)}
-.game-row{border-color:var(--border)}.game-row:hover{background:var(--surface-1)}.game-row.active{background:var(--selection);box-shadow:inset 3px 0 var(--accent)}
-.cover-mini,.cover-large,.bp-art{border-color:color-mix(in srgb,var(--text-primary) 16%,transparent)}
-.detail-hero{background:linear-gradient(125deg,var(--surface-2),var(--surface-0) 70%)}.detail-hero:after{background:radial-gradient(circle at 78% 8%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 40%)}
-.tag,.state-pill,.platform{background:var(--surface-2);border-color:var(--border)}
-.tab.active{color:var(--accent-hover);box-shadow:inset 0 -2px var(--accent)}
-.stat,.kv .value,.variant-row,.card,.candidate{background:var(--surface-0)}
-.card{box-shadow:0 8px 24px rgba(0,0,0,.12);border-radius:10px}.card:hover{border-color:var(--border-strong)}
-.statusbar{background:color-mix(in srgb,var(--chrome) 94%,black);border-color:var(--border)}
-.settings-nav button.active{background:var(--accent-soft);color:var(--accent-hover)}
-.toggle.on{background:var(--accent-soft);border-color:var(--accent)}.toggle.on span{background:var(--accent-hover)}
-#bigPicture{background:radial-gradient(circle at 70% 5%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 36%),linear-gradient(135deg,var(--page),var(--surface-1))}
-.bp-top{background:linear-gradient(color-mix(in srgb,var(--page) 95%,transparent),transparent)}.bp-search,.bp-button,.bp-card{background:var(--surface-1);border-color:var(--border-strong)}.bp-button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.bp-button:focus,.bp-card:focus{outline-color:var(--focus)}
-.bp-footer{background:color-mix(in srgb,var(--chrome) 94%,transparent);border-color:var(--border)}
-.theme-popover{position:fixed;z-index:180;top:calc(var(--menu) + var(--top) - 2px);right:122px;width:210px;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface-1);box-shadow:var(--shadow)}
-.theme-popover button{width:100%;display:flex;align-items:center;gap:10px;padding:9px;border:0;border-radius:7px;background:transparent;color:var(--text-primary);cursor:pointer;text-align:left}.theme-popover button:hover,.theme-popover button.active{background:var(--surface-2)}
-.theme-dots{display:flex}.theme-dots i{width:13px;height:13px;border-radius:50%;border:2px solid var(--surface-1);margin-left:-4px}.theme-dots i:first-child{margin-left:0}
-.utility-count{min-width:18px;height:18px;border-radius:99px;padding:0 5px;background:var(--critical-token);color:white;display:inline-grid;place-items:center;font-size:9px;font-weight:800}
-.add-caret{font-size:10px;opacity:.75}.topbar .icon-btn{background:transparent}.topbar .icon-btn:hover{background:var(--surface-2)}
-@media(max-width:760px){.theme-popover{right:12px;top:62px}.topbar .utility-label{display:none}}
-
-
-/* Pass 3: preserve the rich application shell while reducing routine verbosity. */
-.add-popover{position:fixed;z-index:190;top:calc(var(--menu) + var(--top) - 2px);right:222px;width:300px;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface-1);box-shadow:var(--shadow)}
-.add-popover button{width:100%;display:block;padding:10px 11px;border:0;border-radius:8px;background:transparent;color:var(--text-primary);cursor:pointer;text-align:left}
-.add-popover button:hover,.add-popover button:focus-visible{background:var(--surface-2)}
-.add-popover strong{display:block;font-size:12px}.add-popover span{display:block;margin-top:3px;color:var(--text-secondary);font-size:10px;line-height:1.35}
-.bulk-check{display:none;accent-color:var(--accent)}body.selection-mode .bulk-check{display:block}
-body.selection-mode [data-game]{cursor:default}body.selection-mode .game-card:hover{transform:none}
-#bulkToolbar{position:sticky;top:calc(var(--menu) + var(--top) + 8px);z-index:12;box-shadow:0 10px 28px rgba(0,0,0,.18)}
-#bulkToolbar .notice-actions{flex-wrap:wrap}
-#bulkToolbar button:disabled{opacity:.42;cursor:not-allowed}
-.bp-facts{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px}.bp-facts span{padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface-1);color:var(--text-secondary);font-size:12px}.bp-facts b{color:var(--text-primary)}
-.modal,.modal-head,.modal-foot{background:var(--surface-1);border-color:var(--border)}.modal-foot{background:var(--surface-0)}
-.table td{border-color:var(--border)}.table tr:hover td{background:var(--surface-1)}
-.available-update{background:var(--warning-soft);border-color:color-mix(in srgb,var(--warning) 52%,var(--border))}
-.path-box,.notes-area{background:var(--surface-0)}
-@media(max-width:760px){.add-popover{right:12px;top:62px;width:min(300px,calc(100vw - 24px))}#selectionModeButton{min-width:42px;font-size:0}#selectionModeButton:first-letter{font-size:16px}}
-
-
-/* Pass 3 list-width correction: hidden selection controls must not reserve a column. */
-body:not(.selection-mode) .game-row{grid-template-columns:46px minmax(0,1fr) auto!important}
-body.selection-mode .game-row{grid-template-columns:22px 46px minmax(0,1fr) auto!important}
-.game-row>div:nth-of-type(2){min-width:0}.game-row .game-meta{min-width:0;max-width:100%}
-
-/* Theme contrast corrections discovered during rendered light-palette testing. */
-.nav-row{color:var(--text-secondary)}.nav-icon{color:var(--text-tertiary)}
-.nav-row.active{color:var(--accent)}.nav-row.active .nav-icon{color:var(--accent)}
-.detail-copy p{color:var(--text-secondary)}
-.statusbar{color:var(--text-tertiary)}
-.sidebar-system small,.card-head small,.table .primary-cell small{color:var(--text-secondary)}
-.menu-bar button{color:var(--text-secondary)}.menu-bar button:hover{color:var(--text-primary)}
-
-
-/* Pass 3.1: Desktop and Handheld are separate application shells.
-   Each shell owns its own Library List/Grid presentation choices. */
-#handheldShell{position:fixed;z-index:260;inset:0;display:grid;grid-template-columns:92px minmax(0,1fr);background:var(--page);color:var(--text-primary);overflow:hidden}
-#handheldShell.hidden{display:none}
-.hh-rail{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:12px 9px;background:var(--sidebar-surface);border-right:1px solid var(--border)}
-.hh-logo{height:54px;display:grid;place-items:center;margin-bottom:6px;border:1px solid var(--border);border-radius:12px;background:var(--accent-soft);font:600 25px var(--serif);color:var(--accent)}
-.hh-nav{min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:10px;font-weight:700}
-.hh-nav .ico{font-size:20px;line-height:1}.hh-nav:hover,.hh-nav:focus-visible{background:var(--surface-1);color:var(--text-primary)}
-.hh-nav.active{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 52%,var(--border));color:var(--accent)}
-.hh-rail-spacer{flex:1}
-.hh-app{min-width:0;display:grid;grid-template-rows:70px minmax(0,1fr) 34px;overflow:hidden}
-.hh-topbar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--chrome) 96%,transparent)}
-.hh-back{width:44px;height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-1);color:var(--text-primary);font-size:22px;cursor:pointer}.hh-back:disabled{opacity:.3;cursor:default}
-.hh-heading{min-width:155px}.hh-heading strong{display:block;font:500 21px var(--serif)}.hh-heading small{display:block;margin-top:2px;color:var(--text-tertiary);font-size:10px}
-.hh-search{flex:1;max-width:560px;height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-0);color:var(--text-primary);padding:0 14px;font-size:13px}
-.hh-top-actions{margin-left:auto;display:flex;gap:8px}.hh-action{min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-1);color:var(--text-primary);padding:0 14px;font-weight:750;cursor:pointer}.hh-action.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.hh-content{min-width:0;overflow:auto;padding:16px 18px 28px;background:linear-gradient(180deg,color-mix(in srgb,var(--page) 96%,var(--accent) 4%),var(--page) 190px)}
-.hh-footer{display:flex;align-items:center;gap:16px;padding:0 16px;border-top:1px solid var(--border);background:var(--chrome);color:var(--text-tertiary);font-size:10px}.hh-footer .right{margin-left:auto}
-.hh-hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(270px,.7fr);gap:12px;margin-bottom:12px}.hh-panel{border:1px solid var(--border);border-radius:12px;background:var(--surface-0);overflow:hidden}.hh-panel-head{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 13px;border-bottom:1px solid var(--border);background:var(--surface-1)}.hh-panel-head h2{margin:0;font:500 17px var(--serif)}.hh-panel-head small{color:var(--text-tertiary)}.hh-panel-head .spacer{flex:1}.hh-panel-body{padding:12px}
-.hh-welcome{padding:18px}.hh-welcome h1{margin:0;font:500 27px var(--serif)}.hh-welcome p{max-width:620px;margin:7px 0 0;color:var(--text-secondary);font-size:12px;line-height:1.55}.hh-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:16px}.hh-quick button{min-height:74px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface-1);color:var(--text-primary);text-align:left;cursor:pointer}.hh-quick button:hover,.hh-quick button:focus-visible{border-color:var(--accent);background:var(--surface-2)}.hh-quick b{display:block;font-size:18px}.hh-quick span{display:block;margin-top:4px;color:var(--text-secondary);font-size:10px}
-.hh-summary-list{display:grid;gap:8px}.hh-summary{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px;border:1px solid var(--border);border-radius:9px;background:var(--surface-1);cursor:pointer;text-align:left;color:var(--text-primary)}.hh-summary:hover,.hh-summary:focus-visible{background:var(--surface-2);border-color:var(--border-strong)}.hh-summary .art{width:42px;height:50px;border-radius:6px;display:grid;place-items:center;font:700 15px var(--serif);color:#fff}.hh-summary strong{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hh-summary small{display:block;margin-top:3px;color:var(--text-tertiary);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hh-state{font-size:10px;font-weight:800}.hh-state.ok{color:var(--positive)}.hh-state.pending{color:var(--warning)}.hh-state.critical{color:var(--critical-token)}
-.hh-two-col{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:12px}.hh-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}.hh-toolbar .spacer{flex:1}.hh-seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}.hh-seg button{min-height:38px;border:0;border-right:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);padding:0 13px;cursor:pointer;font-weight:700}.hh-seg button:last-child{border-right:0}.hh-seg button.active{background:var(--accent-soft);color:var(--accent);box-shadow:inset 0 -2px var(--accent)}.hh-filter{height:38px;border:1px solid var(--border);border-radius:9px;background:var(--surface-0);color:var(--text-primary);padding:0 10px}
-.hh-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}.hh-game-card{min-width:0;border:1px solid var(--border);border-radius:11px;overflow:hidden;background:var(--surface-0);color:var(--text-primary);padding:0;text-align:left;cursor:pointer}.hh-game-card:hover,.hh-game-card:focus-visible{border-color:var(--accent);background:var(--surface-1)}.hh-card-art{height:124px;display:flex;align-items:flex-end;padding:9px;position:relative;color:#fff}.hh-card-art:after{content:"";position:absolute;inset:35% 0 0;background:linear-gradient(transparent,rgba(0,0,0,.82))}.hh-card-art strong{position:relative;z-index:1;font-size:12px;line-height:1.2}.hh-card-copy{padding:8px}.hh-card-copy small{display:block;color:var(--text-tertiary);font-size:9px}.hh-card-copy span{display:block;margin-top:4px;font-size:10px;font-weight:750}
-.hh-library-list{display:grid;gap:6px}.hh-game-row{display:grid;grid-template-columns:42px minmax(0,1fr) 120px auto;gap:10px;align-items:center;min-height:56px;padding:7px 9px;border:1px solid var(--border);border-radius:9px;background:var(--surface-0);color:var(--text-primary);cursor:pointer;text-align:left}.hh-game-row:hover,.hh-game-row:focus-visible{background:var(--surface-1);border-color:var(--accent)}.hh-game-row .art{width:42px;height:46px;border-radius:6px;display:grid;place-items:center;font:700 14px var(--serif);color:#fff}.hh-game-row strong{display:block;font-size:12px}.hh-game-row small{display:block;margin-top:3px;color:var(--text-tertiary);font-size:9px}.hh-game-row .system{color:var(--text-secondary);font-size:10px}.hh-game-row .state{text-align:right;font-size:10px;font-weight:800}
-.hh-detail{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px}.hh-detail-cover{height:200px;border:1px solid var(--border);border-radius:12px;display:grid;place-items:center;font:700 42px var(--serif);color:#fff}.hh-detail h1{margin:0;font:500 28px var(--serif)}.hh-detail .meta{margin-top:5px;color:var(--text-secondary);font-size:11px}.hh-detail .actions{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}.hh-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}.hh-fact{padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--surface-1)}.hh-fact small{display:block;color:var(--text-tertiary);font-size:9px;text-transform:uppercase;letter-spacing:.08em}.hh-fact strong{display:block;margin-top:4px;font-size:12px}.hh-detail-sections{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px}.hh-detail-section{border:1px solid var(--border);border-radius:10px;background:var(--surface-0);padding:12px}.hh-detail-section h2{margin:0 0 8px;font:500 16px var(--serif)}
-.hh-issue-list{display:grid;gap:8px}.hh-issue{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:11px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface-0);color:var(--text-primary);cursor:pointer;text-align:left}.hh-issue:hover,.hh-issue:focus-visible{background:var(--surface-1);border-color:var(--accent)}.hh-issue .symbol{width:44px;height:44px;border-radius:9px;display:grid;place-items:center;background:var(--warning-soft);color:var(--warning);font-size:20px}.hh-issue.critical .symbol{background:var(--critical-soft-token);color:var(--critical-token)}.hh-issue strong{display:block;font-size:12px}.hh-issue small{display:block;margin-top:4px;color:var(--text-secondary);font-size:10px}.hh-issue .go{font-size:18px;color:var(--text-tertiary)}
-.hh-decision{max-width:900px;margin:0 auto}.hh-decision-head{display:grid;grid-template-columns:128px minmax(0,1fr);gap:15px;align-items:start}.hh-decision-art{height:170px;border-radius:12px;display:grid;place-items:center;font:700 36px var(--serif);color:#fff}.hh-decision h1{margin:0;font:500 26px var(--serif)}.hh-decision p{margin:7px 0 0;color:var(--text-secondary);font-size:11px;line-height:1.5}.hh-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px}.hh-choice{min-height:66px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;background:var(--surface-1);color:var(--text-primary);text-align:left;cursor:pointer}.hh-choice.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.hh-choice strong{display:block;font-size:12px}.hh-choice small{display:block;margin-top:4px;opacity:.78;font-size:10px}.hh-plan{display:grid;gap:8px;margin-top:14px}.hh-plan-row{display:grid;grid-template-columns:140px 1fr;gap:12px;padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface-0);font-size:10px}.hh-plan-row b{color:var(--text-secondary)}
-.hh-system-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.hh-system{padding:13px;border:1px solid var(--border);border-radius:11px;background:var(--surface-0)}.hh-system h2{margin:0;font:500 17px var(--serif)}.hh-system p{margin:5px 0 0;color:var(--text-secondary);font-size:10px;line-height:1.45}.hh-system .line{display:flex;justify-content:space-between;gap:10px;margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:10px}
-.hh-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hh-setting{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-0)}.hh-setting strong{display:block;font-size:12px}.hh-setting small{display:block;margin:4px 0 9px;color:var(--text-secondary);font-size:10px;line-height:1.4}.hh-setting select{width:100%;height:38px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary);padding:0 9px}
-body.handheld-active>.menu-bar,body.handheld-active>.topbar,body.handheld-active>.shell,body.handheld-active>footer.statusbar{visibility:hidden;pointer-events:none}
-@media(max-width:820px){#handheldShell{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 66px}.hh-rail{grid-row:2;display:grid;grid-template-columns:repeat(6,1fr);padding:6px;border-right:0;border-top:1px solid var(--border)}.hh-logo,.hh-rail-spacer,.hh-nav.desktop-switch{display:none}.hh-nav{min-height:52px}.hh-app{grid-row:1;grid-template-rows:62px minmax(0,1fr) 30px}.hh-heading{min-width:110px}.hh-heading small,.hh-top-actions .desktop-label{display:none}.hh-content{padding:11px}.hh-hero,.hh-two-col{grid-template-columns:1fr}.hh-quick{grid-template-columns:1fr 1fr}.hh-system-grid{grid-template-columns:1fr}.hh-settings{grid-template-columns:1fr}.hh-detail{grid-template-columns:100px minmax(0,1fr)}.hh-detail-cover{height:138px}.hh-detail-sections{grid-template-columns:1fr}.hh-choice-grid{grid-template-columns:1fr}.hh-library-grid{grid-template-columns:repeat(2,minmax(110px,1fr))}.hh-game-row{grid-template-columns:38px minmax(0,1fr) auto}.hh-game-row .system{display:none}.hh-search{display:none}}
-
-/* Pass 4: a real menu bar, Engine & Compatibility, Accounts, and downloadable tools. */
-.menu-bar{position:fixed}.menu-item{position:relative}
-.menu-dropdown{position:absolute;top:26px;left:0;z-index:110;min-width:220px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);box-shadow:var(--shadow)}
-.menu-dropdown.hidden{display:none}
-.menu-dropdown button{width:100%;display:block;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:var(--text-primary);text-align:left;cursor:pointer;font-size:12.5px}
-.menu-dropdown button:hover,.menu-dropdown button:focus-visible{background:var(--surface-2)}
-.menu-dropdown hr{border:0;border-top:1px solid var(--border);margin:5px 2px}
-.platform-status{display:grid;gap:8px;margin-top:4px}
-.platform-row{display:grid;grid-template-columns:130px 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface-0)}
-.platform-row .req{color:var(--text-secondary);font-size:11px}
-.engine-banner{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--border);border-radius:9px;background:var(--surface-1);margin-bottom:12px}
-.engine-banner .spacer{flex:1}
-.account-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:9px;background:var(--surface-0);margin-bottom:8px}
-.account-row .card-icon{width:34px;height:34px}
-
-/* Pass 5 final: status meaning is redundant with shape/text, never color alone. */
-.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
-.status-icon{display:inline-grid;place-items:center;flex:0 0 auto;width:19px;height:19px;border:1px solid var(--border-strong);border-radius:50%;font-size:11px;font-weight:900;line-height:1}
-.status-icon.ok{color:var(--positive);background:var(--positive-soft);border-color:color-mix(in srgb,var(--positive) 55%,var(--border))}
-.status-icon.pending{color:var(--warning);background:var(--warning-soft);border-color:color-mix(in srgb,var(--warning) 55%,var(--border))}
-.status-icon.critical{color:var(--critical-token);background:var(--critical-soft-token);border-color:color-mix(in srgb,var(--critical-token) 55%,var(--border))}
-.status-icon.neutral{color:var(--text-secondary);background:var(--surface-2)}
-.status-inline{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:750}
-.status-inline.pending{color:var(--warning)}.status-inline.critical{color:var(--critical-token)}.status-inline.neutral{color:var(--text-secondary)}
-.account-row .row-status{margin-left:auto;display:flex;align-items:center;gap:8px}
-.settings-nav{padding:8px 8px 12px}.settings-nav-group+.settings-nav-group{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
-.settings-nav-label{padding:4px 10px 5px;color:var(--text-tertiary);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
-.settings-nav button{min-height:36px}
-.inline-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-.root-meta{display:flex;align-items:center;gap:7px;margin-top:4px;color:var(--text-secondary);font-size:11px}
-.planned-label{display:inline-flex;align-items:center;padding:3px 7px;border:1px solid var(--border);border-radius:99px;color:var(--text-secondary);background:var(--surface-2);font-size:10px;font-weight:750}
-.capability-row{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
-.capability-row:first-of-type{border-top:0}.capability-row strong{font-size:12px}.capability-row small{display:block;margin-top:3px;color:var(--text-secondary);font-size:11px}
-.hh-stack{display:grid;gap:12px}.hh-alert-strip{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--critical-token) 45%,var(--border));border-radius:12px;background:var(--critical-soft-token)}
-.hh-alert-strip strong{font-size:14px}.hh-alert-strip small{display:block;margin-top:2px;color:var(--text-secondary);font-size:12px}
-.hh-settings-menu{display:grid;gap:9px}.hh-settings-link{min-height:58px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:11px;background:var(--surface-0);color:var(--text-primary);text-align:left;cursor:pointer}.hh-settings-link:hover,.hh-settings-link:focus-visible{background:var(--surface-2);border-color:var(--accent)}.hh-settings-link strong{display:block;font-size:14px}.hh-settings-link small{display:block;margin-top:3px;color:var(--text-secondary);font-size:12px}.hh-settings-link .go{font-size:22px;color:var(--text-tertiary)}
-.hh-capability-list{display:grid;gap:9px}.hh-capability{display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:62px;padding:10px 12px;border:1px solid var(--border);border-radius:11px;background:var(--surface-0)}.hh-capability strong{display:block;font-size:14px}.hh-capability small{display:block;margin-top:3px;color:var(--text-secondary);font-size:12px}.hh-capability .controls{display:flex;align-items:center;gap:8px}
-@media(min-width:761px){.hh-settings-menu{max-width:760px}.hh-capability-list{max-width:860px}}
-.handheld-active .hh-nav{min-height:68px;font-size:12px}.handheld-active .hh-heading small{font-size:12px}.handheld-active .hh-search{font-size:14px}.handheld-active .hh-footer{font-size:12px}.handheld-active .hh-panel-head{min-height:50px}.handheld-active .hh-panel-head h2{font-size:19px}.handheld-active .hh-panel-head small{font-size:12px}.handheld-active .hh-action{min-height:48px;font-size:14px}.handheld-active .hh-summary{min-height:64px;padding:10px}.handheld-active .hh-summary strong{font-size:14px}.handheld-active .hh-summary small{font-size:12px;white-space:normal}.handheld-active .hh-state{font-size:12px}.handheld-active .hh-toolbar small,.handheld-active .hh-toolbar span{font-size:12px}.handheld-active .hh-filter,.handheld-active .hh-seg button{min-height:46px;font-size:13px}.handheld-active .hh-game-row{min-height:72px}.handheld-active .hh-game-row strong{font-size:14px}.handheld-active .hh-game-row small{font-size:12px}.handheld-active .hh-card-copy small{font-size:12px}.handheld-active .hh-setting strong{font-size:15px}.handheld-active .hh-setting small{font-size:12px}.handheld-active .hh-setting select{min-height:48px;font-size:14px}.handheld-active .hh-detail-section p{font-size:13px!important}
-
-</style>
+<title>Pythia</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -259,6 +14,7 @@ body.handheld-active>.menu-bar,body.handheld-active>.topbar,body.handheld-active
   <div class="menu-item"><button data-menu="file">File</button><div class="menu-dropdown hidden" id="menu-file">
     <button data-add-choice="folder">Add game folder</button>
     <button data-add-choice="scan">Scan library folder</button>
+    <button data-add-choice="stores">Find store games</button>
     <button data-add-choice="source">Import from source</button>
     <button data-add-choice="download">Register downloaded file</button>
     <hr><button data-menu-action="exit">Exit</button>
@@ -281,8 +37,7 @@ body.handheld-active>.menu-bar,body.handheld-active>.topbar,body.handheld-active
   <div class="menu-item"><button data-menu="library">Library</button><div class="menu-dropdown hidden" id="menu-library">
     <button data-menu-action="refresh-all">Refresh all sources</button>
     <button data-menu-action="check-updates">Check all updates</button>
-    <button data-menu-nav="library" data-filter="pending">Needs attention</button>
-    <button data-menu-nav="reconcile">Reconciliation queue</button>
+    <button data-menu-nav="reconcile">Review</button>
     <button data-menu-action="duplicates">Duplicates / merge review</button>
   </div></div>
   <div class="menu-item"><button data-menu="tools">Tools</button><div class="menu-dropdown hidden" id="menu-tools">
@@ -290,6 +45,7 @@ body.handheld-active>.menu-bar,body.handheld-active>.topbar,body.handheld-active
     <button data-menu-action="rebuild-cache">Rebuild local cache</button>
     <button data-menu-action="tools">Downloadable tools…</button>
     <button data-settings-nav="plugins">Plugins</button>
+    <button class="hidden" data-console-toggle>Error console</button>
   </div></div>
   <div class="menu-item"><button data-menu="help">Help</button><div class="menu-dropdown hidden" id="menu-help">
     <button data-menu-action="about">About Pythia</button>
@@ -303,44 +59,48 @@ body.handheld-active>.menu-bar,body.handheld-active>.topbar,body.handheld-active
   <div class="search"><span class="mag">⌕</span><input id="globalSearch" aria-label="Search current view" placeholder="Search games, engines, versions, paths…"><kbd>Ctrl K</kbd></div>
   <div class="top-spacer"></div>
   <button class="btn primary" id="addButton" aria-haspopup="menu" aria-expanded="false" title="Add a game, scan a library, or import from a source">＋ Add <span class="add-caret">⌄</span></button>
-  <button class="icon-btn" data-nav="activity" aria-label="Jobs and activity" title="Jobs and activity">≋<span class="utility-count">2</span></button>
+  <button class="icon-btn" data-nav="activity" aria-label="Jobs and activity" title="Jobs and activity">≋<span class="utility-count hidden" id="jobsCount"></span></button>
+  <button class="icon-btn hidden" data-console-toggle aria-label="Error console" title="Error console (Ctrl+Shift+E)">⚠<span class="utility-count hidden"></span></button>
+  <button class="icon-btn" id="recentButton" aria-label="Recent" title="Recent">🔔</button>
   <button class="icon-btn" id="enterHandheldButton" aria-label="Switch to handheld interface" title="Switch to handheld interface">🎮</button>
   <button class="icon-btn" id="themeButton" aria-label="Change theme" title="Change theme">◐</button>
   <button class="icon-btn" data-nav="settings" aria-label="Settings" title="Settings">⚙</button>
-  <div class="sync-indicator"><span class="status-icon ok" role="img" aria-label="Metadata synchronized" title="Metadata synchronized">✓</span><span>12s ago</span></div>
+  <div class="sync-indicator" id="syncIndicator"><span class="status-icon neutral" role="img" aria-label="Connecting" title="Connecting">○</span><span id="syncLabel">Connecting</span></div>
 </header>
 <div class="theme-popover hidden" id="themePopover" role="menu" aria-label="Theme">
-  <button data-theme-choice="ink"><span class="theme-dots"><i style="background:#14131f"></i><i style="background:#d9a441"></i><i style="background:#201e30"></i></span><span>Ink &amp; Amber</span></button>
-  <button data-theme-choice="parchment"><span class="theme-dots"><i style="background:#f2efe6"></i><i style="background:#a8672a"></i><i style="background:#ffffff"></i></span><span>Parchment</span></button>
-  <button data-theme-choice="cobalt"><span class="theme-dots"><i style="background:#10161f"></i><i style="background:#5fa9d8"></i><i style="background:#16202c"></i></span><span>Slate &amp; Cobalt</span></button>
+  <button data-theme-choice="ink"><span class="theme-dots"><i style="background:var(--swatch-ink-1)"></i><i style="background:var(--swatch-ink-2)"></i><i style="background:var(--swatch-ink-3)"></i></span><span>Ink &amp; Amber</span></button>
+  <button data-theme-choice="parchment"><span class="theme-dots"><i style="background:var(--swatch-parchment-1)"></i><i style="background:var(--swatch-parchment-2)"></i><i style="background:var(--swatch-parchment-3)"></i></span><span>Parchment</span></button>
+  <button data-theme-choice="cobalt"><span class="theme-dots"><i style="background:var(--swatch-cobalt-1)"></i><i style="background:var(--swatch-cobalt-2)"></i><i style="background:var(--swatch-cobalt-3)"></i></span><span>Slate &amp; Cobalt</span></button>
 </div>
 <div class="add-popover hidden" id="addPopover" role="menu" aria-label="Add to Pythia">
   <button data-add-choice="folder"><strong>Add game folder</strong><span>Register one existing install</span></button>
   <button data-add-choice="scan"><strong>Scan library folder</strong><span>Discover multiple candidate roots</span></button>
-  <button data-add-choice="source"><strong>Import from source</strong><span>Use an enabled library or acquisition plugin</span></button>
+  <button data-add-choice="stores"><strong>Find store games</strong><span>What Steam, Epic, GOG, itch and the other stores have installed here</span></button>
+  <button data-add-choice="source"><strong>Import from source</strong><span>Use a connected game source</span></button>
   <button data-add-choice="download"><strong>Register downloaded file</strong><span>Send an archive or extracted folder to intake</span></button>
 </div>
 <div class="shell">
 <aside class="sidebar" aria-label="Primary navigation">
   <div class="nav-group"><div class="nav-label">Manage</div>
-    <button class="nav-row active" data-nav="library"><span class="nav-icon">▦</span>Library<span class="nav-count" id="allCount">16</span></button>
-    <button class="nav-row" data-filter-nav="pending"><span class="nav-icon">●</span>Needs attention<span class="nav-count">9</span></button>
-    <button class="nav-row" data-nav="downloads"><span class="nav-icon">⇩</span>Downloads &amp; intake<span class="nav-count">3</span></button>
+    <button class="nav-row active" data-nav="library"><span class="nav-icon">▦</span>Library<span class="nav-count" id="allCount"></span></button>
+    <button class="nav-row" data-nav="downloads"><span class="nav-icon">⇩</span>Downloads</button>
+    <button class="nav-row" data-nav="saves"><span class="nav-icon">⟲</span>Save backups</button>
+    <button class="nav-row" data-nav="launcher"><span class="nav-icon">▶</span>Launcher entries</button>
   </div>
   <div class="nav-group"><div class="nav-label">Coordinate</div>
-    <button class="nav-row" data-nav="reconcile"><span class="nav-icon">⇄</span>Reconciliation<span class="nav-count">2</span></button>
+    <button class="nav-row" data-nav="reconcile"><span class="nav-icon">⇄</span>Review<span class="nav-count" id="reviewCount" aria-label=""></span></button>
     <button class="nav-row" data-nav="systems"><span class="nav-icon">◫</span>Systems &amp; sync</button>
-    <button class="nav-row" data-nav="activity"><span class="nav-icon">≋</span>Activity &amp; jobs<span class="nav-count">4</span></button>
+    <button class="nav-row" data-nav="activity"><span class="nav-icon">≋</span>Activity &amp; jobs<span class="nav-count" id="activityCount"></span></button>
   </div>
   <div class="nav-group"><div class="nav-label">Extend</div>
     <button class="nav-row" data-settings-nav="plugins"><span class="nav-icon">◇</span>Plugins</button>
     <button class="nav-row" data-nav="settings"><span class="nav-icon">⚙</span>Settings</button>
   </div>
-  <div class="sidebar-system"><strong>Desktop</strong><small>Windows x86_64 · online<br>42 local installs · 3 pending actions</small><div class="mini-progress"><span></span></div></div>
+  <div class="sidebar-system" id="sidebarSystem"><strong>This computer</strong><small id="sidebarSystemText">Connecting to Pythia…</small><div class="mini-progress hidden" id="sidebarProgress"><span></span></div></div>
 </aside>
 <main class="workspace" id="main">
   <section class="view active" id="view-library">
-    <div class="page-head"><div class="title-block"><h1>Library</h1><p id="librarySummary">16 games · 3 systems · 9 need attention</p></div>
+    <div class="page-head"><div class="title-block"><h1>Library</h1><p id="librarySummary"></p></div>
       <div class="head-actions">
         <button class="btn" id="selectionModeButton" aria-pressed="false">☑ Select</button>
         <div class="seg presentation-switch" aria-label="Desktop library presentation">
@@ -351,83 +111,73 @@ body.handheld-active>.menu-bar,body.handheld-active>.topbar,body.handheld-active
         <select class="field" id="sortSelect" aria-label="Sort games" style="width:auto"><option value="name">Sort: Name</option><option value="status">Sort: Attention first</option><option value="updated">Sort: Recently updated</option></select>
       </div>
     </div>
-    <div class="notice pending"><span class="dot pending"></span><div><strong>9 items need review</strong><p>Updates, compatibility gaps, and identity conflicts.</p></div><div class="notice-actions"><button class="btn small" data-nav="reconcile">Review queue</button></div></div>
-    
-    <div class="notice hidden" id="bulkToolbar" style="align-items:center;background:var(--surface-2)">
-      <strong id="bulkCount" style="font-size:12px">Select games</strong>
-      <div class="notice-actions" style="gap:7px">
+    <div id="libraryNotice"></div>
+    <div class="bulk-bar hidden" id="bulkToolbar">
+      <strong id="bulkCount">Select games</strong>
+      <div class="bulk-actions">
         <button class="btn small ghost" id="bulkSelectAll">Select visible</button>
         <button class="btn small" data-bulk-action="updates">Check updates</button>
-        <button class="btn small" data-bulk-action="reconcile">Reconcile selected</button>
+        <button class="btn small" data-bulk-action="reconcile">Find duplicates</button>
         <button class="btn small" data-bulk-action="backup">Back up saves</button>
-        <button class="btn small" data-bulk-action="policy">Management policy…</button>
         <button class="btn small" data-bulk-action="export">Export report</button>
+        <button class="btn small danger" data-bulk-action="remove">Remove from library</button>
         <button class="btn small ghost" id="bulkClear">Done</button>
       </div>
     </div>
     <div class="library-layout" id="libraryLayout">
-      <section class="panel library-master" aria-label="Game list"><div class="library-tools"><select id="sourceFilter"><option value="all">All sources</option><option>Steam</option><option>F95Checker</option><option>Manual</option></select><select id="engineFilter"><option value="all">All engines</option><option>Ren'Py</option><option>Kirikiri</option><option>Unity</option><option>Unknown</option></select><button class="btn small ghost" id="clearFilters">Clear</button></div><div class="game-list" id="gameList"></div></section>
+      <section class="panel library-master" aria-label="Game list"><div class="library-tools"><select id="sourceFilter"><option value="all">All sources</option></select><select id="engineFilter"><option value="all">All engines</option></select><button class="btn small ghost" id="clearFilters">Clear</button></div><div class="game-list" id="gameList"></div></section>
       <section class="panel library-detail" id="gameDetail" aria-label="Selected game details"></section>
     </div>
   </section>
 
   <section class="view" id="view-downloads">
-    <div class="page-head"><div><h1>Downloads & intake</h1><p>3 intake items · 1 unverified · 2 watchers active</p></div><div class="head-actions"><button class="btn" data-action="open-f95">Open F95Checker</button><button class="btn primary" data-action="watch-folder">Watch a folder</button></div></div>
-    <div class="panel"><div class="panel-head"><h2>Intake queue</h2><small>3 items</small><div class="panel-actions"><button class="btn small">Pause watcher</button></div></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Detected item</th><th>Source</th><th>Match</th><th>State</th><th></th></tr></thead><tbody id="downloadRows"></tbody></table></div></div>
-    <div class="cards" style="margin-top:13px"><div class="card"><div class="card-head"><div class="card-icon">95</div><div><strong>F95Checker watcher</strong><small>G:\Downloads\F95</small></div></div><div class="card-body"><p>Watching for new downloads. Certain matches go straight to your library; anything uncertain waits for you in Reconciliation.</p><div class="progress ok" style="margin-top:12px"><span style="width:100%"></span></div></div><div class="card-foot"><span class="status-icon ok" role="img" aria-label="Connected" title="Connected">✓</span><span class="spacer"></span><button class="btn small" data-action="f95-config">Configure</button></div></div><div class="card"><div class="card-head"><div class="card-icon">S</div><div><strong>SteamCMD</strong><small>Headless acquisition</small></div></div><div class="card-body"><p>Needs your Steam sign-in before it can search or download anything.</p><div class="progress" style="margin-top:12px"><span style="width:34%"></span></div></div><div class="card-foot"><span class="state-pill pending">Needs sign-in</span><span class="spacer"></span><button class="btn small">Set up</button></div></div></div>
+    <div class="page-head"><div><h1>Downloads</h1><p id="downloadsSummary"></p></div><div class="head-actions"><button class="btn" data-action="add-folder">Add folder</button><button class="btn primary" id="watchButton" data-action="watch-folder">Watch a folder</button></div></div>
+    <div id="downloadsNotice"></div>
+    <div class="cards" id="downloaderCards"></div>
   </section>
 
   <section class="view" id="view-reconcile">
-    <div class="page-head"><div><h1>Reconciliation</h1><p>2 decisions queued · no files changed yet</p></div><div class="head-actions"><button class="btn">Skip all low confidence</button></div></div>
-    <div class="stepper"><div class="step done"><span class="n">✓</span><strong>Detected</strong></div><div class="step done"><span class="n">✓</span><strong>Analyzed</strong></div><div class="step active"><span class="n">3</span><strong>Decide</strong></div><div class="step"><span class="n">4</span><strong>Commit</strong></div></div>
-    <div class="onboard-grid"><section class="panel"><div class="panel-head"><h2>Incoming install</h2><span class="state-pill pending">Suggested match</span></div><div class="panel-body"><div class="path-box">G:\Downloads\F95\BeingADIK-11.2-scrappy</div><div class="kv" style="margin-top:12px"><div class="key">Detected name</div><div class="value">BeingADIK</div><div class="key">Version</div><div class="value">11.2</div><div class="key">Engine</div><div class="value">Ren'Py 8.x</div><div class="key">Platforms</div><div class="value">Windows x86_64 · Linux x86_64</div><div class="key">Variant tags</div><div class="value">scrappy · language en</div></div></div></section>
-      <section class="panel"><div class="panel-head"><h2>Choose identity</h2><small>Awaiting selection</small></div><div class="panel-body"><div class="candidate selected" data-candidate="beingadik"><div class="candidate-top"><div class="cover-mini art-a">BD</div><div><h3>Being a DIK</h3><p>Tracked game 101 · current 11.1</p></div><span class="confidence">92% similar</span></div><p>Same normalized title, same engine, and a higher detected version. Path differs from existing installs.</p></div><div class="candidate" data-candidate="new" style="margin-top:9px"><div class="candidate-top"><div class="cover-mini art-g">＋</div><div><h3>Create a new game</h3><p>Mint a local identity</p></div></div><p>Use this when the folder is a sequel, spin-off, remake, or unrelated title with a similar name.</p></div><label class="check-row"><input type="checkbox" id="moveSibling"> Move the incoming folder beside the selected game's versions</label><div class="choice-row"><button class="btn">Skip for now</button><button class="btn primary" id="commitDecision">Link and review plan</button></div></div></section></div>
-    <div class="panel hidden" id="commitPlan" style="margin-top:13px"><div class="panel-head"><h2>Proposed commit</h2><span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">○</span>Preview only</span></div><div class="panel-body"><table class="table"><tbody><tr><td>Identity</td><td>Link to game_id 101 · Being a DIK</td></tr><tr><td>Version group</td><td>Create 11.2</td></tr><tr><td>Variant</td><td>mods: scrappy · language: en</td></tr><tr><td>Filesystem</td><td id="moveResult">Leave the folder where it is</td></tr><tr><td>Launcher changes</td><td>None until a manager adapter is selected</td></tr></tbody></table><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:13px"><button class="btn">Edit fields</button><button class="btn primary" data-action="commit">Commit import</button></div></div></div>
+    <div class="page-head"><div><h1>Review</h1><p id="reviewSummary"></p></div><div class="head-actions"><button class="btn" id="refreshMerges">Find duplicates again</button></div></div>
+    <div id="reviewEmpty"></div>
+    <div class="panel review-section" id="reviewDecisions"><div class="panel-head"><h2>Scan decisions</h2><small data-count></small></div><div class="panel-body" id="decisionArea"></div></div>
+    <div class="panel review-section" id="reviewDuplicates"><div class="panel-head"><h2>Possible duplicates</h2><small id="mergeCount"></small></div><div class="panel-body" id="mergePanel"></div></div>
+    <div class="panel review-section" id="reviewUnidentified"><div class="panel-head"><h2>Not identified</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
+    <div class="panel review-section" id="reviewUpdates"><div class="panel-head"><h2>Updates seen</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
+    <div class="panel review-section" id="reviewDownloads"><div class="panel-head"><h2>New downloads</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
+    <div class="panel review-section" id="reviewConflicts"><div class="panel-head"><h2>Sync conflicts</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
   </section>
 
   <section class="view" id="view-systems">
-    <div class="page-head"><div><h1>Systems & sync</h1><p>3 systems · 1 offline · 3 pending actions</p></div><div class="head-actions"><button class="btn">Rebuild local cache</button><button class="btn primary">Add system</button></div></div>
+    <div class="page-head"><div><h1>Systems &amp; sync</h1><p id="systemsSummary"></p></div><div class="head-actions"><button class="btn" data-action="rebuild-cache">Rebuild local cache</button><button class="btn primary" data-action="add-system">Add system</button></div></div>
+    <div id="systemsNotice"></div>
+    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>Handhelds</h2><small id="handheldSummary"></small><div class="panel-actions"><button class="btn small" data-action="show-pair-code">Show a code</button><button class="btn small" data-action="pair-handheld">Pair a handheld</button></div></div><div class="panel-body"><div id="pairShowing"></div><div id="agentState"></div><div id="handheldState"></div></div></div>
+    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>On your handhelds</h2><small id="handheldGamesSummary"></small></div><div class="panel-body" id="handheldGames"></div></div>
     <div class="cards" id="systemCards"></div>
-    <div class="panel" style="margin-top:13px"><div class="panel-head"><h2>Cross-system status</h2><small>3 systems · 1 offline</small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>Desktop</th><th>GPD Win 4</th><th>Retroid Pocket 5</th><th>NAS source</th></tr></thead><tbody><tr><td class="primary-cell"><strong>Being a DIK</strong><small>11.1 installed · 11.2 available</small></td><td><span class="state-pill pending">Update ready</span></td><td><span class="state-pill pending">11.1</span></td><td><span class="state-pill critical">No config</span></td><td>—</td></tr><tr><td class="primary-cell"><strong>Artemis</strong><small>0.7.1</small></td><td><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span></td><td><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span></td><td><span class="state-pill critical">Unsupported</span></td><td>—</td></tr><tr><td class="primary-cell"><strong>ChronoClock</strong><small>Kirikiri · Windows</small></td><td><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span></td><td><span class="state-pill critical">Runtime missing</span></td><td><span class="state-pill critical">Unsupported</span></td><td>—</td></tr><tr><td class="primary-cell"><strong>Persona 3 Portable</strong><small>Remote ROM</small></td><td>—</td><td><span class="state-pill pending">Not fetched</span></td><td><span class="status-icon ok" role="img" aria-label="Cached" title="Cached">✓</span></td><td><span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">↓</span>Available</span></td></tr></tbody></table></div></div>
+    <div class="panel" style="margin-top:13px"><div class="panel-head"><h2>Cross-system status</h2><small id="crossSystemCount"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead id="crossSystemHead"></thead><tbody id="crossSystemRows"></tbody></table><div id="crossSystemState"></div></div></div>
   </section>
 
-  
   <section class="view" id="view-launcher">
-    <div class="page-head"><div><h1>Launcher entries</h1><p>2 tracked entries · 1 drifted</p></div><div class="head-actions"><button class="btn">Rescan launcher entries</button></div></div>
-    <div class="notice critical"><span class="dot critical"></span><div><strong>1 entry has drifted</strong><p>An external edit or a moved install no longer matches what Pythia last wrote.</p></div><div class="notice-actions"><button class="btn small primary" data-launcher-review="1">Review</button></div></div>
-    <div class="panel"><div class="panel-head"><h2>Tracked entries</h2><small>2 entries · 1 drifted</small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>System</th><th>Manager</th><th>State</th><th></th></tr></thead><tbody>
-      <tr><td class="primary-cell"><strong>Goodbye Eternity</strong><small>0.10</small></td><td>GPD Win 4</td><td>Lutris</td><td><span class="state-pill critical">Drifted</span></td><td><button class="btn small primary" data-launcher-review="1">Review</button></td></tr>
-      <tr><td class="primary-cell"><strong>Being a DIK</strong><small>11.1</small></td><td>Desktop</td><td>Lutris</td><td><span class="status-icon ok" role="img" aria-label="Current" title="Current">✓</span></td><td><button class="btn small">Inspect</button></td></tr>
-    </tbody></table></div></div>
-    <div class="panel hidden" id="launcherDrift" style="margin-top:13px"><div class="panel-head"><h2>Goodbye Eternity · GPD Win 4</h2><span class="state-pill critical">Drifted</span></div><div class="panel-body">
-      <div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr">
-        <div class="stat"><div class="label">Last written by Pythia</div><div class="value mono" style="font-size:11px">…/GoodbyeEternity/0.10</div><div class="sub">Recorded 6 days ago</div></div>
-        <div class="stat"><div class="label">Current external state</div><div class="value mono" style="font-size:11px">…/GoodbyeEternity/0.9 (removed)</div><div class="sub">Points at a path that no longer exists</div></div>
-        <div class="stat"><div class="label">Proposed projection</div><div class="value mono" style="font-size:11px">…/GoodbyeEternity/0.10</div><div class="sub">Matches the currently tracked install</div></div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:13px"><button class="btn">Ignore this drift</button><button class="btn primary" data-action="apply-projection">Apply proposed projection</button></div>
-    </div></div>
+    <div class="page-head"><div><h1>Launcher entries</h1><p id="launcherSummary"></p></div><div class="head-actions"><button class="btn" data-action="reload-launcher">Look again</button></div></div>
+    <div class="panel"><div class="panel-head"><h2>In this computer's launchers</h2><small id="launcherCount"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>System</th><th>Manager</th><th>State</th><th></th></tr></thead><tbody id="launcherRows"></tbody></table><div id="launcherState"></div></div></div>
   </section>
 
-  
   <section class="view" id="view-saves">
-    <div class="page-head"><div><h1>Save backups</h1><p>4 tracked games · 1 stale · 1 not configured</p></div><div class="head-actions"><button class="btn primary">Back up now</button></div></div>
-    <div class="notice pending"><span class="dot pending"></span><div><strong>1 backup is stale</strong><p>Saves changed after the last verified snapshot.</p></div><div class="notice-actions"><button class="btn small" data-nav="saves">Review</button></div></div>
-    <div class="panel"><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>Last snapshot</th><th>Status</th><th>Size</th><th></th></tr></thead><tbody>
-      <tr><td class="primary-cell"><strong>Being a DIK</strong><small>Desktop · 11.1-scrappy</small></td><td>Today · 09:02</td><td><span class="status-icon ok" role="img" aria-label="Verified" title="Verified">✓</span></td><td>14 MB</td><td><button class="btn small">Restore</button></td></tr>
-      <tr><td class="primary-cell"><strong>Artemis</strong><small>Desktop · 0.7.1</small></td><td>3 days ago</td><td><span class="state-pill pending">Stale</span></td><td>6 MB</td><td><button class="btn small primary">Back up</button></td></tr>
-      <tr><td class="primary-cell"><strong>ChronoClock</strong><small>Desktop · 1.0</small></td><td>—</td><td><span class="state-pill info">Not configured</span></td><td>—</td><td><button class="btn small">Configure</button></td></tr>
-    </tbody></table></div></div>
+    <div class="page-head"><div><h1>Save backups</h1><p id="savesSummary"></p></div><div class="head-actions"><button class="btn primary" data-action="backup-now">Back up now</button></div></div>
+    <div class="panel"><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>Last snapshot</th><th>Status</th><th>Size</th><th></th></tr></thead><tbody id="saveRows"></tbody></table><div id="savesState"></div></div></div>
   </section>
 
+  <section class="view" id="view-look">
+    <div class="page-head"><div><h1>Review what was found</h1><p id="lookSummary"></p></div></div>
+    <div id="lookHost"></div>
+  </section>
   <section class="view" id="view-activity">
-    <div class="page-head"><div><h1>Activity & jobs</h1><p>4 jobs · 1 waiting on you</p></div><div class="head-actions"><button class="btn">Clear completed</button></div></div>
-    <div class="panel"><div class="panel-head"><h2>Active jobs</h2><small>4 total</small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Job</th><th>Progress</th><th>State</th><th>Started</th><th></th></tr></thead><tbody id="jobRows"></tbody></table></div></div>
-    <div class="panel" style="margin-top:13px"><div class="panel-head"><h2>Event log</h2><div class="panel-actions"><button class="btn small">Export</button></div></div><div class="panel-body"><div class="timeline"><div class="timeline-item"><strong>F95Watcher detected BeingADIK-11.2-scrappy</strong><p>Queued for identity reconciliation; no files moved.</p><time>09:18:42</time></div><div class="timeline-item"><strong>Metadata directory synchronized</strong><p>Received 2 read-only records from GPD Win 4.</p><time>09:17:08</time></div><div class="timeline-item"><strong>Kirikiri check completed</strong><p>ChronoClock isn’t enabled on GPD Win 4 yet.</p><time>09:13:55</time></div><div class="timeline-item"><strong>Steam manifest refresh completed</strong><p>2 managed titles refreshed; no identity changes.</p><time>09:08:16</time></div></div></div></div>
+    <div class="page-head"><div><h1>Activity &amp; jobs</h1><p id="activitySummary"></p></div><div class="head-actions"><button class="btn" data-action="clear-jobs">Clear completed</button></div></div>
+    <div class="panel"><div class="panel-head"><h2>Jobs</h2><small id="jobsTotal"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Job</th><th>Progress</th><th>State</th><th>Started</th><th></th></tr></thead><tbody id="jobRows"></tbody></table><div id="jobsState"></div></div></div>
+    <div class="panel" style="margin-top:13px"><div class="panel-head"><h2>Event log</h2><small id="eventCount"></small><div class="panel-actions"><button class="btn small" data-action="export-diagnostics">Export</button></div></div><div class="panel-body"><div class="timeline" id="eventLog"></div><div id="eventState"></div></div></div>
   </section>
 
   <section class="view" id="view-settings">
-    <div class="page-head"><div><h1>Settings</h1></div><div class="head-actions"><button class="btn">Reset this page</button><button class="btn primary" data-action="save-settings">Save changes</button></div></div>
+    <div class="page-head"><div><h1>Settings</h1><p>Changes apply as you make them.</p></div></div>
     <div class="settings-layout">
       <section class="panel settings-nav" aria-label="Settings categories">
         <div class="settings-nav-group"><div class="settings-nav-label">Core</div>
@@ -440,528 +190,105 @@ body.handheld-active>.menu-bar,body.handheld-active>.topbar,body.handheld-active
       </section>
       <section class="panel">
         <div class="settings-pane active" data-pane="general">
+          <div class="form-section"><h3>Modes</h3><div id="modesState"></div></div>
           <div class="form-section"><h3>General</h3>
-            <div class="form-row"><div class="form-label"><strong>Application data directory</strong><small>%APPDATA%\Pythia</small></div><div class="inline-actions"><button class="btn">Open folder</button><button class="btn">Move application data…</button></div></div>
-            <div class="form-row"><div class="form-label"><strong>Resident watcher</strong><small>Offer to register newly added game folders and versions.</small></div><button class="toggle on" aria-label="Resident watcher"><span></span></button></div>
+            <div class="form-row"><div class="form-label"><strong>Application data directory</strong><small class="mono" id="appDataPath"></small></div><div class="inline-actions"><button class="btn" data-open-path="app_data_folder">Open folder</button><button class="btn" data-option-action="move_app_data">Move application data…</button></div></div>
+            <div class="form-row"><div class="form-label"><strong>Resident watcher</strong><small>Offer to register newly added game folders and versions.</small></div><button class="toggle" data-option="resident_watcher" aria-label="Resident watcher"><span></span></button></div>
+            
           </div>
         </div>
 
         <div class="settings-pane" data-pane="library">
-          <div class="form-section"><h3>Tracked folders</h3>
-            <div class="account-row"><div class="card-icon">F</div><div><strong>G:\games\adult</strong><div class="root-meta"><span class="status-icon ok" role="img" aria-label="Watching" title="Watching">✓</span>126 installs · scanned 8m ago</div></div><div class="inline-actions"><button class="btn small">Scan now</button><button class="btn small">Edit</button><button class="btn small">Remove</button></div></div>
-            <div class="account-row"><div class="card-icon">F</div><div><strong>G:\games\Pirated</strong><div class="root-meta"><span class="status-icon ok" role="img" aria-label="Watching" title="Watching">✓</span>31 installs · scanned 12m ago</div></div><div class="inline-actions"><button class="btn small">Scan now</button><button class="btn small">Edit</button><button class="btn small">Remove</button></div></div>
-            <div class="account-row"><div class="card-icon">N</div><div><strong>nas://roms/</strong><small>NAS ROM Source · fetched on demand</small></div><div class="inline-actions"><button class="btn small">Scan now</button><button class="btn small">Edit</button><button class="btn small">Remove</button></div></div>
-            <button class="btn primary small" style="margin-top:4px">＋ Add folder…</button>
-          </div>
-          <div class="form-section"><h3>Scanning</h3>
-            <div class="form-row"><div class="form-label"><strong>Link exact identifiers automatically</strong><small>Applies to exact identifiers such as Steam AppIDs.</small></div><button class="toggle on"><span></span></button></div>
-            <div class="form-row"><div class="form-label"><strong>Uncertain name matches</strong></div><select class="field"><option>Ask me</option><option>Treat as a new game</option><option>Skip during bulk scans</option></select></div>
-          </div>
+          <div class="form-section"><h3>Tracked folders</h3><div id="libraryFolders"></div></div>
+          <div class="form-section"><h3>Scanning</h3><div id="scanSettings"></div></div>
         </div>
 
-        <div class="settings-pane" data-pane="sources"><div class="form-section"><h3>Sources</h3>
-          <div class="account-row"><div class="card-icon">S</div><div><strong>Steam</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Connected" title="Connected">✓</span><button class="toggle on" aria-label="Enable Steam source"><span></span></button></div></div>
-          <div class="account-row"><div class="card-icon">G</div><div><strong>GOG</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Connected" title="Connected">✓</span><button class="toggle on" aria-label="Enable GOG source"><span></span></button><button class="btn small">Account</button></div></div>
-          <div class="account-row"><div class="card-icon">E</div><div><strong>Epic Games Store</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Connected" title="Connected">✓</span><button class="toggle on" aria-label="Enable Epic source"><span></span></button></div></div>
-          <div class="account-row"><div class="card-icon">I</div><div><strong>itch.io</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Connected" title="Connected">✓</span><button class="toggle on" aria-label="Enable itch.io source"><span></span></button></div></div>
-          <div class="account-row"><div class="card-icon">95</div><div><strong>F95Checker</strong><small>Watchlist imported 14m ago</small></div><div class="row-status"><button class="toggle on" aria-label="Enable F95Checker source"><span></span></button><button class="btn small" data-action="f95-config">Import / export</button></div></div>
-        </div></div>
+        <div class="settings-pane" data-pane="sources"><div class="form-section"><h3>Sources</h3><p>Where games come from. A source with an account can list what you own there.</p><div data-capability-list="library"></div></div></div>
 
-        <div class="settings-pane" data-pane="downloaders"><div class="form-section"><h3>Downloaders</h3>
-          <div class="account-row"><div class="card-icon">95</div><div><strong>F95Checker</strong><small>Watching G:\Downloads\F95</small></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Watcher active" title="Watcher active">✓</span><button class="toggle on"><span></span></button><button class="btn small" data-action="configure-f95">Configure</button></div></div>
-          <div class="account-row"><div class="card-icon">SC</div><div><strong>SteamCMD</strong><small class="status-inline pending"><span class="status-icon pending" aria-hidden="true">!</span>Needs sign-in</small></div><div class="row-status"><button class="toggle on"><span></span></button><button class="btn small primary">Sign in</button></div></div>
-        </div>
-        <div class="form-section"><h3>Downloaded tools</h3><table class="table"><thead><tr><th>Tool</th><th>Used by</th><th>Version</th><th>State</th><th></th></tr></thead><tbody><tr><td class="primary-cell"><strong>legendary</strong></td><td>Epic Games Store</td><td>0.20.34</td><td><span class="status-icon ok" role="img" aria-label="Installed" title="Installed">✓</span></td><td><button class="btn small">Check for update</button></td></tr></tbody></table></div></div>
+        <div class="settings-pane" data-pane="downloaders"><div class="form-section"><h3>Downloaders</h3><p>Tools that fetch game files. Pythia watches their download folder and offers what arrives.</p><div data-capability-list="downloader"></div></div>
+        <div class="form-section"><h3>Downloaded tools</h3><div id="toolsState"></div></div></div>
 
-        <div class="settings-pane" data-pane="metadata"><div class="form-section"><h3>Metadata</h3>
-          <div class="account-row"><div class="card-icon">S</div><div><strong>Steam</strong><small>Cover art · DLC</small></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button><button class="btn small">Configure</button></div></div>
-          <div class="account-row"><div class="card-icon">G</div><div><strong>GOG</strong><small>Names · release metadata</small></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button></div></div>
-          <div class="account-row"><div class="card-icon">SG</div><div><strong>SteamGridDB</strong><small class="status-inline pending"><span class="status-icon pending" aria-hidden="true">!</span>Not connected</small></div><div class="row-status"><button class="btn small primary">Connect…</button></div></div>
-          <div class="account-row"><div class="card-icon">VN</div><div><strong>Community VN Tools</strong><small>Visual novel metadata</small></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button></div></div>
-        </div></div>
+        <div class="settings-pane" data-pane="metadata"><div class="form-section"><h3>Metadata</h3><p>Names, platforms and DLC from a store's public listing.</p><div data-capability-list="metadata"></div></div></div>
 
-        <div class="settings-pane" data-pane="managers"><div class="form-section"><h3>Open games with</h3><table class="table"><thead><tr><th>Source</th><th>Manager</th><th></th></tr></thead><tbody>
-          <tr><td class="primary-cell"><strong>Steam</strong></td><td>Steam</td><td><button class="btn small">Change</button></td></tr>
-          <tr><td class="primary-cell"><strong>GOG</strong></td><td><span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not set</span></td><td><button class="btn small">Choose…</button></td></tr>
-          <tr><td class="primary-cell"><strong>Local folders</strong></td><td>Lutris</td><td><button class="btn small">Change</button></td></tr>
-          <tr><td class="primary-cell"><strong>Remote ROMs</strong></td><td><span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not set</span></td><td><button class="btn small">Choose…</button></td></tr>
-        </tbody></table></div>
-        <div class="form-section"><h3>Manager capabilities</h3>
-          <div class="account-row"><div class="card-icon">S</div><div><strong>Steam</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button></div></div>
-          <div class="account-row"><div class="card-icon">L</div><div><strong>Lutris</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button><button class="btn small">Configure</button></div></div>
-        </div></div>
+        <div class="settings-pane" data-pane="managers"><div class="form-section"><h3>Open games with</h3><p>Launchers Pythia can hand a game to. A launcher opens its own game; Pythia runs a game itself only for a paired handheld you let start games here.</p><div data-capability-list="manager"></div></div></div>
 
-        <div class="settings-pane" data-pane="engines"><div class="form-section"><h3>Engine detection</h3><p>Detects game engines and provides enablement actions when available.</p>
-          <div class="account-row"><div class="card-icon">R</div><div><strong>Ren'Py</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button><button class="btn small" data-action="configure-renpy">Configure</button></div></div>
-          <div class="account-row"><div class="card-icon">K</div><div><strong>Kirikiri</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button></div></div>
-          <div class="account-row"><div class="card-icon">U</div><div><strong>Unity</strong></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button></div></div>
-        </div></div>
+        <div class="settings-pane" data-pane="engines"><div class="form-section"><h3>Engine detection</h3><p>Detects game engines and provides enablement actions when available.</p><div data-capability-list="engine"></div></div></div>
 
-        <div class="settings-pane" data-pane="mods"><div class="form-section"><h3>Mods</h3>
-          <div class="account-row"><div class="card-icon">M</div><div><strong>Variant Mod Tracker</strong><small>Tracks mods separately for each installed variant.</small></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button></div></div>
-          <div class="account-row"><div class="card-icon">VN</div><div><strong>Community VN Tools</strong><small>Direct-file visual novel mods</small></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button><button class="btn small">Configure</button></div></div>
-        </div></div>
+        <div class="settings-pane" data-pane="mods"><div class="form-section"><h3>Mods</h3><div data-capability-list="mod"></div></div></div>
 
-        <div class="settings-pane" data-pane="patchers"><div class="form-section"><h3>Patchers</h3>
-          <div class="account-row"><div class="card-icon">R</div><div><strong>Ren'Py runtime libraries</strong><small>Proposes platform-library changes for a selected game instance.</small></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button></div></div>
-          <div class="account-row"><div class="card-icon">VN</div><div><strong>Community VN Tools</strong><small>Translation and script patch plans</small></div><div class="row-status"><span class="status-icon ok" role="img" aria-label="Ready" title="Ready">✓</span><button class="toggle on"><span></span></button></div></div>
-        </div></div>
+        <div class="settings-pane" data-pane="patchers"><div class="form-section"><h3>Patchers</h3><div data-capability-list="patcher"></div></div></div>
 
-        <div class="settings-pane" data-pane="plugins"><div class="form-section"><h3>Installed plugins</h3><p>Built-in plugins cannot be removed.</p><div class="cards" id="pluginCards"></div><button class="btn primary small" style="margin-top:12px" data-action="install-plugin">＋ Install plugin…</button></div>
-          <div class="form-section"><h3>Plugin repositories <span class="planned-label">Planned</span></h3><p>A list of scannable sources (a git URL, or a plugin-index endpoint) for discovering plugins that aren't installed yet -- separate from the installed-plugins list above.</p>
-            <div class="form-row" style="grid-template-columns:1fr auto"><input class="field mono" placeholder="https://github.com/example/pythia-plugin-repo" disabled><button class="btn" disabled>＋ Add repository</button></div>
-            <div class="kv" style="margin-top:10px"><div class="key">No repositories added yet</div><div class="value">This list is empty until the feature ships.</div></div>
-          </div>
+        <div class="settings-pane" data-pane="plugins"><div class="form-section"><h3>Installed plugins</h3><p>Built-in plugins cannot be removed.</p><div class="cards" id="pluginCards"></div><div id="pluginsState"></div><button class="btn primary small" style="margin-top:12px" data-action="install-plugin">＋ Install plugin…</button></div>
+          <div class="form-section"><h3>Plugin repositories</h3><div id="pluginRepos"></div></div>
         </div>
 
         <div class="settings-pane" data-pane="sync">
           <div class="form-section"><h3>Metadata folder</h3>
-            <div class="form-row"><div class="form-label"><strong>Shared folder</strong><small>%APPDATA%\Pythia\datadir</small></div><div class="inline-actions"><button class="btn">Open folder</button><button class="btn">Change…</button></div></div>
-            <div class="form-row"><div class="form-label"><strong>This system's ID</strong></div><input class="field mono" value="38f19d7a-8c22-45e6-a8c1-66d21a10c1d9" readonly></div>
-            <div class="form-row"><div class="form-label"><strong>Warn on metadata conflicts</strong></div><button class="toggle on"><span></span></button></div>
+            <div class="form-row"><div class="form-label"><strong>Shared folder</strong><small class="mono" id="syncFolderPath"></small></div><div class="inline-actions"><button class="btn" data-open-path="sync_folder">Open folder</button><button class="btn" data-option-action="set_sync_folder">Change…</button></div></div>
+            <div class="form-row"><div class="form-label"><strong>This system's ID</strong></div><input class="field mono" id="systemIdField" value="" readonly></div>
+            <div class="form-row"><div class="form-label"><strong>Warn on metadata conflicts</strong></div><button class="toggle" data-option="warn_conflicts" aria-label="Warn on metadata conflicts"><span></span></button></div>
           </div>
-          <div class="form-section"><h3>Game transfer <span class="planned-label">Planned</span></h3><p>The receiving system requests an installed game or instance from another Pythia system. The transfer protocol is not selected yet.</p>
-            <div class="form-row"><div class="form-label"><strong>Serve game files on the local network</strong></div><button class="toggle" disabled><span></span></button></div>
-            <div class="form-row"><div class="form-label"><strong>Default modification handling</strong></div><select class="field" disabled><option>Ask for each transfer</option><option>Include the selected instance</option><option>Transfer the unmodded instance</option></select></div>
-          </div>
-          <div class="form-section"><h3>Storage roles <span class="planned-label">Planned</span></h3>
-            <div class="form-row"><div class="form-label"><strong>Save-backup destination</strong></div><button class="btn" disabled>Choose…</button></div>
-            <div class="form-row"><div class="form-label"><strong>Game-transfer staging</strong></div><button class="btn" disabled>Choose…</button></div>
-          </div>
+          <div class="form-section"><h3>Game transfer</h3><div id="transferSettings"></div></div>
+          <div class="form-section"><h3>Storage roles</h3><div id="storageRoles"></div></div>
         </div>
 
         <div class="settings-pane" data-pane="interface"><div class="form-section"><h3>Interface</h3>
           <div class="form-row"><div class="form-label"><strong>Theme</strong></div><select class="field" id="themeSelect"><option value="ink">Ink &amp; Amber</option><option value="parchment">Parchment</option><option value="cobalt">Slate &amp; Cobalt</option></select></div>
-          <div class="form-row"><div class="form-label"><strong>Startup shell</strong></div><select class="field" id="startupShellSelect"><option value="auto">Auto-detect at startup</option><option value="desktop">Always Desktop</option><option value="handheld">Always Handheld</option><option value="last">Remember last shell</option></select></div>
+          <div class="form-row"><div class="form-label"><strong>Text size</strong><small>Reflows every page; the library's two panes stack at Large.</small></div><select class="field" id="textScaleSelect"><option value="1">Normal</option><option value="1.15">Larger</option><option value="1.3">Large</option><option value="1.5">Largest</option></select></div>
+          <div class="form-row"><div class="form-label"><strong>Start in</strong><small id="startInNote"></small></div><select class="field" id="startupShellSelect"><option value="auto">Auto-detect</option><option value="desktop">Desktop</option><option value="handheld">Handheld</option><option value="last">Remember last</option></select></div>
           <div class="form-row"><div class="form-label"><strong>Desktop library view</strong></div><select class="field" id="desktopLibrarySelect"><option value="list">List + inspector</option><option value="grid">Grid + inspector</option></select></div>
           <div class="form-row"><div class="form-label"><strong>Handheld library view</strong></div><select class="field" id="handheldLibrarySelect"><option value="list">List</option><option value="grid">Cover grid</option></select></div>
-          <div class="form-row"><div class="form-label"><strong>Desktop density</strong></div><select class="field"><option>Comfortable</option><option>Compact</option><option>Spacious</option></select></div>
-          <div class="form-row"><div class="form-label"><strong>Reduce motion</strong></div><button class="toggle"><span></span></button></div>
+          <div class="form-row"><div class="form-label"><strong>Desktop density</strong></div><select class="field" id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="spacious">Spacious</option></select></div>
+          <div class="form-row"><div class="form-label"><strong>Reduce motion</strong><small>Also follows the system's own setting.</small></div><button class="toggle" id="motionToggle" aria-label="Reduce motion"><span></span></button></div>
         </div></div>
 
         <div class="settings-pane" data-pane="advanced"><div class="form-section"><h3>Diagnostics</h3>
-          <div class="form-row"><div class="form-label"><strong>Database directory</strong><small>%APPDATA%\Pythia</small></div><button class="btn">Open folder</button></div>
-          <div class="form-row"><div class="form-label"><strong>Schema version</strong></div><span class="status-inline"><span class="status-icon ok" role="img" aria-label="Up to date" title="Up to date">✓</span>v3</span></div>
-          <div class="form-row"><div class="form-label"><strong>Log level</strong></div><select class="field"><option>Normal</option><option>Verbose</option><option>Debug</option></select></div>
-          <div class="form-row"><div class="form-label"><strong>Export diagnostics</strong><small>Logs and non-sensitive configuration</small></div><button class="btn">Export…</button></div>
-          <div class="form-row"><div class="form-label"><strong>Rebuild cache.db</strong></div><button class="btn">Rebuild now</button></div>
-          <div class="form-row"><div class="form-label"><strong>Reset local identity</strong><small>Removes this system's identity and requires typed confirmation.</small></div><button class="btn danger">Review reset…</button></div>
+          <div class="form-row"><div class="form-label"><strong>Database directory</strong><small class="mono" id="dbPath"></small></div><button class="btn" data-open-path="app_data_folder">Open folder</button></div>
+          <div class="form-row"><div class="form-label"><strong>Schema version</strong></div><span class="status-inline" id="schemaVersion"></span></div>
+          <div class="form-row"><div class="form-label"><strong>Log level</strong><small>Debug writes every step to the log file.</small></div><select class="field" id="logLevelSelect"><option value="info">Normal</option><option value="debug">Debug</option></select></div>
+          <div class="form-row"><div class="form-label"><strong>Error console</strong><small id="consoleHint">Shows failures live. Start Pythia with --error-console, or set error_console = True in pythia.conf.</small></div><div class="inline-actions"><button class="btn" data-open-path="log_file_dir">Open log folder</button><button class="btn hidden" data-console-toggle>Open console</button></div></div>
+          <div class="form-row"><div class="form-label"><strong>Export diagnostics</strong><small>The log file plus app, system and plugin facts. No credentials.</small></div><button class="btn" data-action="export-diagnostics">Export…</button></div>
+          <div class="form-row"><div class="form-label"><strong>Rebuild cache.db</strong><small>Reads every record in the library folder again.</small></div><button class="btn" data-action="rebuild-cache">Rebuild now</button></div>
+          <div class="form-row"><div class="form-label"><strong>Reset local identity</strong><small>Gives this computer a new ID; its records become another computer's.</small></div><button class="btn danger" data-action="reset-identity">Review reset…</button></div>
         </div></div>
       </section>
     </div>
   </section>
 </main>
 </div>
-<footer class="statusbar"><span id="statusSyncLabel">This system only</span><span class="right" id="statusRight"></span></footer>
-<div class="toast-stack" id="toasts"></div>
-<div id="modalRoot"></div>
+<footer class="statusbar"><span id="statusSyncLabel">Connecting</span><span class="right" id="statusRight"></span></footer>
+<div class="flashes" id="flashes" aria-live="polite"></div>
 <section id="handheldShell" class="hidden" aria-label="Handheld interface">
   <aside class="hh-rail" aria-label="Handheld navigation">
     <div class="hh-logo">P</div>
     <button class="hh-nav active" data-hh-nav="home"><span class="ico">⌂</span><span>Home</span></button>
     <button class="hh-nav" data-hh-nav="library"><span class="ico">▦</span><span>Library</span></button>
-    <button class="hh-nav" data-hh-nav="attention"><span class="ico">!</span><span>Attention</span></button>
+    <button class="hh-nav" data-hh-nav="attention"><span class="ico">!</span><span>Review</span></button>
     <button class="hh-nav" data-hh-nav="downloads"><span class="ico">⇩</span><span>Downloads</span></button>
     <button class="hh-nav" data-hh-nav="systems"><span class="ico">◫</span><span>Systems</span></button>
+    <button class="hh-nav" data-hh-nav="activity"><span class="ico">≋</span><span>Activity</span></button>
     <button class="hh-nav" data-hh-nav="settings"><span class="ico">⚙</span><span>Settings</span></button>
     <div class="hh-rail-spacer"></div>
     <button class="hh-nav desktop-switch" id="exitHandheldRail"><span class="ico">↗</span><span>Desktop</span></button>
   </aside>
   <div class="hh-app">
     <header class="hh-topbar">
-      <button class="hh-back" id="hhBack" aria-label="Back" disabled>‹</button>
-      <div class="hh-heading"><strong id="hhTitle">Home</strong><small id="hhSubtitle">Desktop · metadata synced</small></div>
+      <button class="hh-back" id="hhBack" aria-label="Back">‹</button>
+      <div class="hh-heading"><strong id="hhTitle">Home</strong><small id="hhSubtitle"></small></div>
       <input class="hh-search" id="hhSearch" aria-label="Search handheld view" placeholder="Search games and tasks">
-      <div class="hh-top-actions"><button class="hh-action primary" id="hhAdd">＋ Add</button><button class="hh-action" id="exitHandheldTop"><span class="desktop-label">Desktop</span> ↗</button></div>
+      <div class="hh-top-actions"><button class="hh-action primary" id="hhAdd">＋ Add</button><button class="hh-action hidden" data-console-toggle aria-label="Error console">⚠</button><button class="hh-action" id="exitHandheldTop"><span class="desktop-label">Desktop</span> ↗</button></div>
     </header>
     <main class="hh-content" id="hhContent" tabindex="-1"></main>
-    <footer class="hh-footer"><span>◉ Select</span><span>○ Back</span><span>☰ Menu</span><span class="right">Desktop online · 1 task</span></footer>
+    <footer class="hh-footer"><span class="hh-hints" id="hhHints" aria-label="Controller buttons"></span><span class="right" id="hhFooterRight"></span></footer>
   </div>
 </section>
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-<script>
-(()=>{
-'use strict';
-let games=[];  // populated live from window.pythia via QWebChannel -- see bootstrap script near end of file
-
-// Real-data adapter (2026-08-03): maps one backend.games row (real datadir
-// entries, see pythia/ui/backend.py) onto the shape this mockup's own
-// rendering functions (renderLibrary/renderDetail/filteredGames) already
-// expect. Anything the real schema doesn't have yet (enginePlugin,
-// platformStatus, systems beyond "this system") is left off rather than
-// faked -- renderDetail() already tolerates missing optional fields with
-// real fallbacks, so this stays honest instead of inventing data.
-const ART_CLASSES='abcdefghijkl';
-// game_id is now an opaque 16-char hex string (2026-08-04 redesign), not a
-// number -- Math.abs()/Number() on it would just be NaN, so picking a stable
-// "random-looking" art class needs a real string hash instead.
-function strHash(s){s=String(s||'');let h=0;for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))|0}return Math.abs(h)}
-function adaptGame(real){
-  const entry=(real.entries&&real.entries[0])||{};
-  const versions=entry.versions||[];
-  let variant=null;
-  for(const v of versions){for(const va of (v.variants||[])){variant=va;break}if(variant)break}
-  const kind=(variant&&variant.source&&variant.source.kind)||null;
-  const kindLabel=kind?(kind.charAt(0).toUpperCase()+kind.slice(1)):'Unidentified';
-  const status=(!kind||kind==='unknown')?'critical':'ok';
-  const updates=entry.available_updates||[];
-  return{
-    id:real.game_id,
-    name:entry.canonical_name||'?',
-    source:kindLabel,
-    engine:kindLabel,
-    version:(versions[0]&&versions[0].version)||'?',
-    status:updates.length?'pending':status,
-    statusText:updates.length?'Update available':(status==='critical'?'Configuration invalid':'Current'),
-    updated:0,
-    art:ART_CLASSES[strHash(real.game_id)%ART_CLASSES.length],
-    systems:['This system'],
-    platforms:(variant&&variant.platforms)||[],
-    path:(variant&&variant.path)||'',
-    note:entry.notes||'',
-    managed:false,
-    versions:versions,
-    versionCount:versions.length,
-    updates:updates,
-  };
-}
-let plugins=[];  // populated live from window.pythia.getAllPlugins() -- see bootstrap script
-
-function adaptPlugin(real){
-  const kind=(real.categories||[]).map(c=>c.charAt(0).toUpperCase()+c.slice(1)).join(' · ')||'Uncategorized';
-  return{
-    id:real.id,
-    icon:(real.display_name||'?').slice(0,2).toUpperCase(),
-    name:real.display_name,
-    kind:kind,
-    desc:real.origin!=='Built-in'?`${real.origin} · ${real.author}`:'',
-    state:real.enabled?'Ready':'Disabled',
-    status:real.enabled?'ok':'neutral',
-    enabled:real.enabled,
-    origin:real.origin,
-    version:real.version,
-  };
-}
-let systems=[];  // populated live from real per-entry system_uuid data -- see refreshGames()
-const jobs=[
- {name:'Scan G:\\games\\adult',detail:'Library scan · read-only',pct:68,status:'info',state:'Scanning',start:'09:16'},
- {name:'Verify BeingADIK 11.2 archive',detail:'F95Checker Intake',pct:42,status:'info',state:'Verifying',start:'09:18'},
- {name:'Resolve launcher drift',detail:'Goodbye Eternity · GPD Win 4',pct:0,status:'pending',state:'Waiting for decision',start:'09:12'},
- {name:'Refresh Steam manifests',detail:'2 managed titles',pct:100,status:'ok',state:'Completed',start:'09:08'}
-];
-let state={view:'library',history:[],selected:games[0]?games[0].id:null,filterStatus:'all',density:'comfortable',libraryMode:localStorage.getItem('pythia-desktop-library')||'list',search:'',source:'all',engine:'all',sort:'name',bulk:new Set(),selectionMode:false,shell:'desktop',hhPage:'home',hhHistory:[],hhLibraryMode:localStorage.getItem('pythia-handheld-library')||'list',hhSearch:'',hhSelected:null,hhSource:'all',hhSettingsPage:'root'};
-const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const initials=n=>n.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();
-// List-level version-count affordance -- only worth a mention when there's
-// more than one, since "1 version" is the norm and would just be noise.
-const versionsBadge=g=>(g.versionCount>1?` · ${g.versionCount} versions`:'');
-const routineStatus=(label,kind='ok',symbol='✓')=>`<span class="status-icon ${kind}" role="img" aria-label="${esc(label)}" title="${esc(label)}">${symbol}</span>`;
-const visibleStatus=(label,kind='pending',symbol='!')=>`<span class="status-inline ${kind}"><span class="status-icon ${kind}" aria-hidden="true">${symbol}</span>${esc(label)}</span>`;
-const gameStatus=g=>g.status==='ok'?routineStatus(g.statusText||'No action required'):visibleStatus(g.statusText,g.status,g.status==='critical'?'!':'↻');
-function toast(title,msg){const el=document.createElement('div');el.className='toast';el.innerHTML=`<strong>${esc(title)}</strong><span>${esc(msg)}</span>`;$('#toasts').append(el);setTimeout(()=>el.remove(),3600)}
-function showModal(title,body,primary='Continue'){const root=$('#modalRoot');root.innerHTML=`<div class="modal-backdrop"><div class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h2>${esc(title)}</h2><button class="icon-btn" style="margin-left:auto" data-close>×</button></div><div class="modal-body">${body}</div><div class="modal-foot"><button class="btn" data-close>Cancel</button><button class="btn primary" data-confirm>${esc(primary)}</button></div></div></div>`;$$('[data-close]',root).forEach(b=>b.onclick=()=>root.innerHTML='');$('[data-confirm]',root).onclick=()=>{root.innerHTML='';toast(title,'Prototype action completed without changing real files.')}}
-function navigate(view,push=true){if(view===state.view)return;if(push)state.history.push(state.view);state.view=view;$$('.view').forEach(v=>v.classList.toggle('active',v.id===`view-${view}`));$$('.nav-row[data-nav]').forEach(n=>n.classList.toggle('active',n.dataset.nav===view));$('#backButton').disabled=!state.history.length;const titles={library:'Search games, engines, versions, paths…',downloads:'Search intake queue…',reconcile:'Search reconciliation candidates…',systems:'Search systems and readiness…',launcher:'Search launcher entries…',saves:'Search save backups…',plugins:'Search plugins and capabilities…',activity:'Search jobs and events…',settings:'Search settings…'};$('#globalSearch').placeholder=titles[view]||'Search…';$('#globalSearch').value='';state.search='';renderCurrent();window.scrollTo({top:0,behavior:'instant'})}
-function renderCurrent(){if(state.view==='library')renderLibrary();if(state.view==='downloads')renderDownloads();if(state.view==='plugins')renderPlugins();if(state.view==='systems')renderSystems();if(state.view==='activity')renderJobs();if(state.view==='settings')renderSettingsSearch();}
-function filteredGames(){let list=games.filter(g=>{const q=state.search.toLowerCase();const matches=!q||[g.name,g.source,g.engine,g.version,g.path,g.note,...g.platforms,...g.systems].join(' ').toLowerCase().includes(q);return matches&&(state.filterStatus==='all'||g.status===state.filterStatus)&&(state.source==='all'||g.source===state.source)&&(state.engine==='all'||g.engine===state.engine)});list.sort((a,b)=>state.sort==='status'?({critical:0,pending:1,ok:2}[a.status]-{critical:0,pending:1,ok:2}[b.status])||a.name.localeCompare(b.name):state.sort==='updated'?b.updated-a.updated:a.name.localeCompare(b.name));return list}
-function renderLibrary(){
-  const list=filteredGames();
-  const attention=list.filter(g=>g.status!=='ok').length;
-  $('#librarySummary').textContent=`${list.length} visible · ${attention} need attention · 3 systems`;
-  if(!list.some(g=>g.id===state.selected)&&list[0])state.selected=list[0].id;
-  const host=$('#gameList');
-  const layout=$('#libraryLayout');
-  host.classList.toggle('grid-mode',state.libraryMode==='grid');
-  layout.classList.toggle('grid-presentation',state.libraryMode==='grid');
-  $$('[data-library-mode]').forEach(b=>b.classList.toggle('active',b.dataset.libraryMode===state.libraryMode));
-  if(!list.length){host.innerHTML='<div class="empty">No games match the current filters.</div>'}
-  else if(state.libraryMode==='grid'){
-    host.innerHTML=list.map(g=>`<article class="game-card ${g.id===state.selected?'active':''}" data-game="${g.id}" tabindex="0" aria-label="${esc(g.name)}">
-      <div class="game-card-art art-${g.art}"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id)?'checked':''} aria-label="Select ${esc(g.name)}" style="position:absolute;z-index:3;right:8px;bottom:8px;width:17px;height:17px;"><span class="game-card-source">${esc(g.source)}</span>${g.status!=='ok'?`<span class="game-card-attention ${g.status}" title="${esc(g.statusText)}"></span>`:''}<strong>${esc(g.name)}</strong></div>
-      <div class="game-card-copy"><div class="game-card-meta">${esc(g.engine)} · ${esc(g.version)}${versionsBadge(g)}</div>${g.status!=='ok'?`<div class="game-card-state ${g.status}">${esc(g.statusText)}</div>`:''}</div>
-    </article>`).join('');
-  }else{
-    host.innerHTML=list.map(g=>`<article class="game-row ${g.id===state.selected?'active':''}" data-game="${g.id}" tabindex="0" style="grid-template-columns:22px 46px minmax(0,1fr) auto"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id)?'checked':''} aria-label="Select ${esc(g.name)}"><div class="cover-mini art-${g.art}">${esc(initials(g.name))}</div><div><h3>${esc(g.name)}</h3><div class="game-meta"><span>${esc(g.source)}</span><span>·</span><span>${esc(g.engine)}</span><span>·</span><span>${esc(g.version)}${versionsBadge(g)}</span></div></div><div class="status-text ${g.status}">${g.status==='ok'?'':esc(g.statusText)}</div></article>`).join('');
-  }
-  $$('[data-game]').forEach(row=>{const choose=()=>{const id=row.dataset.game;if(state.selectionMode){state.bulk.has(id)?state.bulk.delete(id):state.bulk.add(id);updateBulkToolbar();renderLibrary();return}state.selected=id;renderLibrary()};row.onclick=choose;row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose()}}});
-  $$('[data-bulk-check]').forEach(cb=>{cb.onclick=e=>e.stopPropagation();cb.onchange=()=>{const id=cb.dataset.bulkCheck;cb.checked?state.bulk.add(id):state.bulk.delete(id);updateBulkToolbar()}});
-  renderDetail(games.find(g=>g.id===state.selected)||list[0]);
-}
-function updateBulkToolbar(){const n=state.bulk.size;document.body.classList.toggle('selection-mode',state.selectionMode);$('#bulkToolbar').classList.toggle('hidden',!state.selectionMode);$('#bulkCount').textContent=n?`${n} selected`:'Select games';$('#selectionModeButton').classList.toggle('primary',state.selectionMode);$('#selectionModeButton').setAttribute('aria-pressed',String(state.selectionMode));$$('[data-bulk-action]').forEach(b=>b.disabled=n===0)}
-function bulkAction(a){const labels={updates:'Checking updates for the selected games.',reconcile:'Sending selected games to the reconciliation queue.',backup:'Queuing a save backup for the selected games.',policy:'Opening management-policy options for the selected games.',export:'Exporting a report for the selected games.'};toast('Bulk action',`${labels[a]||a} (${state.bulk.size} selected)`);
-  // Save backups and launcher entries are reached contextually -- from here, or from
-  // a per-game inspector action -- rather than living in the sidebar permanently.
-  if(a==='backup')navigate('saves');if(a==='reconcile')navigate('reconcile')}
-function renderDetail(g){if(!g){$('#gameDetail').innerHTML='<div class="empty">Select a game.</div>';return}const versions=g.versions||[{version:g.version,variants:[{name:'default',language:'unknown',mods:[],platforms:g.platforms,path:g.path}]}];const updates=g.updates||[];$('#gameDetail').innerHTML=`<div class="detail-hero"><div class="cover-large art-${g.art}">${esc(initials(g.name))}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${gameStatus(g)}<span class="tag">Version ${esc(g.version)}</span><span class="tag">${g.systems.length} system${g.systems.length===1?'':'s'}</span>${g.managed?'<span class="tag">Externally managed</span>':''}</div><p>${esc(g.note)}</p><div class="detail-actions"><button class="btn primary" data-detail-action="manager">Open in manager</button><button class="btn" data-detail-tab="versions">Manage versions</button><button class="btn" data-detail-action="scan">Rescan install</button><button class="icon-btn" data-detail-action="more" aria-label="More actions">•••</button></div></div></div><div class="detail-tabs"><button class="tab active" data-tab="overview">Overview</button><button class="tab" data-tab="engine">Engine &amp; Compatibility</button><button class="tab" data-tab="versions">Versions</button><button class="tab" data-tab="systems">Systems</button><button class="tab" data-tab="notes">Notes</button><button class="tab" data-tab="history">History</button></div>
-<div class="tab-pane active" data-pane="overview"><div class="stats-grid"><div class="stat"><div class="label">Latest installed</div><div class="value">${esc(g.version)}</div></div><div class="stat"><div class="label">Systems</div><div class="value">${g.systems.length}</div><div class="sub">${esc(g.systems.join(' · '))}</div></div><div class="stat"><div class="label">Status</div><div class="value" style="text-align:left;font-size:14px">${gameStatus(g)}</div>${g.status==='ok'?'':`<div class="sub">Review available</div>`}</div></div><div class="kv"><div class="key">Canonical name</div><div class="value">${esc(g.name)} <button class="row-action" style="float:right">✎</button></div><div class="key">Game ID</div><div class="value mono">${esc(g.id)}</div><div class="key">Source</div><div class="value">${esc(g.source)}</div><div class="key">Engine</div><div class="value">${esc(g.engine)}</div><div class="key">Platforms</div><div class="value">${esc(g.platforms.join(' · '))}</div><div class="key">Primary path</div><div class="value mono">${esc(g.path)}</div></div></div>
-<div class="tab-pane" data-pane="engine">${renderEngineTab(g)}</div>
-<div class="tab-pane" data-pane="versions">${updates.length?`<h3 style="font:500 17px var(--serif);margin:0 0 9px">Available, not installed</h3>${updates.map(u=>`<div class="available-update"><span class="status-icon pending" aria-hidden="true">↻</span><div><strong>${esc(u.version)} · ${esc(u.platform)}</strong><br><small>Seen via ${esc(u.source)}</small></div><button class="btn small primary" style="margin-left:auto" data-action="download-update">Review update</button></div>`).join('')}`:''}<h3 style="font:500 17px var(--serif);margin:14px 0 9px">Installed versions</h3>${versions.map(v=>`<div class="version-group"><div class="version-head"><strong>${esc(v.version)}</strong><small>${v.variants.length} variant${v.variants.length===1?'':'s'}</small><span class="spacer"></span><button class="row-action">＋ Add variant</button></div>${v.variants.map(x=>`<div class="variant-row"><div><div class="variant-name">${esc(x.name)} ${x.language&&x.language!=='unknown'?`<span class="tag">${esc(x.language)}</span>`:''}</div><div class="variant-path">${esc(x.path)}</div></div><div class="platforms">${x.platforms.map(p=>`<span class="platform">${esc(p)}</span>`).join('')}</div><div>${x.mods.length?x.mods.map(m=>`<span class="tag">${esc(m)}</span>`).join(' '):'<span style="color:var(--dim);font-size:10px">No mods</span>'}</div><button class="row-action">•••</button></div>`).join('')}</div>`).join('')}</div>
-<div class="tab-pane" data-pane="systems"><table class="table"><thead><tr><th>System</th><th>Availability</th><th>Readiness</th><th>Manager</th><th></th></tr></thead><tbody>${g.systems.map((name,index)=>`<tr><td class="primary-cell"><strong>${esc(name)}</strong><small>${index===0?'Last seen 12 seconds ago':'Metadata available'}</small></td><td>${index===0?routineStatus('Installed here'):`<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">i</span>Known remotely</span>`}</td><td>${g.status==='critical'?visibleStatus(g.statusText,'critical'):index===0?routineStatus('Ready'):visibleStatus('Review configuration','pending')}</td><td>${g.managed?'External manager':'Not configured'}</td><td><button class="btn small">Inspect</button></td></tr>`).join('')}</tbody></table></div>
-<div class="tab-pane" data-pane="notes"><textarea class="notes-area">${esc(g.note)}\n\nOperational notes:\n• Preserve saves before removing an older variant.\n• Launcher changes require a reviewed manager plan.</textarea><div style="display:flex;justify-content:flex-end;margin-top:9px"><button class="btn primary" data-action="save-note">Save note</button></div></div>
-<div class="tab-pane" data-pane="history"><div class="timeline"><div class="timeline-item"><strong>Metadata refreshed</strong><p>Engine, platform, and local path information verified.</p><time>Today · 09:13</time></div><div class="timeline-item"><strong>Version ${esc(g.version)} registered</strong><p>Added from ${esc(g.source)} without moving game files.</p><time>Yesterday · 21:42</time></div><div class="timeline-item"><strong>Game identity created</strong><p>Canonical record ${esc(g.id)} established.</p><time>August 2 · 18:05</time></div></div></div>`;
-$$('[data-tab]',$('#gameDetail')).forEach(t=>t.onclick=()=>openTab(t.dataset.tab));$$('[data-detail-tab]',$('#gameDetail')).forEach(t=>t.onclick=()=>openTab(t.dataset.detailTab));$$('[data-detail-action]',$('#gameDetail')).forEach(b=>b.onclick=()=>detailAction(b.dataset.detailAction,g,b));$$('[data-action]',$('#gameDetail')).forEach(bindAction)}
-function renderEngineTab(g){
-  if(!g.enginePlugin){
-    return `<div class="engine-banner">${visibleStatus('Unidentified','critical')}<div><strong>No engine plugin matched this install.</strong><div style="color:var(--text-secondary);font-size:11px;margin-top:2px">The folder is tracked without an engine assignment.</div></div><span class="spacer"></span><button class="btn small" data-detail-action="correct-engine">Correct manually…</button></div>`;
-  }
-  const rows=(g.platformStatus||[]).map(p=>`<div class="platform-row"><strong>${esc(p.platform)}</strong><div class="req">${esc(p.detail)}</div>${p.state==='fixable'?`<button class="btn small primary" data-detail-action="fix-platform" data-fix-platform="${esc(p.platform)}">${esc(p.fix||'Fix')}</button>`:p.state==='blocked'?visibleStatus('Unavailable for this install','critical'):routineStatus('Ready')}</div>`).join('');
-  return `<div class="engine-banner">${routineStatus('Identified')}<div><strong>${esc(g.enginePlugin)}</strong></div><span class="spacer"></span><button class="btn small ghost" data-detail-action="correct-engine">Correct manually…</button></div><div class="platform-status">${rows||'<div class="empty">No platform status reported yet.</div>'}</div>`;
-}
-function openTab(name){$$('.tab',$('#gameDetail')).forEach(t=>t.classList.toggle('active',t.dataset.tab===name));$$('.tab-pane',$('#gameDetail')).forEach(p=>p.classList.toggle('active',p.dataset.pane===name))}
-function detailAction(a,g,el){if(a==='manager')toast('Manager hand-off',`Would open ${g.name} in the configured launcher manager.`);if(a==='scan')toast('Rescan started',`Read-only scan queued for ${g.name}.`);
-if(a==='fix-platform')toast('Enablement started',`Applying the available fix for ${g.name} on ${el?.dataset.fixPlatform||'this platform'}. No game files are launched.`);
-if(a==='correct-engine')showModal('Correct engine identification',`<select class="field"><option>Ren'Py</option><option>Unity</option><option>RPG Maker MV/MZ</option><option>Kirikiri</option><option>Unreal Engine</option><option>None of these / leave unidentified</option></select>`,'Save identification');
-if(a==='more'){
-  // Save backups and launcher entries are per-item concerns, reached from this
-  // game's own action menu rather than occupying a permanent sidebar slot.
-  const root=$('#modalRoot');
-  showModal('Game actions',`<div class="cards"><button class="btn">Edit metadata</button><button class="btn">Create copy plan</button><button class="btn" data-more-nav="saves">Review save backup</button><button class="btn" data-more-nav="launcher">Review launcher entry</button><button class="btn danger">Review removal</button></div>`,'Close');
-  $$('[data-more-nav]',root).forEach(b=>b.onclick=()=>{root.innerHTML='';navigate(b.dataset.moreNav)});
-}}
-function renderDownloads(){const q=state.view==='downloads'?state.search.toLowerCase():'';const data=[['BeingADIK-11.2-scrappy.zip','F95Checker','Being a DIK · 92%','pending','Needs decision'],['Ripples-0.8-pc.zip','F95Checker','Ripples · certain','ok','Ready to review'],['NobleWorks_ENG_patch.7z','Browser watcher','Noble Works · 74%','critical','Unverified archive']].filter(r=>!q||r.join(' ').toLowerCase().includes(q));$('#downloadRows').innerHTML=data.length?data.map((r,i)=>`<tr><td class="primary-cell"><strong>${esc(r[0])}</strong><small>Detected ${i+2} minutes ago · no filesystem action taken</small></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td><span class="state-pill ${r[3]}">${esc(r[4])}</span></td><td><button class="btn small ${i===1?'primary':''}" data-nav="reconcile">Review</button></td></tr>`).join(''):'<tr><td colspan="5" class="empty">No intake items match.</td></tr>';$$('[data-nav="reconcile"]',$('#view-downloads')).forEach(b=>b.onclick=()=>navigate('reconcile'))}
-function renderPlugins(){const q=state.view==='plugins'?state.search.toLowerCase():'';$('#pluginCards').innerHTML=plugins.filter(p=>!q||[p.name,p.kind,p.desc,p.state,p.origin,p.version].join(' ').toLowerCase().includes(q)).map(p=>`<article class="card"><div class="card-head"><div class="card-icon">${esc(p.icon)}</div><div><strong>${esc(p.name)}</strong><small>${esc(p.kind)} · ${esc(p.origin)} · ${esc(p.version)}</small></div><button class="toggle ${p.enabled?'on':''}" data-plugin="${p.id}" style="margin-left:auto" aria-label="${p.enabled?'Disable':'Enable'} ${esc(p.name)}"><span></span></button></div>${p.desc?`<div class="card-body"><p>${esc(p.desc)}</p></div>`:''}<div class="card-foot">${!p.enabled?visibleStatus('Disabled','neutral','–'):p.status==='ok'?routineStatus(p.state):visibleStatus(p.state,p.status)}<span class="spacer"></span><button class="btn small">Details</button>${p.origin!=='Built-in'?`<button class="btn small danger" data-remove-plugin="${p.id}">Remove</button>`:''}</div></article>`).join('');$$('[data-plugin]').forEach(t=>t.onclick=()=>{const p=plugins.find(x=>x.id===t.dataset.plugin);p.enabled=!p.enabled;if(window.pythia)window.pythia.set_plugin_enabled(p.id,p.enabled);renderPlugins();toast(p.name,p.enabled?'Enabled':'Disabled')});$$('[data-remove-plugin]').forEach(b=>b.onclick=()=>{const p=plugins.find(x=>x.id===b.dataset.removePlugin);showModal('Remove plugin',`<p>Remove <b>${esc(p.name)}</b>? Existing game metadata will remain.</p>`,'Remove')})}
-function renderSystems(){
-  const q=state.view==='systems'?state.search.toLowerCase():'';
-  const list=systems.filter(s=>!q||s.name.toLowerCase().includes(q));
-  $('#systemCards').innerHTML=list.length?list.map(s=>`<article class="card"><div class="card-head"><div class="card-icon">${esc(s.icon)}</div><div><strong>${esc(s.name)}</strong><small>${esc(s.id)}</small></div></div><div class="card-body"><div class="stats-grid" style="grid-template-columns:1fr;margin-bottom:0"><div class="stat"><div class="label">Tracked</div><div class="value">${esc(s.games)}</div></div></div></div></article>`).join('')
-    :'<div class="empty">No systems seen yet -- point Syncthing at your datadir/ folder to sync with another real system.</div>';
-}
-function renderSettingsSearch(){const q=state.search.toLowerCase();$$('.form-row',$('#view-settings')).forEach(r=>r.classList.toggle('hidden',!!q&&!r.innerText.toLowerCase().includes(q)));}
-function renderJobs(){const q=state.view==='activity'?state.search.toLowerCase():'';$('#jobRows').innerHTML=jobs.filter(j=>!q||[j.name,j.detail,j.state].join(' ').toLowerCase().includes(q)).map(j=>`<tr><td class="primary-cell"><strong>${esc(j.name)}</strong><small>${esc(j.detail)}</small></td><td style="width:260px"><div class="progress ${j.status}"><span style="width:${j.pct}%"></span></div><small style="color:var(--muted)">${j.pct}%</small></td><td>${j.status==='ok'?routineStatus(j.state):visibleStatus(j.state,j.status,j.status==='pending'?'!':'↻')}</td><td>${esc(j.start)}</td><td><button class="btn small">Inspect</button></td></tr>`).join('')}
-function bindAction(el){el.onclick=()=>action(el.dataset.action)}
-function action(a){if(a==='scan')showModal('Add to Pythia',`<p>Select a folder or library source. Scanning is read-only; detected candidates enter onboarding or reconciliation before any optional move or launcher change.</p><div class="form-row" style="grid-template-columns:1fr"><input class="field mono" value="G:\\games\\adult"><label class="check-row"><input type="checkbox" checked> Include enabled library plugins</label></div>`,'Start scan');if(a==='watch-folder')showModal('Watch a download folder',`<p>Pythia will snapshot the directory, launch or observe the selected tool, and surface newly completed files as intake candidates.</p><input class="field mono" value="G:\\Downloads\\F95">`,'Start watcher');if(a==='open-f95')toast('External tool','Would open F95Checker in its own normal window.');if(a==='commit')toast('Import committed','The prototype recorded the reviewed version and variant plan.');if(a==='save-settings')toast('Settings saved','Local preferences were stored.');if(a==='save-note')toast('Note saved','Game notes were updated.');if(a==='download-update')navigate('downloads');if(a==='apply-projection')toast('Projection applied','Goodbye Eternity\u2019s GPD Win 4 entry now points at the tracked install.');
-if(a==='configure-renpy')showModal('Ren\u2019Py',`<div class="form-row" style="padding-top:0"><div class="form-label"><strong>Keep downloaded engine files</strong><small>Reuse them for the next game instead of fetching again.</small></div><button class="toggle on"><span></span></button></div><div class="form-row"><div class="form-label"><strong>Fetch ARM files ahead of time</strong><small>Have them ready before you need them, instead of on demand.</small></div><button class="toggle"><span></span></button></div><div class="form-row"><div class="form-label"><strong>Bring saves along on updates</strong><small>Copy saves forward automatically when a new version is installed.</small></div><button class="toggle on"><span></span></button></div><div class="form-row"><div class="form-label"><strong>Downloaded files</strong></div><span>128 MB</span></div>`,'Close');
-if(a==='configure-f95')showModal('F95Checker',`<div class="form-row" style="padding-top:0"><div class="form-label"><strong>Watch folder</strong></div><input class="field mono" value="G:\\Downloads\\F95"></div><div class="form-row"><div class="form-label"><strong>Check files before adding them</strong></div><button class="toggle on"><span></span></button></div>`,'Close');
-if(a==='install-plugin')showModal('Install plugin',`<div class="form-row" style="grid-template-columns:1fr;padding-top:0"><button class="btn">Choose plugin folder…</button><button class="btn">Choose Python package…</button></div>`,'Close');
-if(a==='f95-config')showModal('F95Checker',`<p>Import and export happen once, on request \u2014 there's no ongoing account sync to keep running.</p><div class="form-row" style="grid-template-columns:1fr 1fr;padding-top:0"><button class="btn">Import from F95Checker\u2026</button><button class="btn">Export to F95Checker\u2026</button></div><div class="form-row"><div class="form-label"><strong>Let the F95Checker browser extension use Pythia</strong><small>The official extension can send new games straight here instead.</small></div><button class="toggle on"><span></span></button></div>`,'Close');
-}
-function bindLauncherReview(){$$('[data-launcher-review]').forEach(b=>b.onclick=()=>{$('#launcherDrift').classList.remove('hidden');$('#launcherDrift').scrollIntoView({behavior:'smooth',block:'start'})})}
-function resolveInitialShell(){
-  const explicit=new URLSearchParams(location.search).get('ui');
-  if(explicit==='handheld'||explicit==='desktop')return explicit;
-  const pref=localStorage.getItem('pythia-startup-shell')||'auto';
-  if(pref==='desktop'||pref==='handheld')return pref;
-  if(pref==='last')return localStorage.getItem('pythia-last-shell')||'desktop';
-  const coarse=window.matchMedia&&matchMedia('(pointer: coarse)').matches;
-  const compact=window.innerWidth<=900||(coarse&&window.innerWidth<=1400)||(window.innerHeight<=650&&window.innerWidth<=1200);
-  return compact?'handheld':'desktop';
-}
-function enterHandheld(page='home'){
-  state.shell='handheld';state.hhPage=page;localStorage.setItem('pythia-last-shell','handheld');
-  document.body.classList.add('handheld-active');$('#handheldShell').classList.remove('hidden');renderHandheld();
-  setTimeout(()=>$('.hh-nav.active')?.focus(),0);
-}
-function exitHandheld(){
-  state.shell='desktop';localStorage.setItem('pythia-last-shell','desktop');document.body.classList.remove('handheld-active');$('#handheldShell').classList.add('hidden');
-  setTimeout(()=>$('#enterHandheldButton')?.focus(),0);
-}
-function navigateHandheld(page,push=true){
-  if(page===state.hhPage){renderHandheld();return}
-  if(push)state.hhHistory.push(state.hhPage);state.hhPage=page;state.hhSelected=null;if(page!=='settings')state.hhSettingsPage='root';renderHandheld();
-}
-function handheldTitle(){
-  if(state.hhPage==='settings'&&state.hhSettingsPage!=='root'){
-    const labels={library:'Library',capabilities:'Plugin capabilities',plugins:'Installed plugins',sync:'Systems & sync',interface:'Interface',advanced:'Advanced',sources:'Sources',downloaders:'Downloaders',metadata:'Metadata',managers:'Managers',engines:'Engine detection',mods:'Mods',patchers:'Patchers'};
-    return [labels[state.hhSettingsPage]||'Settings','Settings'];
-  }
-  return {home:['Home',`${games.filter(g=>g.status!=='ok').length} need attention · 2 jobs running`],library:['Library',`${games.length} games`],attention:['Needs attention',`${games.filter(g=>g.status!=='ok').length} items`],downloads:['Downloads & intake','3 intake items · 2 watchers'],systems:['Systems','3 systems · 1 offline'],settings:['Settings','Library, plugins, systems, and interface'],detail:['Game details','Versions, systems, and actions'],decision:['Review decision','No changes applied'],plan:['Proposed plan','Review before applying']}[state.hhPage]||['Pythia',''];
-}
-function renderHandheld(){
-  const [title,sub]=handheldTitle();$('#hhTitle').textContent=title;$('#hhSubtitle').textContent=sub;$('#hhBack').disabled=!state.hhHistory.length&&!['detail','decision','plan'].includes(state.hhPage)&&!(state.hhPage==='settings'&&state.hhSettingsPage!=='root');
-  $$('[data-hh-nav]').forEach(b=>b.classList.toggle('active',b.dataset.hhNav===state.hhPage));
-  const q=state.hhSearch.toLowerCase();
-  if(state.hhPage==='home')renderHHHome();else if(state.hhPage==='library')renderHHLibrary(q);else if(state.hhPage==='attention')renderHHAttention(q);else if(state.hhPage==='downloads')renderHHDownloads();else if(state.hhPage==='systems')renderHHSystems();else if(state.hhPage==='settings')renderHHSettings();else if(state.hhPage==='detail')renderHHDetail(games.find(g=>g.id===state.hhSelected));else if(state.hhPage==='decision')renderHHDecision(games.find(g=>g.id===state.hhSelected));else if(state.hhPage==='plan')renderHHPlan(games.find(g=>g.id===state.hhSelected));
-  bindHandheldActions();
-}
-function hhSummaryGame(g){return `<button class="hh-summary" data-hh-game="${g.id}"><span class="art art-${g.art}">${esc(initials(g.name))}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.engine)} · ${esc(g.version)}${versionsBadge(g)} · ${esc(g.systems.join(' / '))}</small></span>${g.status==='ok'?routineStatus(g.statusText||'No action required'):visibleStatus(g.statusText,g.status,g.status==='critical'?'!':'↻')}</button>`}
-function renderHHHome(){
-  const attention=games.filter(g=>g.status!=='ok');
-  $('#hhContent').innerHTML=`<div class="hh-stack"><section class="hh-alert-strip"><span class="status-icon critical" aria-hidden="true">!</span><div><strong>${attention.length} items need attention</strong><small>1 system offline · 2 jobs running</small></div><button class="hh-action" style="margin-left:auto" data-hh-nav-jump="attention">Review</button></section><section class="hh-panel"><div class="hh-panel-head"><h2>Needs attention</h2><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="attention">All ${attention.length}</button></div><div class="hh-panel-body hh-summary-list">${attention.slice(0,4).map(hhSummaryGame).join('')}</div></section><section class="hh-panel"><div class="hh-panel-head"><h2>Active work</h2><span class="spacer"></span><small>2 running</small></div><div class="hh-panel-body hh-summary-list"><div class="hh-summary" style="cursor:default"><span class="art" style="background:var(--informational-soft);color:var(--informational)">68%</span><span><strong>Scan adult library</strong><small>G:\\games\\adult</small></span>${visibleStatus('Scanning','pending','↻')}</div><div class="hh-summary" style="cursor:default"><span class="art" style="background:var(--warning-soft);color:var(--warning)">42%</span><span><strong>Verify BeingADIK 11.2</strong><small>F95Checker intake</small></span>${visibleStatus('Verifying','pending','↻')}</div></div></section><section class="hh-panel"><div class="hh-panel-head"><h2>Continue managing</h2><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="library">Library</button></div><div class="hh-panel-body hh-summary-list">${games.filter(g=>g.status==='ok').slice(0,3).map(hhSummaryGame).join('')}</div></section><section class="hh-alert-strip" style="border-color:color-mix(in srgb,var(--warning) 45%,var(--border));background:var(--warning-soft)"><span class="status-icon pending" aria-hidden="true">!</span><div><strong>Retroid Pocket 5 is offline</strong><small>Last seen 2h ago</small></div><button class="hh-action" style="margin-left:auto" data-hh-nav-jump="systems">Systems</button></section></div>`;
-}
-function handheldGames(q=''){return games.filter(g=>!q||[g.name,g.source,g.engine,g.version,g.statusText,...g.systems].join(' ').toLowerCase().includes(q))}
-function renderHHLibrary(q=''){
-  const list=handheldGames(q).filter(g=>state.hhSource==='all'||g.source===state.hhSource);$('#hhContent').innerHTML=`<div class="hh-toolbar"><div class="hh-seg"><button data-hh-library-mode="list" class="${state.hhLibraryMode==='list'?'active':''}">☰ List</button><button data-hh-library-mode="grid" class="${state.hhLibraryMode==='grid'?'active':''}">▦ Grid</button></div><select class="hh-filter" id="hhSourceFilter"><option value="all" ${state.hhSource==='all'?'selected':''}>All sources</option><option value="Steam" ${state.hhSource==='Steam'?'selected':''}>Steam</option><option value="F95Checker" ${state.hhSource==='F95Checker'?'selected':''}>F95Checker</option><option value="Manual" ${state.hhSource==='Manual'?'selected':''}>Local folders</option></select><button class="hh-action" data-hh-nav-jump="attention">Needs attention</button><span class="spacer"></span><small>${list.length} visible</small></div>${state.hhLibraryMode==='grid'?`<div class="hh-library-grid">${list.map(g=>`<button class="hh-game-card" data-hh-game="${g.id}"><div class="hh-card-art art-${g.art}"><strong>${esc(g.name)}</strong></div><div class="hh-card-copy"><small>${esc(g.engine)} · ${esc(g.version)}${versionsBadge(g)}</small>${g.status==='ok'?routineStatus(g.statusText||'No action required'):visibleStatus(g.statusText,g.status,g.status==='critical'?'!':'↻')}</div></button>`).join('')}</div>`:`<div class="hh-library-list">${list.map(g=>`<button class="hh-game-row" data-hh-game="${g.id}"><span class="art art-${g.art}">${esc(initials(g.name))}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.source)} · ${esc(g.engine)} · ${esc(g.version)}${versionsBadge(g)}</small></span><span class="system">${esc(g.systems.join(' · '))}</span><span class="state">${g.status==='ok'?routineStatus(g.statusText||'No action required'):visibleStatus(g.statusText,g.status,g.status==='critical'?'!':'↻')}</span></button>`).join('')}</div>`}`;
-}
-function renderHHAttention(q=''){
-  const list=handheldGames(q).filter(g=>g.status!=='ok');$('#hhContent').innerHTML=`<div class="hh-toolbar"><span>${list.length} items</span><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="library">Library</button></div><div class="hh-issue-list">${list.map(g=>`<button class="hh-issue ${g.status}" data-hh-decision="${g.id}"><span class="symbol">${g.status==='critical'?'!':'↻'}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.statusText)} · ${esc(g.engine)} · ${esc(g.version)}</small></span><span class="go">›</span></button>`).join('')}</div>`;
-}
-function renderHHDownloads(){
-  $('#hhContent').innerHTML=`<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-head"><h2>Intake queue</h2><span class="spacer"></span><button class="hh-action primary" data-hh-add>＋ Add</button></div><div class="hh-panel-body hh-summary-list"><div class="hh-summary" data-hh-decision="101"><span class="art art-a">BD</span><span><strong>BeingADIK-11.2-scrappy</strong><small>F95Checker · suggested match 92%</small></span>${visibleStatus('Review','pending')}</div><div class="hh-summary" style="cursor:default"><span class="art art-d">CC</span><span><strong>ChronoClock-ENG.zip</strong><small>Watch folder · language detected</small></span>${visibleStatus('Verify','pending','↻')}</div><div class="hh-summary" style="cursor:default"><span class="art art-j">P3P</span><span><strong>Persona 3 Portable</strong><small>NAS source · remote only</small></span>${routineStatus('Available')}</div></div></section><section class="hh-panel"><div class="hh-panel-head"><h2>Watchers</h2><span class="spacer"></span><small>2 configured</small></div><div class="hh-panel-body hh-summary-list"><div class="hh-summary" style="cursor:default"><span class="art" style="background:var(--positive-soft);color:var(--positive)">95</span><span><strong>F95Checker</strong><small>G:\\Downloads\\F95</small></span>${routineStatus('Watcher active')}</div><div class="hh-summary" style="cursor:default"><span class="art" style="background:var(--warning-soft);color:var(--warning)">S</span><span><strong>SteamCMD</strong><small>Authentication required</small></span>${visibleStatus('Sign in','pending')}</div></div></section></div>`;
-}
-function renderHHSystems(){
-  $('#hhContent').innerHTML=`<div class="hh-system-grid"><article class="hh-system"><h2>Desktop</h2><p>Windows x86_64 · current system · 42 installs</p><div class="line"><span>Metadata</span><b style="color:var(--positive)">Synced</b></div><div class="line"><span>Pending actions</span><b>3</b></div></article><article class="hh-system"><h2>GPD Win 4</h2><p>Windows x86_64 · online · 28 installs</p><div class="line"><span>Metadata</span><b style="color:var(--warning)">2 pending</b></div><div class="line"><span>Launcher drift</span><b>1</b></div></article><article class="hh-system"><h2>Retroid Pocket 5</h2><p>Pocknix aarch64 · offline · 11 local items</p><div class="line"><span>Last seen</span><b style="color:var(--critical-token)">2h ago</b></div><div class="line"><span>Remote ROMs</span><b>14 TB source</b></div></article></div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Selected readiness</h2><span class="spacer"></span><small>Cross-system view</small></div><div class="hh-panel-body hh-summary-list">${games.slice(0,4).map(hhSummaryGame).join('')}</div></section>`;
-}
-function renderHHSettings(){
-  const page=state.hhSettingsPage;
-  const back=`<button class="hh-action" data-hh-settings-page="root">‹ Settings</button>`;
-  if(page==='root'){
-    $('#hhContent').innerHTML=`<div class="hh-settings-menu"><button class="hh-settings-link" data-hh-settings-page="library"><span><strong>Library</strong><small>Tracked folders and scanning</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="capabilities"><span><strong>Plugin capabilities</strong><small>Sources, downloaders, metadata, managers, engines, mods, and patchers</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="plugins"><span><strong>Installed plugins</strong><small>${plugins.length} installed</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="sync"><span><strong>Systems & sync</strong><small>Metadata folder and planned game transfer</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="interface"><span><strong>Interface</strong><small>Theme, startup shell, and library view</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="advanced"><span><strong>Advanced</strong><small>Diagnostics and recovery</small></span><span class="go">›</span></button></div>`;
-  }else if(page==='capabilities'){
-    $('#hhContent').innerHTML=`<div class="hh-stack">${back}<div class="hh-settings-menu">${[['sources','Sources'],['downloaders','Downloaders'],['metadata','Metadata'],['managers','Managers'],['engines','Engine detection'],['mods','Mods'],['patchers','Patchers']].map(x=>`<button class="hh-settings-link" data-hh-settings-page="${x[0]}"><span><strong>${x[1]}</strong></span><span class="go">›</span></button>`).join('')}</div></div>`;
-  }else if(['sources','downloaders','metadata','managers','engines','mods','patchers'].includes(page)){
-    const rows={sources:[['S','Steam','',true],['G','GOG','',true],['95','F95Checker','Watchlist imported 14m ago',true]],downloaders:[['95','F95Checker','Watching G:\\Downloads\\F95',true],['SC','SteamCMD','Needs sign-in',false]],metadata:[['S','Steam','Cover art · DLC',true],['SG','SteamGridDB','Not connected',false],['VN','Community VN Tools','Visual novel metadata',true]],managers:[['S','Steam','',true],['L','Lutris','',true]],engines:[['R',"Ren'Py",'',true],['K','Kirikiri','',true],['U','Unity','',true]],mods:[['M','Variant Mod Tracker','',true],['VN','Community VN Tools','Direct-file visual novel mods',true]],patchers:[['R',"Ren'Py runtime libraries",'',true],['VN','Community VN Tools','Translation and script patch plans',true]]}[page];
-    $('#hhContent').innerHTML=`<div class="hh-stack">${back}<div class="hh-capability-list">${rows.map(r=>`<div class="hh-capability"><span class="art">${r[0]}</span><span><strong>${r[1]}</strong>${r[2]?`<small>${r[2]}</small>`:''}</span><span class="controls">${r[3]?routineStatus('Ready'):visibleStatus(r[2]||'Needs attention','pending')}<button class="toggle ${r[3]?'on':''}" aria-label="Enable ${r[1]}"><span></span></button></span></div>`).join('')}</div></div>`;
-  }else if(page==='library'){
-    $('#hhContent').innerHTML=`<div class="hh-stack">${back}<div class="hh-capability-list"><div class="hh-capability"><span class="art">F</span><span><strong>G:\\games\\adult</strong><small>126 installs · scanned 8m ago</small></span><span class="controls">${routineStatus('Watching')}<button class="hh-action">Edit</button></span></div><div class="hh-capability"><span class="art">F</span><span><strong>G:\\games\\Pirated</strong><small>31 installs · scanned 12m ago</small></span><span class="controls">${routineStatus('Watching')}<button class="hh-action">Edit</button></span></div><div class="hh-capability"><span class="art">N</span><span><strong>nas://roms/</strong><small>Fetched on demand</small></span><span class="controls">${routineStatus('Available')}<button class="hh-action">Edit</button></span></div><button class="hh-action primary">＋ Add folder</button></div></div>`;
-  }else if(page==='plugins'){
-    $('#hhContent').innerHTML=`<div class="hh-stack">${back}<div class="hh-capability-list">${plugins.map(p=>`<div class="hh-capability"><span class="art">${esc(p.icon)}</span><span><strong>${esc(p.name)}</strong><small>${esc(p.kind)} · ${esc(p.version)}</small></span><span class="controls">${p.enabled&&p.status==='ok'?routineStatus('Ready'):p.enabled?visibleStatus(p.state,p.status):visibleStatus('Disabled','neutral','–')}<button class="toggle ${p.enabled?'on':''}" aria-label="Enable ${esc(p.name)}"><span></span></button></span></div>`).join('')}</div></div>`;
-  }else if(page==='sync'){
-    $('#hhContent').innerHTML=`<div class="hh-stack">${back}<div class="hh-setting"><strong>Metadata folder</strong><small>%APPDATA%\\Pythia\\datadir</small><button class="hh-action">Open folder</button></div><div class="hh-setting"><strong>Warn on metadata conflicts</strong><button class="toggle on"><span></span></button></div><div class="hh-setting"><strong>Game transfer</strong><small>Planned · protocol not selected</small><button class="toggle" disabled><span></span></button></div></div>`;
-  }else if(page==='interface'){
-    const startup=localStorage.getItem('pythia-startup-shell')||'auto';$('#hhContent').innerHTML=`<div class="hh-stack">${back}<div class="hh-settings"><div class="hh-setting"><strong>Startup shell</strong><select id="hhStartupShell"><option value="auto" ${startup==='auto'?'selected':''}>Auto-detect at startup</option><option value="desktop" ${startup==='desktop'?'selected':''}>Always Desktop</option><option value="handheld" ${startup==='handheld'?'selected':''}>Always Handheld</option><option value="last" ${startup==='last'?'selected':''}>Remember last shell</option></select></div><div class="hh-setting"><strong>Handheld library view</strong><select id="hhLibraryDefault"><option value="list" ${state.hhLibraryMode==='list'?'selected':''}>List</option><option value="grid" ${state.hhLibraryMode==='grid'?'selected':''}>Cover grid</option></select></div><div class="hh-setting"><strong>Theme</strong><select id="hhTheme"><option value="ink">Ink &amp; Amber</option><option value="parchment">Parchment</option><option value="cobalt">Slate &amp; Cobalt</option></select></div><div class="hh-setting"><strong>Desktop interface</strong><button class="hh-action" id="hhSettingsDesktop" style="width:100%">Open Desktop</button></div></div></div>`;$('#hhTheme').value=document.documentElement.dataset.theme||'ink';
-  }else{
-    $('#hhContent').innerHTML=`<div class="hh-stack">${back}<div class="hh-setting"><strong>Export diagnostics</strong><button class="hh-action">Export…</button></div><div class="hh-setting"><strong>Rebuild cache.db</strong><button class="hh-action">Rebuild</button></div><div class="hh-setting"><strong>Reset local identity</strong><small>Requires typed confirmation.</small><button class="hh-action">Review reset…</button></div></div>`;
-  }
-}
-function renderHHDetail(g){if(!g){navigateHandheld('library',false);return}$('#hhContent').innerHTML=`<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-body"><div class="hh-decision-head"><div class="hh-decision-art art-${g.art}">${esc(initials(g.name))}</div><div><h1 style="margin:0">${esc(g.name)}</h1><div class="meta">${esc(g.source)} · ${esc(g.engine)} · ${esc(g.version)}</div><div style="margin-top:10px">${gameStatus(g)}</div></div></div><div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="hh-action primary" data-hh-manager="${g.id}">Open in manager</button>${g.status!=='ok'?`<button class="hh-action" data-hh-decision="${g.id}">Review</button>`:''}<button class="hh-action" data-hh-nav-jump="systems">Systems</button></div></div></section><section class="hh-detail-section"><h2>Overview</h2><p style="margin:0;color:var(--text-secondary);line-height:1.5">${esc(g.note)}</p><div class="hh-plan" style="margin-top:10px"><div class="hh-plan-row"><b>Path</b><span class="mono">${esc(g.path)}</span></div><div class="hh-plan-row"><b>Platforms</b><span>${esc(g.platforms.join(' · '))}</span></div><div class="hh-plan-row"><b>Systems</b><span>${esc(g.systems.join(' · '))}</span></div></div></section><section class="hh-detail-section"><h2>Versions</h2><div class="hh-summary-list"><div class="hh-summary" style="cursor:default"><span class="art art-${g.art}">${esc(g.version)}</span><span><strong>${esc(g.version)}</strong><small>${g.versions?.[0]?.variants?.length||1} installed variant(s)</small></span>${routineStatus('Installed')}</div>${g.updates?.length?`<div class="hh-summary" style="cursor:default"><span class="art" style="background:var(--warning-soft);color:var(--warning)">＋</span><span><strong>${esc(g.updates[0].version)}</strong><small>${esc(g.updates[0].source)} · ${esc(g.updates[0].platform)}</small></span>${visibleStatus('Available','pending','↻')}</div>`:''}</div></section></div>`;}
-function renderHHDecision(g){if(!g){navigateHandheld('attention',false);return}$('#hhContent').innerHTML=`<section class="hh-decision"><div class="hh-decision-head"><div class="hh-decision-art art-${g.art}">${esc(initials(g.name))}</div><div><div class="hh-state ${g.status}">${esc(g.statusText)}</div><h1>${esc(g.name)}</h1><p>${esc(g.note)}</p><div class="hh-facts"><div class="hh-fact"><small>Installed</small><strong>${esc(g.version)}</strong></div><div class="hh-fact"><small>Observed</small><strong>${esc(g.updates?.[0]?.version||g.statusText)}</strong></div><div class="hh-fact"><small>Systems</small><strong>${g.systems.length}</strong></div></div></div></div><div class="hh-choice-grid"><button class="hh-choice primary" data-hh-choice="plan"><strong>Review proposed plan</strong><small>See exact version, files, saves, systems, and launcher effects before applying.</small></button><button class="hh-choice" data-hh-choice="manager"><strong>Open in manager</strong><small>Hand this title to its configured launcher or manager.</small></button><button class="hh-choice" data-hh-choice="remind"><strong>Remind me later</strong><small>Keep it visible in Needs attention.</small></button><button class="hh-choice" data-hh-choice="dismiss"><strong>Dismiss observation</strong><small>Hide this observation without deleting the underlying record.</small></button></div></section>`;
-}
-function renderHHPlan(g){if(!g){navigateHandheld('attention',false);return}$('#hhContent').innerHTML=`<section class="hh-decision"><div class="hh-state pending">Preview only</div><h1 style="margin:5px 0 0;font:500 26px var(--serif)">Proposed update plan · ${esc(g.name)}</h1><div class="hh-plan"><div class="hh-plan-row"><b>Identity</b><span>Keep game ${g.id} · ${esc(g.name)}</span></div><div class="hh-plan-row"><b>Version</b><span>${esc(g.version)} → ${esc(g.updates?.[0]?.version||'review detected state')}</span></div><div class="hh-plan-row"><b>Filesystem</b><span>Import beside the existing version; no deletion</span></div><div class="hh-plan-row"><b>Saves</b><span>Create and verify a local snapshot before copy-forward</span></div><div class="hh-plan-row"><b>Systems</b><span>${esc(g.systems.join(' · '))}; remote systems remain unchanged until available</span></div><div class="hh-plan-row"><b>Launcher</b><span>Preview projection; do not overwrite external edits automatically</span></div><div class="hh-plan-row"><b>Rollback</b><span>Keep prior version and pre-change snapshot until verification succeeds</span></div></div><div class="actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="hh-action" data-hh-plan-back>Back</button><button class="hh-action primary" data-hh-apply>Apply reviewed plan</button></div></section>`;
-}
-function bindHandheldActions(){
-  $$('[data-hh-nav-jump]').forEach(b=>b.onclick=()=>navigateHandheld(b.dataset.hhNavJump));
-  $$('[data-hh-game]').forEach(b=>b.onclick=()=>{state.hhHistory.push(state.hhPage);state.hhSelected=b.dataset.hhGame;state.hhPage='detail';renderHandheld()});
-  $$('[data-hh-decision]').forEach(b=>b.onclick=()=>{state.hhHistory.push(state.hhPage);state.hhSelected=b.dataset.hhDecision;state.hhPage='decision';renderHandheld()});
-  $$('[data-hh-library-mode]').forEach(b=>b.onclick=()=>{state.hhLibraryMode=b.dataset.hhLibraryMode;localStorage.setItem('pythia-handheld-library',state.hhLibraryMode);renderHandheld()});
-  $('#hhSourceFilter')?.addEventListener('change',e=>{state.hhSource=e.target.value;renderHandheld()});
-  $$('[data-hh-settings-page]').forEach(b=>b.onclick=()=>{state.hhSettingsPage=b.dataset.hhSettingsPage;renderHandheld()});
-  $$('[data-hh-choice]').forEach(b=>b.onclick=()=>{const g=games.find(x=>x.id===state.hhSelected);if(b.dataset.hhChoice==='plan'){state.hhHistory.push('decision');state.hhPage='plan';renderHandheld()}else if(b.dataset.hhChoice==='manager')toast('Manager hand-off',`Would open ${g.name} in its configured manager.`);else if(b.dataset.hhChoice==='remind'){toast('Reminder set',`${g.name} remains in Needs attention.`);navigateHandheld('attention',false)}else{toast('Observation dismissed','The underlying version record was not deleted.');navigateHandheld('attention',false)}});
-  $$('[data-hh-manager]').forEach(b=>b.onclick=()=>toast('Manager hand-off',`Would open ${games.find(g=>g.id===b.dataset.hhManager).name} in its configured manager.`));
-  $$('[data-hh-add]').forEach(b=>b.onclick=()=>showModal('Add to Pythia','<p>Choose a folder, source, or completed download.</p>','Continue'));
-  $('[data-hh-plan-back]')?.addEventListener('click',()=>{state.hhPage='decision';renderHandheld()});
-  $('[data-hh-apply]')?.addEventListener('click',()=>{toast('Plan queued','The reviewed operation was queued for apply and verification.');navigateHandheld('home',false)});
-  $('#hhStartupShell')?.addEventListener('change',e=>{localStorage.setItem('pythia-startup-shell',e.target.value);const desktop=$('#startupShellSelect');if(desktop)desktop.value=e.target.value});
-  $('#hhLibraryDefault')?.addEventListener('change',e=>{state.hhLibraryMode=e.target.value;localStorage.setItem('pythia-handheld-library',e.target.value)});
-  $('#hhTheme')?.addEventListener('change',e=>applyTheme(e.target.value));
-  $('#hhSettingsDesktop')?.addEventListener('click',exitHandheld);
-}
-function moveHandheldFocus(direction){
-  const items=$$('#handheldShell button:not([disabled]),#handheldShell input:not([disabled]),#handheldShell select:not([disabled])').filter(el=>el.offsetParent!==null);if(!items.length)return;
-  const current=document.activeElement;const from=current&&items.includes(current)?current:items[0];const r=from.getBoundingClientRect();const cx=r.left+r.width/2,cy=r.top+r.height/2;
-  let best=null,bestScore=Infinity;for(const el of items){if(el===from)continue;const q=el.getBoundingClientRect(),x=q.left+q.width/2,y=q.top+q.height/2,dx=x-cx,dy=y-cy;const valid=direction==='left'?dx<0&&Math.abs(dx)>=Math.abs(dy)*.35:direction==='right'?dx>0&&Math.abs(dx)>=Math.abs(dy)*.35:direction==='up'?dy<0&&Math.abs(dy)>=Math.abs(dx)*.35:dy>0&&Math.abs(dy)>=Math.abs(dx)*.35;if(!valid)continue;const primary=direction==='left'||direction==='right'?Math.abs(dx):Math.abs(dy),cross=direction==='left'||direction==='right'?Math.abs(dy):Math.abs(dx),score=primary+cross*2.2;if(score<bestScore){best=el;bestScore=score}}
-  (best||from).focus();
-}
-function openSettingsPane(name){navigate('settings');const btn=$$('[data-settings]').find(b=>b.dataset.settings===name);if(btn){$$('[data-settings]').forEach(x=>x.classList.toggle('active',x===btn));$$('.settings-pane').forEach(p=>p.classList.toggle('active',p.dataset.pane===name))}}
-function closeAllMenus(){$$('.menu-dropdown').forEach(d=>d.classList.add('hidden'))}
-function toggleMenu(name){const d=$(`#menu-${name}`);const willShow=d.classList.contains('hidden');closeAllMenus();if(willShow)d.classList.remove('hidden')}
-function menuAction(a){
-  if(a==='exit')toast('Exit','Would close Pythia. (No-op in this prototype.)');
-  if(a==='preferences')navigate('settings');
-  if(a==='rename'){const g=games.find(x=>x.id===state.selected);if(g)showModal('Rename game',`<input class="field" value="${esc(g.name)}">`,'Save');}
-  if(a==='notes'){navigate('library');openTab('notes')}
-  if(a==='handheld')enterHandheld('home');
-  if(a==='refresh-all')toast('Refreshing sources','Re-reading manifests and synced metadata for every enabled source.');
-  if(a==='check-updates')toast('Checking updates','Asking every enabled downloader/metadata plugin for observed updates.');
-  if(a==='rebuild-cache')toast('Cache rebuilt','cache.db was rebuilt entirely from datadir JSON — safe, since nothing else is authoritative.');
-  if(a==='tools')showModal('Downloadable tools',`<p>Tools are downloaded on demand, matched to this system's architecture, and cached after first use.</p><div class="cards">
-    <div class="card"><div class="card-head"><div class="card-icon">L</div><div><strong>legendary</strong><small>Epic Games Store · downloader</small></div></div><div class="card-body"><p>0.20.34 · Windows x86_64</p></div><div class="card-foot"><span class="status-icon ok" role="img" aria-label="Installed" title="Installed">✓</span><span class="spacer"></span><button class="btn small">Check for update</button></div></div>
-    <div class="card"><div class="card-head"><div class="card-icon">W</div><div><strong>Wine / Proton</strong><small>Runtime · experimental internal-launch mode only</small></div></div><div class="card-body"><p>Not downloaded — internal launch mode is disabled</p></div><div class="card-foot"><span class="state-pill info">Not installed</span></div></div>
-    <div class="card"><div class="card-head"><div class="card-icon">?</div><div><strong>Community tool</strong><small>Provided by an installed plugin</small></div></div><div class="card-body"><p>Not downloaded</p></div><div class="card-foot"><span class="state-pill info">Not installed</span><span class="spacer"></span><button class="btn small">Download</button></div></div>
-  </div>`,'Close');
-  if(a==='about')showModal('About Pythia',`<p><b>Pythia</b> manages game installations, versions, systems, and external tools.</p><p style="margin-top:10px">License and third-party notices are available in the application directory.</p>`,'Close');
-  if(a==='issue')toast('Report an issue','Would open the issue tracker in a browser.');
-  if(a==='docs')toast('Documentation','Would open Pythia’s documentation in a browser.');
-  closeAllMenus();
-}
-function applyTheme(theme){
-  const valid=['ink','parchment','cobalt'];
-  const next=valid.includes(theme)?theme:'ink';
-  document.documentElement.dataset.theme=next;
-  localStorage.setItem('pythia-theme',next);
-  const select=$('#themeSelect');if(select)select.value=next;
-  $$('[data-theme-choice]').forEach(b=>b.classList.toggle('active',b.dataset.themeChoice===next));
-}
-function toggleThemePopover(force){
-  const pop=$('#themePopover');
-  const show=typeof force==='boolean'?force:pop.classList.contains('hidden');
-  pop.classList.toggle('hidden',!show);
-}
-function setup(){
-const savedTheme=localStorage.getItem('pythia-theme')||'ink';applyTheme(savedTheme);
-renderDownloads();renderSystems();renderPlugins();renderJobs();renderLibrary();updateBulkToolbar();$$('[data-nav]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.nav)));$$('[data-source-nav]').forEach(b=>b.addEventListener('click',()=>{state.source=b.dataset.sourceNav;navigate('library');$('#sourceFilter').value=state.source;renderLibrary()}));$$('[data-filter-nav]').forEach(b=>b.onclick=()=>{state.filterStatus=b.dataset.filterNav;navigate('library');renderLibrary()});$$('[data-action]').forEach(bindAction);$('#backButton').onclick=()=>{const prev=state.history.pop();if(prev)navigate(prev,false);$('#backButton').disabled=!state.history.length};$('#globalSearch').addEventListener('input',e=>{state.search=e.target.value;renderCurrent()});document.addEventListener('keydown',e=>{if(state.shell==='handheld'){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();moveHandheldFocus(e.key.replace('Arrow','').toLowerCase())}if(e.key==='Escape'){e.preventDefault();if(state.hhHistory.length){state.hhPage=state.hhHistory.pop();renderHandheld()}else exitHandheld()}return}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('#globalSearch').focus()}});$('#sourceFilter').onchange=e=>{state.source=e.target.value;renderLibrary()};$('#engineFilter').onchange=e=>{state.engine=e.target.value;renderLibrary()};$('#sortSelect').onchange=e=>{state.sort=e.target.value;renderLibrary()};$('#clearFilters').onclick=()=>{state.source='all';state.engine='all';state.filterStatus='all';$('#sourceFilter').value='all';$('#engineFilter').value='all';renderLibrary()};$$('[data-library-mode]').forEach(b=>b.onclick=()=>{state.libraryMode=b.dataset.libraryMode;localStorage.setItem('pythia-desktop-library',state.libraryMode);renderLibrary();toast('Desktop library view',state.libraryMode==='grid'?'Cover grid with persistent inspector.':'List with persistent inspector.')});$$('[data-density]').forEach(b=>b.onclick=()=>{state.density=b.dataset.density;$$('[data-density]').forEach(x=>x.classList.toggle('active',x===b));document.documentElement.style.setProperty('--row-pad',state.density==='compact'?'7px':state.density==='spacious'?'14px':'10px');toast('Density changed',`${b.textContent} library density selected.`)});$$('.toggle:not([data-plugin])').forEach(t=>t.onclick=()=>t.classList.toggle('on'));$$('[data-settings]').forEach(b=>b.onclick=()=>{$$('[data-settings]').forEach(x=>x.classList.toggle('active',x===b));$$('.settings-pane').forEach(p=>p.classList.toggle('active',p.dataset.pane===b.dataset.settings))});$$('[data-candidate]').forEach(c=>c.onclick=()=>{$$('[data-candidate]').forEach(x=>x.classList.remove('selected'));c.classList.add('selected')});$('#commitDecision').onclick=()=>{$('#commitPlan').classList.remove('hidden');$('#moveResult').textContent=$('#moveSibling').checked?'Move beside the existing game versions after explicit approval':'Leave the folder where it is';$('#commitPlan').scrollIntoView({behavior:'smooth',block:'start'})};
-$('#themeButton').onclick=e=>{e.stopPropagation();toggleThemePopover()};
-$$('[data-theme-choice]').forEach(b=>b.onclick=()=>{applyTheme(b.dataset.themeChoice);toggleThemePopover(false);toast('Theme changed',b.textContent.trim())});
-$('#themeSelect').onchange=e=>applyTheme(e.target.value);
-document.addEventListener('click',e=>{if(!e.target.closest('#themePopover')&&!e.target.closest('#themeButton'))toggleThemePopover(false)});
-$('#enterHandheldButton').onclick=()=>enterHandheld('home');$('#exitHandheldRail').onclick=exitHandheld;$('#exitHandheldTop').onclick=exitHandheld;$$('[data-hh-nav]').forEach(b=>b.onclick=()=>navigateHandheld(b.dataset.hhNav));$('#hhBack').onclick=()=>{if(state.hhPage==='settings'&&state.hhSettingsPage!=='root'){state.hhSettingsPage='root';renderHandheld();return}if(state.hhHistory.length){state.hhPage=state.hhHistory.pop();renderHandheld()}else if(['detail','decision','plan'].includes(state.hhPage)){navigateHandheld('library',false)}};$('#hhSearch').oninput=e=>{state.hhSearch=e.target.value;renderHandheld()};$('#hhAdd').onclick=()=>showModal('Add to Pythia','<p>Choose a folder, source, or completed download.</p>','Continue');
-bindLauncherReview();
-$$('[data-bulk-action]').forEach(b=>b.onclick=()=>bulkAction(b.dataset.bulkAction));
-$('#selectionModeButton').onclick=()=>{state.selectionMode=!state.selectionMode;if(!state.selectionMode)state.bulk.clear();updateBulkToolbar();renderLibrary()};
-$('#bulkSelectAll').onclick=()=>{filteredGames().forEach(g=>state.bulk.add(g.id));updateBulkToolbar();renderLibrary()};
-$('#bulkClear').onclick=()=>{state.bulk.clear();state.selectionMode=false;updateBulkToolbar();renderLibrary()};
-$('#addButton').onclick=e=>{e.stopPropagation();const pop=$('#addPopover');const show=pop.classList.contains('hidden');pop.classList.toggle('hidden',!show);$('#addButton').setAttribute('aria-expanded',String(show));toggleThemePopover(false)};
-$$('[data-add-choice]').forEach(b=>b.onclick=()=>{const kind=b.dataset.addChoice;$('#addPopover').classList.add('hidden');$('#addButton').setAttribute('aria-expanded','false');if(kind==='scan')action('scan');else if(kind==='download')navigate('downloads');else if(kind==='folder')showModal('Add game folder',`<input class="field mono" value="G:\\games\\">`,'Analyze folder');else showModal('Import from source',`<select class="field"><option>Steam library</option><option>F95Checker watchlist</option><option>Local folder source</option><option>NAS ROM source</option></select>`,'Continue')});
-document.addEventListener('click',e=>{if(!e.target.closest('#addPopover')&&!e.target.closest('#addButton')){$('#addPopover').classList.add('hidden');$('#addButton').setAttribute('aria-expanded','false')}});
-const startupPref=localStorage.getItem('pythia-startup-shell')||'auto';$('#startupShellSelect').value=startupPref;$('#desktopLibrarySelect').value=state.libraryMode;$('#handheldLibrarySelect').value=state.hhLibraryMode;$('#startupShellSelect').onchange=e=>localStorage.setItem('pythia-startup-shell',e.target.value);$('#desktopLibrarySelect').onchange=e=>{state.libraryMode=e.target.value;localStorage.setItem('pythia-desktop-library',e.target.value);renderLibrary()};$('#handheldLibrarySelect').onchange=e=>{state.hhLibraryMode=e.target.value;localStorage.setItem('pythia-handheld-library',e.target.value)};
-if(resolveInitialShell()==='handheld')enterHandheld('home');
-$$('[data-menu]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleMenu(b.dataset.menu)});
-$$('[data-menu-action]').forEach(b=>b.onclick=()=>menuAction(b.dataset.menuAction));
-$$('[data-menu-nav]').forEach(b=>b.onclick=()=>{if(b.dataset.filter)state.filterStatus=b.dataset.filter;navigate(b.dataset.menuNav);closeAllMenus()});
-$$('[data-menu-density]').forEach(b=>b.onclick=()=>{const t=$$('[data-density]').find(x=>x.dataset.density===b.dataset.menuDensity);t?.click();closeAllMenus()});
-$$('[data-menu-theme]').forEach(b=>b.onclick=()=>{applyTheme(b.dataset.menuTheme);closeAllMenus()});
-$$('[data-settings-nav]').forEach(b=>b.onclick=()=>{openSettingsPane(b.dataset.settingsNav);closeAllMenus()});
-document.addEventListener('click',e=>{if(!e.target.closest('.menu-item'))closeAllMenus()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAllMenus()});
-}
-setup();
-
-// Real backend bridge (2026-08-03) -- Backend (pythia/ui/backend.py) is
-// already a real QObject with @Property/@Slot members (the same object the
-// QML big-picture front end talks to), so QWebChannel exposes it to this
-// page automatically once registered on the Python side. `pythia.games` is
-// kept live via its own gamesChanged signal -- no polling.
-if(window.qt&&qt.webChannelTransport){
-  new QWebChannel(qt.webChannelTransport,function(channel){
-    window.pythia=channel.objects.pythia;
-    function populateFilterOptions(){
-      const sources=[...new Set(games.map(g=>g.source))].sort();
-      const engines=[...new Set(games.map(g=>g.engine))].sort();
-      const fill=(sel,values,allLabel)=>{
-        const current=sel.value;
-        sel.innerHTML=`<option value="all">${allLabel}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
-        sel.value=values.includes(current)?current:'all';
-      };
-      fill($('#sourceFilter'),sources,'All sources');
-      fill($('#engineFilter'),engines,'All engines');
-    }
-    function updateStatusBar(raw){
-      const uuids=new Set();
-      (raw||[]).forEach(r=>(r.entries||[]).forEach(e=>{if(e.system_uuid)uuids.add(e.system_uuid)}));
-      const n=uuids.size||1;
-      const right=$('#statusRight');if(right)right.textContent=`${games.length} game${games.length===1?'':'s'} · ${n} system${n===1?'':'s'}`;
-      const label=$('#statusSyncLabel');if(label)label.textContent=n>1?`Synced across ${n} systems`:'This system only';
-    }
-    let mySystemUuid=null;
-    function updateSystems(raw){
-      const counts=new Map();
-      (raw||[]).forEach(r=>(r.entries||[]).forEach(e=>{
-        const uuid=e.system_uuid;
-        if(!uuid)return;
-        counts.set(uuid,(counts.get(uuid)||0)+1);
-      }));
-      systems=[...counts.entries()].map(([uuid,count])=>({
-        id:uuid,
-        icon:uuid===mySystemUuid?'PC':uuid.slice(0,2).toUpperCase(),
-        name:uuid===mySystemUuid?'This system':`System ${uuid.slice(0,8)}`,
-        games:count,
-      }));
-      if(state.view==='systems')renderSystems();
-    }
-    function refreshGames(){const raw=window.pythia.games||[];games=raw.map(adaptGame);populateFilterOptions();updateStatusBar(raw);updateSystems(raw);if(state.view==='library')renderLibrary()}
-    window.pythia.gamesChanged.connect(refreshGames);
-    window.pythia.get_system_uuid(function(uuid){mySystemUuid=uuid;updateSystems(window.pythia.games||[])});
-    refreshGames();
-
-    function refreshPlugins(){
-      window.pythia.get_all_plugins(function(result){
-        plugins=(result||[]).map(adaptPlugin);
-        renderPlugins();
-      });
-    }
-    refreshPlugins();
-  });
-}
-})();
-</script>
+<script src="components.js"></script>
+<script src="console.js"></script>
+<script src="query.js"></script>
+<script src="versions.js"></script>
+<script src="reconcile.js"></script>
+<script src="review.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

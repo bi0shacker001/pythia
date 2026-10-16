@@ -1,8 +1,8 @@
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from pythia.util.notifier import NotificationSource
 from pythia.util.jobs import AsyncCall
+from pythia.util.notifier import NotificationSource
 
 BUSY_STARTED = NotificationSource()
 BUSY_STOPPED = NotificationSource()

@@ -27,10 +27,34 @@ from pythia.plugins.registry import register_builtin
 # -- no files directly present, AND none of the subfolder names look like internal
 # engine structure -- is what keeps this from misfiring on real installs.
 _STRUCTURE_FOLDER_NAMES = {
-    "bin", "bin_plus", "binaries", "data", "data_final", "logs", "log", "support",
-    "output", "config", "cfg", "saves", "savedata", "cache", "temp", "tmp", "redist",
-    "_commonredist", "engine", "content", "common", "system", "system32", "game",
-    "gamedata", "assets", "installer", "install",
+    "bin",
+    "bin_plus",
+    "binaries",
+    "data",
+    "data_final",
+    "logs",
+    "log",
+    "support",
+    "output",
+    "config",
+    "cfg",
+    "saves",
+    "savedata",
+    "cache",
+    "temp",
+    "tmp",
+    "redist",
+    "_commonredist",
+    "engine",
+    "content",
+    "common",
+    "system",
+    "system32",
+    "game",
+    "gamedata",
+    "assets",
+    "installer",
+    "install",
 }
 
 # Extensions that only ever show up as game *assets*, never as the whole content
@@ -42,8 +66,19 @@ _STRUCTURE_FOLDER_NAMES = {
 # .exe, which would have rejected every real non-Windows game too) -- this only
 # rejects a folder that is *exclusively* this kind of file, nothing else.
 _ASSET_ONLY_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tga", ".psd",
-    ".txt", ".pdf", ".doc", ".docx", ".md",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".webp",
+    ".tga",
+    ".psd",
+    ".txt",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".md",
 }
 
 

@@ -4,11 +4,12 @@ import logging
 import logging.handlers
 import os
 import sys
+from typing import Any
 
 # Used to store log buffers for games (formerly typed as Gtk.TextBuffer under
 # GTK; now just whatever the actual UI's log-view widget stores -- see the Qt
 # UI's own log window once it exists).
-LOG_BUFFERS: dict = {}
+LOG_BUFFERS: dict[str, Any] = {}
 
 
 def _user_cache_dir() -> str:

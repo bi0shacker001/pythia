@@ -15,7 +15,7 @@ lutris.e4p
 pga.db
 tests/coverage/*
 /dist
-/lutris.egg-info
+*.egg-info/
 /flake.nix
 /flake.lock
 
@@ -41,3 +41,12 @@ CLAUDE.md
 
 # glade recovery files
 *.ui~
+
+/dist/
+
+# cargo's output for native/
+/native/target
+/pythia/_native*.so
+/pythia/_native*.pyd
+/native/vendor
+/native/.cargo

@@ -18,14 +18,12 @@ from pythia.database import games as games_db
 from pythia.database import sql
 from pythia.exception_backstops import watch_game_errors
 from pythia.exceptions import GameConfigError, InvalidGameMoveError, MissingExecutableError
-from pythia.util.notifier import NotificationSource
 from pythia.installer import InstallationKind, get_entry_point_path
 from pythia.monitored_command import MonitoredCommand
 from pythia.runner_interpreter import export_bash_script, get_launch_parameters
 from pythia.runners import import_runner, is_valid_runner_name
 from pythia.runners.runner import Runner, kill_processes
 from pythia.util import app_singleton, busy, discord, extract, jobs, linux, strings, system, xdgshortcuts
-from pythia.util.log_buffer import SimpleLogBuffer
 from pythia.util.display import (
     DISPLAY_MANAGER,
     SCREEN_SAVER_INHIBITOR,
@@ -36,14 +34,16 @@ from pythia.util.display import (
 from pythia.util.graphics.xrandr import turn_off_except
 from pythia.util.linux import LINUX_SYSTEM
 from pythia.util.log import LOG_BUFFERS, logger
+from pythia.util.log_buffer import SimpleLogBuffer
+from pythia.util.notifier import NotificationSource
 from pythia.util.steam.shortcut import remove_shortcut as remove_steam_shortcut
 from pythia.util.system import fix_path_case
 from pythia.util.timer import Timer
 from pythia.util.yaml import write_yaml_to_file
 
 if TYPE_CHECKING:
-    from pythia.gui.application import PythiaApplication
     from pythia.delegates import LaunchUIDelegate
+    from pythia.gui.application import PythiaApplication
 
 HEARTBEAT_DELAY = 2000
 

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Pythia
+Comment=Install a game from a Lutris installer script
+Type=Application
+Exec=pythia --install %f
+MimeType=application/x-lutris;
+Icon=net.pythia.Pythia
+NoDisplay=true
+StartupNotify=true

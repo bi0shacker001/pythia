@@ -6,7 +6,7 @@ on:
   workflow_call:
     inputs:
       # This should be in the format: "ppa:username/repo"
-      # Ex. "ppa:lutris-team/lutris"
+      # Ex. "ppa:<owner>/pythia"
       PPA_URI:
         required: true
         type: string
@@ -30,7 +30,7 @@ jobs:
     # GitHub only has runners for LTS versions of Ubuntu.
     # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
     # Also note that, although a runner exists for Ubuntu 18.04, the
-    # lutris build-dependencies are not supported on that version.
+    # pythia build-dependencies are not supported on that version.
     strategy:
       matrix:
         os: [ ubuntu-24.04, ubuntu-22.04 ]

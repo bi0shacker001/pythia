@@ -1,5 +1,5 @@
 """
-On-disk instance marker files (2026-08-04, Milestone 9's `game_uuid`-only slice
+On-disk instance marker files, read only (2026-08-04, Milestone 9's `game_uuid`-only slice
 -- the full instance model/`instance_uuid` convergence stays deferred with the
 rest of the mod-manager/instance-model work, per explicit user instruction).
 
@@ -17,13 +17,16 @@ arrival).
 Deliberately a hidden dotfile, plain JSON -- self-describing even before
 cross-referencing the corresponding synced `datadir/*.json` entry, and safe to
 read manually if something needs debugging.
+
+**Pythia no longer writes them (2026-10-16).** Owner direction for the
+Windows test (Droidtop/tracker#538): Pythia never writes into a person's game
+folders. An install's identity lives in Pythia's own data: the entry's
+`game_uuid` and the variant's `path` in `datadir/`. A marker written by an
+earlier Pythia is still read as evidence (read_marker), since reading writes
+nothing; none is created or updated.
 """
 
-import ctypes
-import datetime
 import json
-import os
-import uuid
 from pathlib import Path
 
 MARKER_FILENAME = ".pythia-instance"
@@ -41,45 +44,3 @@ def read_marker(variant_root: Path) -> dict | None:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-
-
-def write_marker(variant_root: Path, game_uuid: str, version: str, mods: list, language, system_uuid: str) -> None:
-    """Best-effort -- a write failure (e.g. a read-only or not-yet-existing
-    path) should never block onboarding, so this never raises. Preserves the
-    marker's own `instance_uuid`/`created_at` across repeat calls instead of
-    re-minting them every time this variant is re-onboarded/rescanned."""
-    path = marker_path(variant_root)
-    if not Path(variant_root).is_dir():
-        return
-    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    existing = read_marker(variant_root)
-    data = {
-        "game_uuid": game_uuid,
-        "instance_uuid": (existing or {}).get("instance_uuid") or str(uuid.uuid4()),
-        "version": version,
-        "mods": mods,
-        "language": language,
-        "produced_by_system_uuid": system_uuid,
-        "created_at": (existing or {}).get("created_at") or now,
-        "updated_at": now,
-    }
-    try:
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        _set_hidden(path)
-    except OSError:
-        pass
-
-
-def _set_hidden(path: Path) -> None:
-    """Best-effort Windows hidden-attribute set -- on POSIX the leading dot
-    already makes it a dotfile by convention, nothing more to do here. Real,
-    confirmed limitation (see Milestone 9 §D): this attribute is local-only,
-    it doesn't travel through an external sync tool the way the dotfile
-    convention itself does."""
-    if os.name != "nt":
-        return
-    try:
-        FILE_ATTRIBUTE_HIDDEN = 0x02
-        ctypes.windll.kernel32.SetFileAttributesW(str(path), FILE_ATTRIBUTE_HIDDEN)
-    except OSError:
-        pass

@@ -56,10 +56,7 @@ class GodotEnginePlugin(DetectOnlyEnginePlugin):
             return False
         if any(p.suffix.lower() == ".pck" for p in candidates):
             return True
-        return any(
-            p.suffix.lower() in _EXECUTABLE_SUFFIXES and _has_embedded_pck_trailer(p)
-            for p in candidates
-        )
+        return any(p.suffix.lower() in _EXECUTABLE_SUFFIXES and _has_embedded_pck_trailer(p) for p in candidates)
 
 
 plugin = register_builtin(GodotEnginePlugin())

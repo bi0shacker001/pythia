@@ -12,7 +12,7 @@ except ImportError:
     # at all on Windows. get_display_manager() in util/display.py already
     # catches the resulting failure and falls back to LegacyDisplayManager,
     # so this module just needs to not crash at *import* time.
-    dbus = None  # type: ignore[assignment]
+    dbus = None
 
 from pythia.settings import DEFAULT_RESOLUTION_HEIGHT, DEFAULT_RESOLUTION_WIDTH
 from pythia.util.log import logger

@@ -37,6 +37,7 @@ Two independent capabilities, same split as itch.io/Steam:
 """
 
 import json
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -162,10 +163,10 @@ class GogPlugin(LibraryPlugin, MetadataPlugin):
         string and display name the file-marker alone can't give), but `winreg`
         doesn't exist on Linux at all -- this returns None there immediately, and
         match() falls straight through to the file-based check, unaffected."""
-        try:
-            import winreg
-        except ImportError:
+        if sys.platform != "win32":
             return None
+        import winreg
+
         resolved = str(path.resolve())
         try:
             games_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\GOG.com\Games")
@@ -214,7 +215,7 @@ class GogPlugin(LibraryPlugin, MetadataPlugin):
         if not info_files:
             return None
         stem = info_files[0].stem  # "goggame-1207658691"
-        gog_id = stem[len("goggame-"):]
+        gog_id = stem[len("goggame-") :]
         return {
             "kind": "gog",
             "name": None,

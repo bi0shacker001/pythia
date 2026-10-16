@@ -2,8 +2,8 @@ import configparser
 import os
 from typing import Any
 
-from pythia.util.notifier import NotificationSource
 from pythia.util.log import logger
+from pythia.util.notifier import NotificationSource
 
 
 class SettingsIO:

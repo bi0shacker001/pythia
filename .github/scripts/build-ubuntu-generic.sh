@@ -1,27 +1,27 @@
 #!/bin/bash
-# Default build script for producing a generic Lutris build.
+# Default build script for producing a generic Pythia build.
 # It requires several environment variables which are typically
 # passed in from the ./build-ubuntu.sh script.
 #
 #   CODEBASE_ROOT
 #       The absolute real path to the git repository root directory.
 #
-#   LUTRIS_VERSION
-#       The version of Lutris being built, in semver format.
+#   PYTHIA_VERSION
+#       The version of Pythia being built, in semver format.
 #       Ex. "0.5.12-1" or "0.5.12"
 #
 #   OS_CODENAME
 #       The Ubuntu codename the package is being built for.
 #       Ex. "jammy" or "kinetic"
 #
-#   LUTRIS_DEBIAN_VERSION
+#   PYTHIA_DEBIAN_VERSION
 #       The Debian-specific version which follows the guidelines
 #       specified here: https://help.launchpad.net/Packaging/PPA/BuildingASourcePackage#Versioning
 #       Ex. "0.5.12-0ubuntu1"
 #
 #   PPA_VERSION
 #       The PPA release version which follows the same guide as mentioned
-#       in the LUTRIS_DEBIAN_VERSION variable.
+#       in the PYTHIA_DEBIAN_VERSION variable.
 #       Ex. "ppa1~ubuntu22.04" or "ppa3~ubuntu22.04"
 #
 #   PPA_GPG_KEY_ID
@@ -35,13 +35,13 @@
 #
 
 # Make sure the changelog has a proper entry for the version being built.
-if ! grep -q "${LUTRIS_VERSION}" "${CODEBASE_ROOT}/debian/changelog"; then
+if ! grep -q "${PYTHIA_VERSION}" "${CODEBASE_ROOT}/debian/changelog"; then
     echo "Error: ${CODEBASE_ROOT}/debian/changelog does not contain an entry for our current version."
     exit 255
 fi
 
 # Does an initial make process for creating a debian source package.
-debmake -n -p lutris -u "${LUTRIS_VERSION}" -b":python3"
+debmake -n -p pythia -u "${PYTHIA_VERSION}" -b":python3"
 
 # Updates debian/control file based on current environment.
 sudo mk-build-deps --install \
@@ -53,8 +53,18 @@ sudo mk-build-deps --install \
 # number to match the Debian+PPA version scheme described above.
 sed -i"" \
     -re"1s/\s\w+;/ ${OS_CODENAME};/" \
-    -re"1s/${LUTRIS_VERSION}/${LUTRIS_DEBIAN_VERSION}${PPA_VERSION}/" \
+    -re"1s/${PYTHIA_VERSION}/${PYTHIA_DEBIAN_VERSION}${PPA_VERSION}/" \
     "${CODEBASE_ROOT}/debian/changelog"
+
+# Launchpad builds without a network, so the crates pythia._native (native/)
+# builds from go into the source package, with the cargo config that points
+# cargo at them.
+mkdir -p "${CODEBASE_ROOT}/native/.cargo"
+cargo vendor --locked --versioned-dirs \
+    --manifest-path "${CODEBASE_ROOT}/native/Cargo.toml" \
+    "${CODEBASE_ROOT}/native/vendor" \
+    > "${CODEBASE_ROOT}/native/.cargo/config.toml"
+sed -i"" -e"s|${CODEBASE_ROOT}/native/vendor|vendor|" "${CODEBASE_ROOT}/native/.cargo/config.toml"
 
 # Builds and signs the debian package files.
 # PPA_GPG_KEY_ID and PPA_GPG_PASSPHRASE environment variables must be defined
@@ -62,6 +72,6 @@ sed -i"" \
 make github-ppa
 
 # Clean up.
-sudo rm -f "${CODEBASE_ROOT}/lutris-build-deps"*
+sudo rm -f "${CODEBASE_ROOT}/pythia-build-deps"*
 git clean -df "${CODEBASE_ROOT}"
 git reset --hard

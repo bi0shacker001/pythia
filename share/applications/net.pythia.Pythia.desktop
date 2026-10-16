@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Pythia
+StartupWMClass=net.pythia.Pythia
+Comment=Game library manager for your computers and handhelds
+Categories=Game;PackageManager;
+Keywords=gaming;library;handheld;droidtop;wine;emulator;
+Exec=pythia %U
+Icon=net.pythia.Pythia
+Terminal=false
+Type=Application
+StartupNotify=true
+MimeType=x-scheme-handler/pythia;

@@ -26,7 +26,7 @@ from pathlib import Path
 from pythia import datadir
 from pythia.core import instance_marker
 from pythia.database import games as games_db
-from pythia.datadir import classify_variant_tokens
+from pythia.datadir import classify_folder_tokens
 from pythia.identity import get_system_uuid, new_game_id
 
 NAME_SIMILARITY_THRESHOLD = 0.6
@@ -39,7 +39,11 @@ NAME_SIMILARITY_THRESHOLD = 0.6
 # finding). This won't catch every real case either (a bare build number like
 # "Bunnycop-049" now just stays part of the name) -- best-effort, not exhaustive; see
 # this function's docstring.
-_NAME_VERSION_RE = re.compile(r"^(.*?)[-_ ](?:v(\d+(?:[._]\d+)*[a-zA-Z]*)|(\d+[._]\d+(?:[._]\d+)*[a-zA-Z]*))(.*)$")
+# A version's tail may be letters then digits ("0.8.09r1", "1.0b2", "2.0rc3"):
+# Droidtop/tracker#538, "0.8.09r1" was cut to "0.8.09r" with "1" as a mod.
+_NAME_VERSION_RE = re.compile(
+    r"^(.*?)[-_ ](?:v(\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?)|(\d+[._]\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?))(.*)$"
+)
 
 # A small set of generic "this is a part/chapter marker, not a title" words -- when a
 # leaf folder is *just* one of these plus a number (e.g. "Week 1", "Part1", "Chap3+"),
@@ -47,7 +51,9 @@ _NAME_VERSION_RE = re.compile(r"^(.*?)[-_ ](?:v(\d+(?:[._]\d+)*[a-zA-Z]*)|(\d+[.
 # -library case: BeingADik/Chap3+/10.0-sancho, Fetish Locator/Week 1/2/3, My New
 # Family/Part 1, Thief of Hearts/Part1 all fragmented into separate bogus "games"
 # because only the leaf name was ever considered).
-_GENERIC_PART_PREFIX_RE = re.compile(r"^(chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?)\.?\s*", re.IGNORECASE)
+_GENERIC_PART_PREFIX_RE = re.compile(
+    r"^(chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?)\.?\s*", re.IGNORECASE
+)
 
 
 def _is_generic_part_leaf(name: str) -> bool:
@@ -89,15 +95,32 @@ def _extract_version_only(leaf: str):
     stripped = _GENERIC_PART_PREFIX_RE.sub("", leaf, count=1)
     m = re.search(r"(\d+(?:[._]\d+)*[a-zA-Z]*)", stripped)
     if not m:
-        mods, language = classify_variant_tokens(stripped)
-        return stripped.strip() or leaf, mods, language
+        return stripped.strip() or leaf, classify_folder_tokens(stripped)
     version = m.group(1).replace("_", ".")
     rest = stripped[: m.start()] + " " + stripped[m.end() :]
-    mods, language = classify_variant_tokens(rest)
-    return version, mods, language
+    return version, classify_folder_tokens(rest)
+
+
+def _split_part(leaf: str):
+    """A part folder's part ("Part1", "Week 2", "Chap3+"), the version after it when
+    there is a dotted one ("Chapter 3 v1.1" -> 1.1), and what else its name says."""
+    m = re.match(r"^(.*?\d+\+?)(.*)$", leaf)
+    if not m:
+        return leaf.strip(), "", classify_folder_tokens("")
+    part, rest = m.group(1).strip(" -_"), m.group(2)
+    if re.search(r"\d+[._]\d", rest):
+        version, details = _extract_version_only(re.sub(r"^[vV](?=\d)", "", rest.strip(" -_")))
+        return part, version, details
+    return part, "", classify_folder_tokens(rest)
 
 
 def _derive_name_version_mods_language(path: Path):
+    """_derive_folder's name, version, mods and language."""
+    name, version, details = _derive_folder(path)
+    return name, version, details["mods"], details["language"]
+
+
+def _derive_folder(path: Path):
     """Minimal placeholder splitter -- good enough to seed a canonical name, a
     version-ish label, a `mods` guess, and a `language` guess from a raw folder name; a
     proper Sonarr/Radarr-style naming filter system replaces this later. Best-effort --
@@ -118,16 +141,24 @@ def _derive_name_version_mods_language(path: Path):
     if _is_generic_part_leaf(folder_name):
         ancestor_name = _find_meaningful_ancestor_name(path)
         if ancestor_name is not None:
-            version, mods, language = _extract_version_only(folder_name)
-            return ancestor_name, version, mods, language
+            # A part folder (Part1, Week 2) is a part of the title above it; a bare
+            # version folder (12.0-scrappy) is a version, of the part above it when
+            # that is a part folder (droidtop SPEC 7m, segments; UX review A16).
+            if _GENERIC_PART_PREFIX_RE.match(folder_name):
+                part, version, details = _split_part(folder_name)
+            else:
+                version, details = _extract_version_only(folder_name)
+                parent = path.parent.name
+                part = parent if _GENERIC_PART_PREFIX_RE.match(parent) else None
+            details["part"] = part
+            return ancestor_name, version, details
 
     m = _NAME_VERSION_RE.search(folder_name)
     if not m:
-        return folder_name, "", [], None
+        return folder_name, "", {"mods": [], "language": None, "kind": "game", "flags": [], "part": None}
     name = m.group(1).strip(" -_") or folder_name
     version = (m.group(2) or m.group(3)).replace("_", ".")
-    mods, language = classify_variant_tokens(m.group(4))
-    return name, version, mods, language
+    return name, version, {**classify_folder_tokens(m.group(4)), "part": None}
 
 
 def _own_entries():
@@ -212,6 +243,14 @@ def find_candidates(detection: dict, name_hint: str, path: Path):
             matches[0] if matches else None
         )
 
+    # Part folders of one game (Thief of Hearts/Part1 + Part2, Fetish Locator/Week 1
+    # + Week 3): the leaf is a bare part marker and a sibling part folder under the
+    # same parent is already tracked by this system, so this is the same game,
+    # not a name lookalike (2026-10-14 real-data finding: each part became its own
+    # game, then the duplicate finder offered to fold them back together).
+    if certain is None and _is_generic_part_leaf(Path(path).name):
+        certain = _sibling_part_entry(own, Path(path_str))
+
     suggested = []
     if certain is None:
         target = name_hint.lower()
@@ -231,11 +270,27 @@ def find_candidates(detection: dict, name_hint: str, path: Path):
     return {"certain": certain, "suggested": suggested}
 
 
+def _sibling_part_entry(own_entries: list, path: Path):
+    """This system's entry that already tracks another part folder beside `path`
+    (same parent, leaf also a bare part marker), or None."""
+    parent = str(path.parent)
+    for entry in own_entries:
+        for group in entry.get("versions", []):
+            for variant in group.get("variants", []):
+                other = variant.get("path")
+                if not other:
+                    continue
+                other = Path(other)
+                if str(other.parent) == parent and _is_generic_part_leaf(other.name):
+                    return entry
+    return None
+
+
 def entry_id_source(entry: dict) -> str:
     return entry.get("game_id_source", "local")
 
 
-def preview(path: Path):
+def preview(path: Path | str):
     """Identify `path` and find candidate existing games, without writing anything.
     This is what cli.py/the Qt UI's backend.py call before asking the user for a
     decision. Returns {"status": "ok", "path", "detection", "name", "version_label",
@@ -293,9 +348,13 @@ def preview(path: Path):
         if other.get("kind") != detection.get("kind") and other.get("kind") in datadir.PLATFORM_ID_KINDS
     ]
 
-    derived_name, derived_version, mods, language = _derive_name_version_mods_language(path)
+    derived_name, derived_version, details = _derive_folder(path)
+    mods, language = details["mods"], details["language"]
     name = detection.get("name") or derived_name
-    version_label = detection.get("version_label") or derived_version or path.name
+    # No version token anywhere means no version: None, never the folder name
+    # (2026-10-14 real-data finding: 102 of 162 scanned games carried their own
+    # name as their "version", which every front end then showed as a version).
+    version_label = detection.get("version_label") or derived_version or None
 
     candidates = find_candidates(detection, name, path)
 
@@ -308,11 +367,14 @@ def preview(path: Path):
         "version_label": version_label,
         "mods": mods,
         "language": language,
+        "kind": details["kind"],
+        "flags": details["flags"],
+        "part": details.get("part"),
         "candidates": candidates,
     }
 
 
-def onboard(path: Path, decision: dict | None = None):
+def onboard(path: Path | str, decision: dict | None = None):
     """Identify `path` and record it in this system's datadir. See the plan's
     Onboarding flow section for what `decision` accepts. Returns a result dict:
     {"status": "ok", "game_id": N, "candidates": {...}} or {"status": "error", "message": ...}
@@ -346,13 +408,17 @@ def onboard(path: Path, decision: dict | None = None):
     if action == "new":
         game_id, id_source, existing_entry = _mint_new(detection)
     elif action == "link":
+        assert decision is not None  # action is "link" only when a decision says so
         game_id = decision["game_id"]
         id_source = "linked"
         existing_entry = _find_own_entry_by_game_id(game_id)
         if existing_entry is None:
             foreign_seed = _find_any_entry_by_game_id(game_id)
             if foreign_seed is None:
-                return {"status": "error", "message": f"No existing tracked game with id {game_id} on any known system."}
+                return {
+                    "status": "error",
+                    "message": f"No existing tracked game with id {game_id} on any known system.",
+                }
     else:
         # Automatic: certain match -> link, otherwise new. Used by scan_library() and
         # any caller that doesn't want to prompt.
@@ -418,8 +484,20 @@ def onboard(path: Path, decision: dict | None = None):
     is_new_variant_path = not any(
         variant.get("path") == str(path) for group in entry.get("versions", []) for variant in group.get("variants", [])
     )
-    _merge_version(entry, path, version_label, mods, language, detection.get("platforms", []), source)
-    instance_marker.write_marker(path, entry["game_uuid"], version_label, mods, language, this_uuid)
+    # Nothing is written into the game's folder: its identity is this entry
+    # (game_uuid, and the variant's path) in Pythia's own data.
+    _merge_version(
+        entry,
+        path,
+        version_label,
+        mods,
+        language,
+        detection.get("platforms", []),
+        source,
+        kind=pv.get("kind", "game"),
+        flags=pv.get("flags", []),
+        part=pv.get("part"),
+    )
 
     if is_new_entry and foreign_seed is not None:
         datadir.add_timeline_event(
@@ -504,7 +582,7 @@ def _resolve_name_via_metadata(kind: str, detection: dict):
     a real, previously-stated fidelity gap). Best-effort: returns None (falls
     through to the existing "Unknown (...)" placeholder) if no metadata plugin has
     an answer, never raises."""
-    id_key = datadir.PLATFORM_ID_KINDS.get(kind)
+    id_key = datadir.PLATFORM_ID_KINDS.get(kind) if kind else None
     platform_id_value = detection.get("extra", {}).get(id_key) if id_key else None
     if platform_id_value is None:
         return None
@@ -542,7 +620,7 @@ def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[di
     # caught before it could duplicate every EGS game on every re-sync: the
     # platform_ids fallback below used to be gated on `external_id is not None`,
     # which a string-identified service can never satisfy).
-    id_key = datadir.PLATFORM_ID_KINDS.get(kind)
+    id_key = datadir.PLATFORM_ID_KINDS.get(kind) if kind else None
     string_id = detection.get("extra", {}).get(id_key) if id_key else None
 
     # 2026-08-04: game_id is never a reused platform ID anymore, so matching an
@@ -556,7 +634,10 @@ def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[di
             (
                 e
                 for e in own
-                if any(p.get("platform") == kind and str(p.get("id")) == str(match_value) for p in e.get("platform_ids", []))
+                if any(
+                    p.get("platform") == kind and str(p.get("id")) == str(match_value)
+                    for p in e.get("platform_ids", [])
+                )
             ),
             None,
         )
@@ -594,7 +675,10 @@ def sync_owned(plugin) -> dict:
     no real list_owned() implementation."""
     owned = plugin.list_owned()
     if owned is None:
-        return {"status": "error", "message": f"'{plugin.id}' has no account connected (or doesn't support list_owned())."}
+        return {
+            "status": "error",
+            "message": f"'{plugin.id}' has no account connected (or doesn't support list_owned()).",
+        }
 
     own = _own_entries()
     linked = 0
@@ -622,7 +706,7 @@ def _update_platform_ids_and_ownership(entry: dict, detection: dict):
     Steam stays so even after also onboarding an Epic install of the same game_id."""
     kind = detection.get("kind")
     extra = detection.get("extra") or {}
-    id_key = datadir.PLATFORM_ID_KINDS.get(kind)
+    id_key = datadir.PLATFORM_ID_KINDS.get(kind) if kind else None
 
     platform_ids = entry.setdefault("platform_ids", [])
     if id_key and extra.get(id_key) and not any(p.get("platform") == kind for p in platform_ids):
@@ -633,7 +717,18 @@ def _update_platform_ids_and_ownership(entry: dict, detection: dict):
         ownership.append({"platform": kind})
 
 
-def _merge_version(entry: dict, path: Path, version: str, mods: list, language, platforms: list, source: dict):
+def _merge_version(
+    entry: dict,
+    path: Path,
+    version: str,
+    mods: list,
+    language,
+    platforms: list,
+    source: dict,
+    kind: str = "game",
+    flags: list | None = None,
+    part: str | None = None,
+):
     """Find-or-create the `versions[]` group for `version`, then find-by-path within
     that group's `variants[]` (update in place) or append a new variant. `source`
     (what this specific on-disk install actually is -- see PLATFORM_ID_KINDS'
@@ -655,6 +750,12 @@ def _merge_version(entry: dict, path: Path, version: str, mods: list, language, 
         if variant.get("path") == path_str:
             variant["mods"] = mods
             variant["language"] = language
+            # A kind the person set (set_variant_details) is theirs; a rescan only proposes.
+            if not variant.get("kind_set_by_person"):
+                variant["kind"] = kind
+            variant["flags"] = list(flags or [])
+            if part:
+                variant["part"] = part
             variant["platforms"] = platforms
             variant["source"] = source
             variant["detected_at"] = now
@@ -665,6 +766,9 @@ def _merge_version(entry: dict, path: Path, version: str, mods: list, language, 
             "id": new_game_id()[:12],
             "mods": mods,
             "language": language,
+            "kind": kind,
+            "flags": list(flags or []),
+            **({"part": part} if part else {}),
             "path": path_str,
             "platforms": platforms,
             "source": source,

@@ -14,26 +14,26 @@ import time
 from ctypes.util import find_library
 
 # Source-tree bootstrap: when this script lives at
-# <repo>/share/lutris/bin/lutris-wrapper, the `lutris` package is at
-# <repo>/lutris/ — which is not on the default Python sys.path unless
+# <repo>/share/pythia/bin/pythia-wrapper, the `pythia` package is at
+# <repo>/pythia/ — which is not on the default Python sys.path unless
 # the parent process injected it via PYTHONPATH. Detect that layout
-# and prepend the repo root ourselves so the `from lutris...` imports
-# below resolve regardless of how we were launched. Installed and
-# AppImage layouts already have `lutris` on the default sys.path, so
+# and prepend the repo root ourselves so the `from pythia...` imports
+# below resolve regardless of how we were launched. Installed
+# layouts already have `pythia` on the default sys.path, so
 # this fallback is a no-op for them.
 _DEV_SOURCE_TREE = os.path.normpath(
     os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "..")
 )
 if (
-    os.path.isfile(os.path.join(_DEV_SOURCE_TREE, "lutris", "__init__.py"))
+    os.path.isfile(os.path.join(_DEV_SOURCE_TREE, "pythia", "__init__.py"))
     and _DEV_SOURCE_TREE not in sys.path
 ):
     sys.path.insert(0, _DEV_SOURCE_TREE)
 else:
     _DEV_SOURCE_TREE = None
 
-from lutris.util.log import logger
-from lutris.util.process_watcher import ProcessWatcher
+from pythia.util.log import logger
+from pythia.util.process_watcher import ProcessWatcher
 
 try:
     from setproctitle import setproctitle
@@ -97,7 +97,7 @@ def log(log_message):
         pass
 
     # File output
-    # with open(os.path.expanduser("~/lutris.log"), "a") as logfile:
+    # with open(os.path.expanduser("~/pythia.log"), "a") as logfile:
     #     logfile.write(line)
 
 
@@ -115,13 +115,13 @@ def kill_pid(pid, sigkill=False):
 
 
 def main():
-    """Runs a command independently from the Lutris client"""
+    """Runs a command independently from the Pythia client"""
     # pylint: disable=too-many-branches,too-many-statements
     # TODO: refactor
     set_child_subreaper()
     _script_name, proc_title, include_proc_count, exclude_proc_count, *args = sys.argv
 
-    setproctitle("lutris-wrapper: " + proc_title)
+    setproctitle("pythia-wrapper: " + proc_title)
 
     # So I'm too lazy to implement real argument parsing... sorry.
     include_proc_count = int(include_proc_count)
@@ -209,9 +209,9 @@ def main():
         log("No return code")
     else:
         log("Exit with return code %s" % returncode)
-    return_code_path = os.environ.get("LUTRIS_RETURN_CODE_FILE")
-    if not return_code_path and "LUTRIS_GAME_UUID" in os.environ:
-        return_code_path = "/tmp/lutris-%s" % os.environ["LUTRIS_GAME_UUID"]
+    return_code_path = os.environ.get("PYTHIA_RETURN_CODE_FILE")
+    if not return_code_path and "PYTHIA_GAME_UUID" in os.environ:
+        return_code_path = "/tmp/pythia-%s" % os.environ["PYTHIA_GAME_UUID"]
     if return_code_path:
         with open(return_code_path, "w") as status_file:
             status_file.write("%s" % returncode)

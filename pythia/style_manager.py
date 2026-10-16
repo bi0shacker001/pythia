@@ -1,8 +1,8 @@
 from gi.repository import Gio, GLib, GObject, Gtk
 
 from pythia import settings
-from pythia.util.notifier import NotificationSource
 from pythia.util.log import logger
+from pythia.util.notifier import NotificationSource
 
 PORTAL_BUS_NAME = "org.freedesktop.portal.Desktop"
 PORTAL_OBJECT_PATH = "/org/freedesktop/portal/desktop"

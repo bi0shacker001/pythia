@@ -1,6 +1,7 @@
 """Handle Steam configuration"""
 
 import os
+import sys
 from collections import OrderedDict
 from typing import Any, Iterable
 
@@ -12,7 +13,7 @@ from pythia.util.log import logger
 from pythia.util.steam.steamid import SteamID
 from pythia.util.steam.vdfutils import vdf_parse
 
-STEAM_DATA_DIRS = (
+_LINUX_STEAM_DATA_DIRS = (
     "~/.steam/debian-installation",
     "~/.steam",
     "~/.local/share/steam",
@@ -29,6 +30,41 @@ STEAM_DATA_DIRS = (
     "/usr/share/steam",
     "/usr/local/share/steam",
 )
+
+
+def _windows_steam_dirs() -> tuple[str, ...]:
+    """Where Steam is on Windows: what Steam itself records in the registry
+    (the user's SteamPath, then the machine-wide InstallPath), then its default
+    folders."""
+    found: list[str] = []
+    if sys.platform == "win32":
+        import winreg  # noqa: PLC0415
+
+        for hive, key, value in (
+            (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Valve\Steam", "InstallPath"),
+        ):
+            try:
+                with winreg.OpenKey(hive, key) as opened:
+                    path, _ = winreg.QueryValueEx(opened, value)
+            except OSError:
+                continue
+            if path:
+                found.append(os.path.normpath(path))
+    for env in ("ProgramFiles(x86)", "ProgramFiles"):
+        if os.environ.get(env):
+            found.append(os.path.join(os.environ[env], "Steam"))
+    return tuple(dict.fromkeys(found))  # in order, without repeats
+
+
+# Every folder Steam keeps its data in on this system, most likely first.
+if sys.platform == "win32":
+    STEAM_DATA_DIRS: tuple[str, ...] = _windows_steam_dirs()
+elif sys.platform == "darwin":
+    STEAM_DATA_DIRS = ("~/Library/Application Support/Steam",)
+else:
+    STEAM_DATA_DIRS = _LINUX_STEAM_DATA_DIRS
 STEAM_ACCOUNT_SETTING = "active_steam_account"
 
 

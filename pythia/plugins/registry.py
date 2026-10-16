@@ -84,7 +84,12 @@ def list_folder_plugin_manifests() -> list[dict]:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if not isinstance(data, dict) or not data.get("id") or not data.get("entry_module") or not data.get("entry_class"):
+        if (
+            not isinstance(data, dict)
+            or not data.get("id")
+            or not data.get("entry_module")
+            or not data.get("entry_class")
+        ):
             continue
         data["_folder"] = str(folder)
         manifests.append(data)

@@ -35,32 +35,146 @@ PLATFORM_ID_KINDS = {
     "f95": "f95_thread_id",
 }
 
-LANGUAGE_TOKENS = {
-    "eng": "en", "en": "en", "english": "en",
-    "jp": "ja", "jpn": "ja", "japanese": "ja",
-    "cn": "zh", "chs": "zh", "cht": "zh", "chinese": "zh",
-    "kr": "ko", "kor": "ko", "korean": "ko",
-    "mtl": "mtl", "machine-translated": "mtl", "machinetranslated": "mtl", "translated": "mtl",
+# Languages a folder name may carry, by name and code (UX review A14). Two-letter
+# codes that are also common words ("it", "id", "no") are matched by name only.
+LANGUAGE_NAMES = {
+    "en": "English",
+    "ja": "Japanese",
+    "zh": "Chinese",
+    "ko": "Korean",
+    "es": "Spanish",
+    "ru": "Russian",
+    "de": "German",
+    "pt": "Portuguese",
+    "fr": "French",
+    "it": "Italian",
+    "pl": "Polish",
+    "tr": "Turkish",
+    "vi": "Vietnamese",
+    "id": "Indonesian",
+    "th": "Thai",
+    "uk": "Ukrainian",
+    "cs": "Czech",
+    "nl": "Dutch",
+    "ar": "Arabic",
+    "hu": "Hungarian",
+    "sv": "Swedish",
+    "fi": "Finnish",
+    "ro": "Romanian",
+    "el": "Greek",
+    "he": "Hebrew",
 }
+LANGUAGE_TOKENS = {
+    **{name.lower(): code for code, name in LANGUAGE_NAMES.items()},
+    "eng": "en",
+    "en": "en",
+    "jp": "ja",
+    "jpn": "ja",
+    "cn": "zh",
+    "chs": "zh",
+    "cht": "zh",
+    "kr": "ko",
+    "kor": "ko",
+    "es": "es",
+    "esp": "es",
+    "spa": "es",
+    "espanol": "es",
+    "español": "es",
+    "castellano": "es",
+    "ru": "ru",
+    "rus": "ru",
+    "de": "de",
+    "ger": "de",
+    "deu": "de",
+    "deutsch": "de",
+    "pt": "pt",
+    "ptbr": "pt",
+    "por": "pt",
+    "brazilian": "pt",
+    "portugues": "pt",
+    "português": "pt",
+    "fr": "fr",
+    "fra": "fr",
+    "fre": "fr",
+    "francais": "fr",
+    "français": "fr",
+    "ita": "it",
+    "italiano": "it",
+    "pl": "pl",
+    "pol": "pl",
+    "polski": "pl",
+    "tr": "tr",
+    "tur": "tr",
+    "vi": "vi",
+    "vn": "vi",
+    "ukr": "uk",
+    "cz": "cs",
+    "cze": "cs",
+    "nl": "nl",
+}
+# The kind of folder a word names (translation, patch, mod), checked in this order.
+KIND_WORDS = {
+    "translation": ("translation", "translated", "translate", "tl", "localization", "localisation"),
+    "patch": ("patch", "patched", "fix", "hotfix", "bugfix"),
+    "mod": ("mod", "mods", "modded", "modpack"),
+}
+KINDS = ("game", "mod", "patch", "translation")
+# Words that are a fact about the folder, not a mod: machine translation only from
+# "mtl" or "machine", and uncensoring.
+FLAG_WORDS = {
+    "mtl": "mtl",
+    "machine": "mtl",
+    "uncensored": "uncensored",
+    "uncensor": "uncensored",
+    "uncen": "uncensored",
+    "unc": "uncensored",
+}
+# Release-platform words in a folder name: the engine plugin knows the platform; they are not mods.
+PLATFORM_WORDS = {"pc", "win", "windows", "win64", "win32", "linux", "mac", "macos", "osx", "android", "x64", "x86"}
+
+
+def classify_folder_tokens(rest: str) -> dict:
+    """What a folder name says after its title and version: ``mods`` (each
+    ``{"name": ..., "version": None}``; a name never tells a mod's version),
+    ``language`` (a code, or None), ``kind`` (game, mod, patch or
+    translation) and ``flags`` (mtl, uncensored). Brackets are stripped; kind,
+    flag and platform words are never mods (UX review A14). Best-effort -- shared
+    by onboarding's naming heuristic and the v1->v2 migration."""
+    mods: list[dict] = []
+    language = None
+    kinds: set[str] = set()
+    flags: list[str] = []
+    text = re.sub(r"[\[\](){}]", " ", rest)
+    for token in re.split(r"[-_ +,]+", text.strip(" -_")):
+        if not token or not any(c.isalnum() for c in token):
+            continue  # skip empty/punctuation-only leftovers (e.g. a bare "+")
+        word = token.lower().strip(".")
+        if word in PLATFORM_WORDS:
+            continue
+        kind = next((k for k, words in KIND_WORDS.items() if word in words), None)
+        if kind:
+            kinds.add(kind)
+            continue
+        flag = FLAG_WORDS.get(word)
+        if flag:
+            if flag not in flags:
+                flags.append(flag)
+            if flag == "mtl":
+                kinds.add("translation")
+            continue
+        canonical = LANGUAGE_TOKENS.get(word)
+        if canonical and language is None:
+            language = canonical
+            continue
+        mods.append({"name": token, "version": None})
+    kind = next((k for k in ("translation", "patch", "mod") if k in kinds), "game")
+    return {"mods": mods, "language": language, "kind": kind, "flags": flags}
 
 
 def classify_variant_tokens(rest: str):
-    """Split a trailing string (after name+version have been stripped) into a mods
-    list (each `{"name": ..., "version": None}` -- naming alone can never tell us a
-    mod's version) and an optional language code, using a small fixed set of language
-    tokens. Best-effort -- shared by onboarding's naming heuristic and the v1->v2
-    migration."""
-    mods = []
-    language = None
-    for token in re.split(r"[-_ ]+", rest.strip(" -_")):
-        if not token or not any(c.isalnum() for c in token):
-            continue  # skip empty/punctuation-only leftovers (e.g. a bare "+")
-        canonical = LANGUAGE_TOKENS.get(token.lower())
-        if canonical and language is None:
-            language = canonical
-        else:
-            mods.append({"name": token, "version": None})
-    return mods, language
+    """classify_folder_tokens' mods and language, for callers that want only those."""
+    found = classify_folder_tokens(rest)
+    return found["mods"], found["language"]
 
 
 def _split_version_label(label: str):
@@ -116,7 +230,7 @@ def _migrate_v2_to_v3(entry: dict) -> dict:
             variant.setdefault("source", {"kind": kind, "extra": extra})
 
     platform_ids = entry.setdefault("platform_ids", [])
-    id_key = PLATFORM_ID_KINDS.get(kind)
+    id_key = PLATFORM_ID_KINDS.get(kind) if kind else None
     if id_key and extra.get(id_key) and not any(p.get("platform") == kind for p in platform_ids):
         platform_ids.append({"platform": kind, "id": extra[id_key]})
 
@@ -221,10 +335,10 @@ def list_all_entries() -> list[dict]:
     return entries
 
 
-def list_known_games() -> dict[int, list[dict]]:
+def list_known_games() -> dict[str, list[dict]]:
     """Group every datadir entry by game_id -- the merged, cross-system view of the
     whole library: which systems have which versions of which games, where."""
-    games: dict[int, list[dict]] = {}
+    games: dict[str, list[dict]] = {}
     for entry in list_all_entries():
         games.setdefault(entry["game_id"], []).append(entry)
     return games

@@ -716,9 +716,10 @@ def get_relative_path(root: str, path: str) -> str:
     Returns:
         Relative path using forward slashes.
     """
-    if not root.endswith(os.sep) and not root.endswith("/"):
-        root = root + os.sep
-    return path.replace(root, "").replace("\\", "/")
+    # relpath, not text replacement: replacing the root's text only worked when
+    # the root and the path were spelled with the same separators, and removed
+    # that text wherever it appeared in the path.
+    return os.path.relpath(path, root).replace("\\", "/")
 
 
 class GOGCloudSync:

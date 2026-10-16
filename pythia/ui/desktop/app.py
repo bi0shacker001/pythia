@@ -25,8 +25,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Pythia")
         self.resize(900, 600)
         label = QLabel(
-            "The desktop UI hasn't been built yet.\n\n"
-            "Run with --ui web to use the real, in-progress design surface."
+            "The desktop UI hasn't been built yet.\n\nRun with --ui web to use the real, in-progress design surface."
         )
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setCentralWidget(label)

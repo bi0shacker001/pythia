@@ -55,9 +55,13 @@ class SteamCmdDownloaderPlugin(DownloaderPlugin):
         return {
             "command": [
                 str(binary),
-                "+force_install_dir", str(install_dir),
-                "+login", "anonymous",
-                "+app_update", str(appid), "validate",
+                "+force_install_dir",
+                str(install_dir),
+                "+login",
+                "anonymous",
+                "+app_update",
+                str(appid),
+                "validate",
                 "+quit",
             ],
             "authenticated": False,

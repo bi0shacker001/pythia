@@ -143,9 +143,7 @@ def get_renpy_engine_version(game_root: Path, pyver):
             content = init_file.read_text(errors="replace")
         except OSError:
             content = ""
-        matches = re.findall(
-            r"version_tuple\s*=\s*[A-Za-z_]*\(?\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)", content
-        )
+        matches = re.findall(r"version_tuple\s*=\s*[A-Za-z_]*\(?\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)", content)
         if matches:
             idx = 0
             if len(matches) > 1 and pyver == "py3":
@@ -451,12 +449,12 @@ def run_gui():
 
     ttk.Button(top, text="Browse...", command=browse).grid(row=0, column=2)
 
-    ttk.Checkbutton(
-        top, text="This is a single game folder (not a library)", variable=is_single_game
-    ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
-    ttk.Checkbutton(
-        top, text="Dry run (preview only, no downloads or changes)", variable=dry_run_var
-    ).grid(row=2, column=0, columnspan=3, sticky="w")
+    ttk.Checkbutton(top, text="This is a single game folder (not a library)", variable=is_single_game).grid(
+        row=1, column=0, columnspan=3, sticky="w", pady=(6, 0)
+    )
+    ttk.Checkbutton(top, text="Dry run (preview only, no downloads or changes)", variable=dry_run_var).grid(
+        row=2, column=0, columnspan=3, sticky="w"
+    )
 
     start_btn = ttk.Button(top, text="Start")
     start_btn.grid(row=3, column=0, columnspan=3, pady=(10, 0))
@@ -499,10 +497,7 @@ def run_gui():
 
         if single:
             if not (p / "renpy").is_dir() or not (p / "game").is_dir():
-                gui_log(
-                    f"'{p}' does not look like a Ren'Py game install "
-                    "(expected a 'renpy' and a 'game' subfolder)."
-                )
+                gui_log(f"'{p}' does not look like a Ren'Py game install (expected a 'renpy' and a 'game' subfolder).")
             else:
                 summary.append(process_game_root(p, p.name, cache_root, dry_run, resolve_cache, gui_log))
         else:
@@ -527,9 +522,7 @@ def run_gui():
         log_text.configure(state="normal")
         log_text.delete("1.0", "end")
         log_text.configure(state="disabled")
-        threading.Thread(
-            target=worker, args=(path_str, is_single_game.get(), dry_run_var.get()), daemon=True
-        ).start()
+        threading.Thread(target=worker, args=(path_str, is_single_game.get(), dry_run_var.get()), daemon=True).start()
 
     start_btn.configure(command=start)
 

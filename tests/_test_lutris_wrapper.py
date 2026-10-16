@@ -10,6 +10,9 @@ else:
     pythia_wrapper_bin = "pythia-wrapper"
 
 
+@unittest.skipUnless(
+    sys.platform.startswith("linux"), "pythia-wrapper is Linux-only (prctl child subreaper, /proc, POSIX signals)"
+)
 class PythiaWrapperTestCase(unittest.TestCase):
     def test_excluded_initial_process(self):
         "Test that an excluded process that starts a monitored process works"

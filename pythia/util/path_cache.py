@@ -7,10 +7,10 @@ import time
 from pythia import settings
 from pythia.database.games import get_games
 from pythia.game import GAME_START, GAME_UPDATED, Game
-from pythia.util.notifier import NotificationSource
 from pythia.util import cache_single
 from pythia.util.jobs import AsyncCall
 from pythia.util.log import logger
+from pythia.util.notifier import NotificationSource
 
 GAME_PATH_CACHE_PATH = os.path.join(settings.CACHE_DIR, "game-paths.json")
 

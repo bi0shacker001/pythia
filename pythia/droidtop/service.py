@@ -1,0 +1,75 @@
+"""Serving paired handhelds while Pythia runs (``pythia._native.service``):
+the same service as ``droidtop-agent run``, on the agent's own threads."""
+
+import threading
+
+from pythia.droidtop.native import AgentError, available, submodule, why_unavailable
+from pythia.util.log import logger
+
+_serving_lock = threading.Lock()
+
+
+def serve() -> dict:
+    """Hands the agent Pythia's library, then serves paired handhelds (LAN,
+    discovery, WireGuard, the rendezvous, the cloud share). Raises AgentError
+    when another agent (droidtop-agent, or another Pythia) already serves
+    this computer: that one keeps serving, over the same files."""
+    from pythia.droidtop import library  # noqa: PLC0415 (library imports the agent modules)
+
+    with _serving_lock:
+        library.export()
+        return submodule("service").serve()
+
+
+def serving() -> dict:
+    """``state``: ``off``, ``serving``, or ``stopped`` with the ``reason``."""
+    return submodule("service").serving()
+
+
+def start_in_background() -> None:
+    """Serves in the background if Pythia's droidtop module is built: what a
+    front end calls once at start. Never raises; logs why it does not serve."""
+    if not available():
+        logger.info("Not serving droidtop handhelds: %s", why_unavailable())
+        return
+
+    def run():
+        from pythia.droidtop import takeover  # noqa: PLC0415
+
+        try:
+            if not takeover.serves():
+                summary = takeover.sync(write_back=False)
+                logger.info(
+                    "Not serving droidtop handhelds: droidtop-agent serves them (turned back on); "
+                    "took in its state: %s",
+                    summary,
+                )
+                return
+            taken = takeover.take_over()
+            if taken["turned_off"] or taken["still_running"]:
+                logger.info("droidtop-agent is turned off while Pythia serves the handhelds: %s", taken)
+            if taken["still_running"]:
+                logger.warning("droidtop-agent did not stop: %s", taken["still_running"])
+            from pythia.droidtop import launch  # noqa: PLC0415
+
+            launch.register()
+            serve()
+            from pythia.droidtop import store  # noqa: PLC0415
+
+            logger.info("Serving droidtop handhelds as %s", store.identity().get("name"))
+        except AgentError as ex:
+            logger.warning("Not serving droidtop handhelds: %s", ex)
+        except Exception as ex:  # keep a front end alive whatever the agent does
+            logger.exception("The droidtop agent failed to start: %s", ex)
+
+    threading.Thread(target=run, name="droidtop-agent", daemon=True).start()
+
+
+def events(since: int = 0, wait: float = 0.0) -> list[dict]:
+    """What the service did after event ``since`` (0: the last 500), oldest
+    first: ``seq``, ``ms``, ``level`` ("info", "warn"), ``kind`` ("launch",
+    "arrived", "session", "library", "saves"...), ``message`` and what it is
+    about (``peer``, ``device``, ``title``, ``key``...). With ``wait`` it waits
+    that many seconds for an event when there is none yet, without holding
+    the interpreter."""
+    return submodule("service").events(since=since, wait=wait)

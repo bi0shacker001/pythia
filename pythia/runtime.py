@@ -14,13 +14,13 @@ from pythia.api import (
     get_runtime_versions,
     get_time_from_api_date,
 )
-from pythia.util.progress_info import ProgressInfo
 from pythia.util import http, system
 from pythia.util.downloader import SimpleDownloader
 from pythia.util.extract import extract_archive
 from pythia.util.jobs import AsyncCall
 from pythia.util.linux import LINUX_SYSTEM
 from pythia.util.log import logger
+from pythia.util.progress_info import ProgressInfo
 from pythia.util.strings import parse_version
 from pythia.util.wine.d3d_extras import D3DExtrasManager
 from pythia.util.wine.dgvoodoo2 import dgvoodoo2Manager

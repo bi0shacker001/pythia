@@ -29,6 +29,7 @@ def get_wrapper_script_location() -> str:
     candidates = [
         os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "..")),
         os.path.dirname(os.path.dirname(settings.__file__)),
+        sys.prefix,  # an installed package (pip, a venv) puts its data files under the prefix
         "/usr",
         "/usr/local",
     ]
@@ -204,8 +205,9 @@ class MonitoredCommand:
 
         self._stdout_stop = threading.Event()
         if self.game_process.stdout:
-            self.stdout_monitor = threading.Thread(target=self._stdout_thread, daemon=True)
-            self.stdout_monitor.start()
+            stdout_monitor = threading.Thread(target=self._stdout_thread, daemon=True)
+            stdout_monitor.start()
+            self.stdout_monitor = stdout_monitor
 
     def log_filter(self, line: str) -> bool:
         """Filter out some message we don't want to show to the user."""
@@ -252,8 +254,10 @@ class MonitoredCommand:
     def _wait_thread(self) -> None:
         """Blocks until the game process exits, then handles the same
         cleanup on_stop() used to (see start()'s docstring note)."""
-        pid = self.game_process.pid
-        self.game_process.wait()
+        game_process = self.game_process
+        assert game_process is not None  # started by start() before this thread
+        pid = game_process.pid
+        game_process.wait()
         if self.prevent_on_stop:  # stop() already in progress
             return
         self.return_code = self.get_return_code()
@@ -266,6 +270,7 @@ class MonitoredCommand:
         """Blocking-read loop over the child's stdout, dispatching each chunk
         to the log handlers -- runs on its own thread so the blocking read
         never stalls anything else (see start()'s docstring note)."""
+        assert self.game_process is not None and self.game_process.stdout is not None
         stdout = self.game_process.stdout
         while not self._stdout_stop.is_set():
             try:

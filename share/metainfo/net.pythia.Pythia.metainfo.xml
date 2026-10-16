@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.pythia.Pythia</id>
+  <project_license>GPL-3.0-or-later</project_license>
+  <metadata_license>CC0-1.0</metadata_license>
+  <translation type="gettext">pythia</translation>
+  <developer id="io.github.bi0shacker001">
+    <name translatable="no">bi0shacker001</name>
+  </developer>
+  <name translatable="no">Pythia</name>
+  <summary>Game library manager for your computers and handhelds</summary>
+  <description>
+    <p>Pythia tracks which versions of which games exist on which of your computers and handhelds, where you own them, and what each one needs to run. While it runs, it is the droidtop agent of this computer: paired droidtop handhelds sync their library and saves with it.</p>
+    <p>Pythia is largely based on Lutris, by Mathieu Comandon and the Lutris contributors.</p>
+  </description>
+  <url type="homepage">https://github.com/bi0shacker001/pythia</url>
+  <url type="bugtracker">https://github.com/bi0shacker001/pythia/issues</url>
+  <url type="vcs-browser">https://github.com/bi0shacker001/pythia</url>
+  <launchable type="desktop-id">net.pythia.Pythia.desktop</launchable>
+  <provides>
+    <binary>pythia</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+</component>

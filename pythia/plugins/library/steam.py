@@ -26,7 +26,7 @@ for a full recursive VDF parser here.
 **Account sync** (`list_owned()`) -- real account-level ownership via the Steam Web
 API's GetOwnedGames, using the user's own API key (never Lutris's -- see
 pythia/core/settings.py's docstring for why) and, by default, the most-recently-used
-local Steam account on this machine (pythia.core.steam.windows.get_active_steamid64,
+local Steam account on this machine (pythia.util.steam.config.get_active_steamid64,
 ported from Lutris's lutris/util/steam/config.py, itself adapted for Windows since
 Lutris's own version only knows Linux Steam data-dir layouts). Surfaces owned titles
 that aren't installed locally at all, which no appmanifest scan could ever find.
@@ -74,7 +74,7 @@ def get_api_key() -> str | None:
 
 def set_steamid64(steamid64: str):
     """Override which Steam account list_owned() queries -- only needed if
-    pythia.core.steam.windows.get_active_steamid64()'s local-login-history guess
+    pythia.util.steam.config.get_active_steamid64()'s local-login-history guess
     (most-recently-used account on this machine) picks the wrong one."""
     plugin.set_credential("steamid64", steamid64)
 
@@ -83,7 +83,7 @@ def get_steamid64() -> str | None:
     explicit = plugin.get_credential("steamid64")
     if explicit:
         return explicit
-    from pythia.core.steam.windows import get_active_steamid64
+    from pythia.util.steam.config import get_active_steamid64  # noqa: PLC0415
 
     return get_active_steamid64()
 
@@ -103,7 +103,7 @@ class SteamPlugin(LibraryPlugin, ManagerPlugin, MetadataPlugin):
     def is_connected(self) -> bool:
         """Override PluginMeta's default (which requires every declared field) --
         steamid64 is an optional override with a real auto-detected fallback
-        (pythia.core.steam.windows.get_active_steamid64), only the API key is
+        (pythia.util.steam.config.get_active_steamid64), only the API key is
         actually required to connect."""
         return bool(self.get_credential("api_key"))
 
@@ -213,13 +213,12 @@ class SteamPlugin(LibraryPlugin, ManagerPlugin, MetadataPlugin):
 
     # ---- Manager: hand-off to Steam's own client ------------------------------
     def is_available(self, ctx) -> bool:
-        """No reliable cross-platform "is Steam installed" check without touching
-        the registry/specific install paths, which hasn't been built yet -- reports
-        unknown-as-unavailable (False) rather than guessing. open() still works
-        regardless (the OS URI handler either resolves or the hand-off silently
-        does nothing), this only affects whether a future UI shows Steam as a ready
-        option."""
-        return False
+        """Whether Steam is installed here: its folder, found where Steam records it
+        (the registry on Windows, then Program Files; the usual folders, Flatpak and
+        Snap on Linux; see pythia.util.steam.config)."""
+        from pythia.util.steam.config import get_steam_dir  # noqa: PLC0415
+
+        return get_steam_dir() is not None
 
     def open(self, detection: dict, ctx) -> bool:
         """No-op (returns False) if `detection` has no Steam AppID to hand off to."""

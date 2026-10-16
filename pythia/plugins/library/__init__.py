@@ -28,7 +28,12 @@ from pythia.plugins.registry import filter_enabled, for_category
 # only, see its own docstring) so its priority position is moot -- listed for
 # completeness.
 _DEFAULT_PRIORITY = [
-    steam_plugin.id, gog_plugin.id, egs_plugin.id, itch_plugin.id, f95_plugin.id, generic_plugin.id,
+    steam_plugin.id,
+    gog_plugin.id,
+    egs_plugin.id,
+    itch_plugin.id,
+    f95_plugin.id,
+    generic_plugin.id,
 ]
 
 

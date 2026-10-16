@@ -23,37 +23,82 @@ done this pass (desktop is what this session's actual testing has exercised).
 # CSS directly rather than trusted from memory.
 _PALETTE_TOKENS = {
     "ink": {
-        "page": "#12111a", "chrome": "#181722", "sidebar_surface": "#15141e",
-        "surface_0": "#191824", "surface_1": "#201e2d", "surface_2": "#282537", "surface_3": "#302c42",
-        "border": "#39364d", "border_strong": "#4a4661",
-        "text_primary": "#eeeaf5", "text_secondary": "#aaa5bc", "text_tertiary": "#767188",
-        "accent": "#d9a441", "accent_hover": "#ebba63", "accent_soft": "#39301d", "on_accent": "#251b08",
-        "positive": "#63bd91", "positive_soft": "#192c24",
-        "warning": "#d9a441", "warning_soft": "#342a18",
-        "critical": "#df6976", "critical_soft": "#351d25",
-        "informational": "#78a9dc", "informational_soft": "#182a3c",
+        "page": "#12111a",
+        "chrome": "#181722",
+        "sidebar_surface": "#15141e",
+        "surface_0": "#191824",
+        "surface_1": "#201e2d",
+        "surface_2": "#282537",
+        "surface_3": "#302c42",
+        "border": "#39364d",
+        "border_strong": "#4a4661",
+        "text_primary": "#eeeaf5",
+        "text_secondary": "#aaa5bc",
+        "text_tertiary": "#767188",
+        "accent": "#d9a441",
+        "accent_hover": "#ebba63",
+        "accent_soft": "#39301d",
+        "on_accent": "#251b08",
+        "positive": "#63bd91",
+        "positive_soft": "#192c24",
+        "warning": "#d9a441",
+        "warning_soft": "#342a18",
+        "critical": "#df6976",
+        "critical_soft": "#351d25",
+        "informational": "#78a9dc",
+        "informational_soft": "#182a3c",
     },
     "parchment": {
-        "page": "#ece7da", "chrome": "#f7f4ec", "sidebar_surface": "#e7e1d2",
-        "surface_0": "#faf8f2", "surface_1": "#ffffff", "surface_2": "#f3eee2", "surface_3": "#e9e1d0",
-        "border": "#d5ccb8", "border_strong": "#bdb19a",
-        "text_primary": "#28241f", "text_secondary": "#6b6356", "text_tertiary": "#948a78",
-        "accent": "#a8672a", "accent_hover": "#bd7a36", "accent_soft": "#f0dfc2", "on_accent": "#fff9ed",
-        "positive": "#2f8f5e", "positive_soft": "#e2f2e7",
-        "warning": "#a8672a", "warning_soft": "#f4e5cc",
-        "critical": "#b8433f", "critical_soft": "#f7e2df",
-        "informational": "#356f9c", "informational_soft": "#e0edf6",
+        "page": "#ece7da",
+        "chrome": "#f7f4ec",
+        "sidebar_surface": "#e7e1d2",
+        "surface_0": "#faf8f2",
+        "surface_1": "#ffffff",
+        "surface_2": "#f3eee2",
+        "surface_3": "#e9e1d0",
+        "border": "#d5ccb8",
+        "border_strong": "#bdb19a",
+        "text_primary": "#28241f",
+        "text_secondary": "#6b6356",
+        "text_tertiary": "#948a78",
+        "accent": "#a8672a",
+        "accent_hover": "#bd7a36",
+        "accent_soft": "#f0dfc2",
+        "on_accent": "#fff9ed",
+        "positive": "#2f8f5e",
+        "positive_soft": "#e2f2e7",
+        "warning": "#a8672a",
+        "warning_soft": "#f4e5cc",
+        "critical": "#b8433f",
+        "critical_soft": "#f7e2df",
+        "informational": "#356f9c",
+        "informational_soft": "#e0edf6",
     },
     "cobalt": {
-        "page": "#0e141d", "chrome": "#121b26", "sidebar_surface": "#101823",
-        "surface_0": "#151f2b", "surface_1": "#1a2634", "surface_2": "#223142", "surface_3": "#293b4e",
-        "border": "#314559", "border_strong": "#466078",
-        "text_primary": "#e7edf3", "text_secondary": "#9cacbc", "text_tertiary": "#64778a",
-        "accent": "#5fa9d8", "accent_hover": "#7dbce2", "accent_soft": "#1b3446", "on_accent": "#07141f",
-        "positive": "#63bd91", "positive_soft": "#173128",
-        "warning": "#d4a95d", "warning_soft": "#302819",
-        "critical": "#df6976", "critical_soft": "#391e27",
-        "informational": "#78a9dc", "informational_soft": "#182c40",
+        "page": "#0e141d",
+        "chrome": "#121b26",
+        "sidebar_surface": "#101823",
+        "surface_0": "#151f2b",
+        "surface_1": "#1a2634",
+        "surface_2": "#223142",
+        "surface_3": "#293b4e",
+        "border": "#314559",
+        "border_strong": "#466078",
+        "text_primary": "#e7edf3",
+        "text_secondary": "#9cacbc",
+        "text_tertiary": "#64778a",
+        "accent": "#5fa9d8",
+        "accent_hover": "#7dbce2",
+        "accent_soft": "#1b3446",
+        "on_accent": "#07141f",
+        "positive": "#63bd91",
+        "positive_soft": "#173128",
+        "warning": "#d4a95d",
+        "warning_soft": "#302819",
+        "critical": "#df6976",
+        "critical_soft": "#391e27",
+        "informational": "#78a9dc",
+        "informational_soft": "#182c40",
     },
 }
 
@@ -176,150 +221,150 @@ def build_stylesheet() -> str:
     c = COLORS
     return f"""
     QWidget {{
-        background: {c['ink']};
-        color: {c['text']};
+        background: {c["ink"]};
+        color: {c["text"]};
         font-family: {SANS_FONT};
         font-size: 13px;
     }}
     QMainWindow, QDialog {{
-        background: {c['ink']};
+        background: {c["ink"]};
     }}
     #detailHead, #listSearch {{
-        background: {c['surface']};
+        background: {c["surface"]};
     }}
     #rail {{
-        background: {c['sidebar_surface']};
-        border-right: 1px solid {c['border']};
+        background: {c["sidebar_surface"]};
+        border-right: 1px solid {c["border"]};
     }}
     #gameList {{
-        background: {c['surface']};
-        border-right: 1px solid {c['border']};
+        background: {c["surface"]};
+        border-right: 1px solid {c["border"]};
         border: none;
         outline: none;
     }}
     #gameList::item {{
-        border-bottom: 1px solid {c['border']};
+        border-bottom: 1px solid {c["border"]};
         padding: 10px 12px;
     }}
     #gameList::item:selected {{
-        background: {c['accent_soft']};
-        color: {c['accent']};
+        background: {c["accent_soft"]};
+        color: {c["accent"]};
     }}
     QListWidget, QTableWidget {{
-        background: {c['surface']};
-        border: 1px solid {c['border']};
+        background: {c["surface"]};
+        border: 1px solid {c["border"]};
         border-radius: 8px;
     }}
     QTableWidget::item {{
         padding: 6px;
     }}
     QHeaderView::section {{
-        background: {c['surface_sunken']};
-        color: {c['text_muted']};
+        background: {c["surface_sunken"]};
+        color: {c["text_muted"]};
         border: none;
-        border-bottom: 1px solid {c['border']};
+        border-bottom: 1px solid {c["border"]};
         padding: 6px;
         font-family: {MONO_FONT};
         font-size: 11px;
         text-transform: uppercase;
     }}
     QLineEdit {{
-        background: {c['surface_sunken']};
-        border: 1px solid {c['border']};
+        background: {c["surface_sunken"]};
+        border: 1px solid {c["border"]};
         border-radius: 8px;
         padding: 8px 12px;
-        color: {c['text']};
+        color: {c["text"]};
     }}
     QLineEdit:focus {{
-        border-color: {c['accent']};
+        border-color: {c["accent"]};
     }}
     QPlainTextEdit, QTextEdit {{
-        background: {c['surface_raised']};
-        border: 1px solid {c['border']};
+        background: {c["surface_raised"]};
+        border: 1px solid {c["border"]};
         border-radius: 8px;
         padding: 10px;
-        color: {c['text_muted']};
+        color: {c["text_muted"]};
     }}
     QPushButton {{
-        background: {c['surface_raised']};
-        border: 1px solid {c['border']};
+        background: {c["surface_raised"]};
+        border: 1px solid {c["border"]};
         border-radius: 8px;
         padding: 8px 14px;
-        color: {c['text']};
+        color: {c["text"]};
         font-weight: 600;
     }}
     QPushButton:hover {{
-        border-color: {c['accent']};
+        border-color: {c["accent"]};
     }}
     QPushButton#primary {{
-        background: {c['accent']};
-        border-color: {c['accent']};
-        color: {c['accent_text']};
+        background: {c["accent"]};
+        border-color: {c["accent"]};
+        color: {c["accent_text"]};
     }}
     QPushButton#ghostAction {{
         background: transparent;
         border: none;
-        color: {c['text_muted']};
+        color: {c["text_muted"]};
         font-weight: 500;
     }}
     QPushButton#ghostAction:hover {{
-        background: {c['surface_raised']};
-        color: {c['text']};
+        background: {c["surface_raised"]};
+        color: {c["text"]};
     }}
     QPushButton#segButton {{
         padding: 5px 14px;
         font-size: 11.5px;
         font-weight: 600;
-        color: {c['text_muted']};
+        color: {c["text_muted"]};
         background: transparent;
     }}
     QPushButton#segButton:checked {{
-        background: {c['accent_soft']};
-        border-color: {c['accent']};
-        color: {c['accent']};
+        background: {c["accent_soft"]};
+        border-color: {c["accent"]};
+        color: {c["accent"]};
     }}
     QTabWidget::pane {{
         border: none;
-        border-top: 1px solid {c['border']};
+        border-top: 1px solid {c["border"]};
     }}
     QTabBar::tab {{
         background: transparent;
-        color: {c['text_muted']};
+        color: {c["text_muted"]};
         padding: 9px 14px;
         border-bottom: 2px solid transparent;
     }}
     QTabBar::tab:selected {{
-        color: {c['accent']};
-        border-bottom: 2px solid {c['accent']};
+        color: {c["accent"]};
+        border-bottom: 2px solid {c["accent"]};
         font-weight: 600;
     }}
     QMenuBar {{
-        background: {c['surface_sunken']};
-        color: {c['text_muted']};
-        border-bottom: 1px solid {c['border']};
+        background: {c["surface_sunken"]};
+        color: {c["text_muted"]};
+        border-bottom: 1px solid {c["border"]};
     }}
     QMenuBar::item:selected {{
-        background: {c['surface_raised']};
-        color: {c['text']};
+        background: {c["surface_raised"]};
+        color: {c["text"]};
     }}
     QMenu {{
-        background: {c['surface_raised']};
-        border: 1px solid {c['border']};
-        color: {c['text']};
+        background: {c["surface_raised"]};
+        border: 1px solid {c["border"]};
+        color: {c["text"]};
     }}
     QMenu::item:selected {{
-        background: {c['accent_soft']};
-        color: {c['accent']};
+        background: {c["accent_soft"]};
+        color: {c["accent"]};
     }}
     QStatusBar {{
-        background: {c['surface_sunken']};
-        border-top: 1px solid {c['border']};
-        color: {c['text_faint']};
+        background: {c["surface_sunken"]};
+        border-top: 1px solid {c["border"]};
+        color: {c["text_faint"]};
         font-family: {MONO_FONT};
         font-size: 11px;
     }}
     QSplitter::handle {{
-        background: {c['border']};
+        background: {c["border"]};
     }}
     #navList {{
         border: none;
@@ -329,11 +374,11 @@ def build_stylesheet() -> str:
         border-radius: 8px;
         padding: 8px 10px;
         border-left: 3px solid transparent;
-        color: {c['text_muted']};
+        color: {c["text_muted"]};
     }}
     #navList::item:selected {{
-        background: {c['accent_soft']};
-        border-left: 3px solid {c['accent']};
-        color: {c['accent']};
+        background: {c["accent_soft"]};
+        border-left: 3px solid {c["accent"]};
+        color: {c["accent"]};
     }}
     """

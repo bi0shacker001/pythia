@@ -22,10 +22,12 @@ separate datadir+cache calls, same single-write-path consolidation as onboarding
 """
 
 import difflib
+from pathlib import Path
 
 from pythia import datadir
 from pythia.database import games as games_db
 from pythia.identity import get_system_uuid
+from pythia.onboarding import _is_generic_part_leaf
 
 NAME_SIMILARITY_THRESHOLD = 0.6
 
@@ -55,7 +57,31 @@ def _summarize(entry: dict) -> dict:
         "engine_kind": (first_variant.get("source") or {}).get("kind") if first_variant else None,
         "version_count": len(versions),
         "platforms": first_variant.get("platforms", []) if first_variant else [],
+        # What a cluster's reason and "what moves" are made of (UX review A16).
+        "versions": [group.get("version") for group in versions if group.get("version")],
+        "folders": sum(len(group.get("variants", [])) for group in versions),
+        "sources": sorted(
+            {(v.get("source") or {}).get("kind") for g in versions for v in g.get("variants", [])} - {None}
+        ),
+        "stores": sorted({p.get("platform") for p in entry.get("platform_ids", []) if p.get("platform")}),
     }
+
+
+def _part_folders_of_one_game(a: dict, b: dict) -> bool:
+    """Both entries' installs are bare part folders (Part1, Week 3, ...) under one
+    parent folder: parts of one game, recorded before onboarding learned to link
+    them (2026-10-14). Stronger evidence than a similar name, so the pair is
+    reported with `reason` "parts" and the top score."""
+    for va in _variants(a):
+        for vb in _variants(b):
+            pa, pb = Path(va["path"]), Path(vb["path"])
+            if pa.parent == pb.parent and _is_generic_part_leaf(pa.name) and _is_generic_part_leaf(pb.name):
+                return True
+    return False
+
+
+def _variants(entry: dict):
+    return [v for g in entry.get("versions", []) for v in g.get("variants", []) if v.get("path")]
 
 
 def find_merge_candidates():
@@ -71,9 +97,12 @@ def find_merge_candidates():
             name_b = (b.get("canonical_name") or "").lower()
             if not name_a or not name_b:
                 continue
+            if _part_folders_of_one_game(a, b):
+                candidates.append({"score": 1.0, "reason": "parts", "a": _summarize(a), "b": _summarize(b)})
+                continue
             score = difflib.SequenceMatcher(None, name_a, name_b).ratio()
             if score >= NAME_SIMILARITY_THRESHOLD:
-                candidates.append({"score": round(score, 3), "a": _summarize(a), "b": _summarize(b)})
+                candidates.append({"score": round(score, 3), "reason": "name", "a": _summarize(a), "b": _summarize(b)})
     candidates.sort(key=lambda c: c["score"], reverse=True)
     return candidates
 

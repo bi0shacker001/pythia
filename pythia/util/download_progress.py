@@ -16,6 +16,7 @@ a progress update never corrupts the file.
 import json
 import os
 import tempfile
+import threading
 import time
 from typing import Any
 
@@ -31,10 +32,10 @@ class DownloadProgress:
     after each range finishes; the orchestrator calls :meth:`cleanup`
     once the full file is verified.
 
-    Thread-safety: :meth:`mark_range_complete` uses a file-level
-    atomic-replace strategy. Multiple threads may call it concurrently
-    as long as they pass non-overlapping (start, end) pairs, which is
-    guaranteed by the range-splitting logic in GOGDownloader.
+    Thread-safety: each write is atomic (temp file + replace), and
+    :meth:`mark_range_complete` updates and writes under one lock, so
+    workers marking ranges at the same time cannot overwrite each other's
+    ranges with an older copy of the list.
     """
 
     PROGRESS_SUFFIX = ".progress"
@@ -43,6 +44,7 @@ class DownloadProgress:
         self.dest_path: str = dest_path
         self.progress_path: str = dest_path + self.PROGRESS_SUFFIX
         self._data: dict[str, Any] = {}
+        self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Factory / lifecycle
@@ -120,13 +122,14 @@ class DownloadProgress:
             start: Inclusive start byte offset.
             end: Inclusive end byte offset.
         """
-        completed = self._data.get("completed_ranges", [])
-        pair = [start, end]
-        if pair not in completed:
-            completed.append(pair)
-            self._data["completed_ranges"] = completed
-            self._data["updated_at"] = time.time()
-            self._save()
+        with self._lock:
+            completed = self._data.get("completed_ranges", [])
+            pair = [start, end]
+            if pair not in completed:
+                completed.append(pair)
+                self._data["completed_ranges"] = completed
+                self._data["updated_at"] = time.time()
+                self._save()
 
     # ------------------------------------------------------------------
     # Query helpers

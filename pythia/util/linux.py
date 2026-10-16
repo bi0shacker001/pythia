@@ -132,7 +132,8 @@ class LinuxSystem:  # pylint: disable=too-many-public-methods
                     command_path = self.get_sbin_path(command)
                 if command_path:
                     self._cache[key][command] = command_path
-                elif key == "COMMANDS":
+                elif key == "COMMANDS" and sys.platform.startswith("linux"):
+                    # These are Linux tools; on Windows or macOS their absence is normal.
                     logger.warning("Command '%s' not found on your system", command)
 
         # Detect if system is 64bit capable
@@ -248,13 +249,13 @@ class LinuxSystem:  # pylint: disable=too-many-public-methods
         with the supported architectures from the Pythia API
         """
         match platform.machine():
-            case "x86_64":
+            case "x86_64" | "AMD64":  # AMD64: Windows' name for it
                 return "x86_64"
             case "i386" | "i686":
                 return "i386"
             case m if "armv7" in m:
                 return "armv7"
-            case "aarch64" | "arm64":
+            case "aarch64" | "arm64" | "ARM64":
                 return "aarch64"
             case m:
                 logger.warning("Unsupported architecture %s", m)

@@ -60,7 +60,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-a", "--list-all-service-games", action="store_true", help="List all games for all services in database"
     )
-    parser.add_argument("--list-service-games", metavar="SERVICE", help="List all games for provided service in database")
+    parser.add_argument(
+        "--list-service-games", metavar="SERVICE", help="List all games for provided service in database"
+    )
     parser.add_argument("-r", "--install-runner", metavar="RUNNER", help="Install a Runner")
     parser.add_argument("-u", "--uninstall-runner", metavar="RUNNER", help="Uninstall a Runner")
     parser.add_argument("--export", metavar="SLUG", help="Export a game")
@@ -68,6 +70,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dest", metavar="PATH", help="Destination path for export/import")
     parser.add_argument("-j", "--json", action="store_true", help="Display the list of games in JSON format")
     parser.add_argument("--reinstall", action="store_true", help="Reinstall game")
+    droidtop = parser.add_argument_group("droidtop", "This computer as the droidtop agent of paired handhelds")
+    droidtop.add_argument("--droidtop-serve", action="store_true", help="Serve paired droidtop handhelds until stopped")
+    droidtop.add_argument("--droidtop-pair", metavar="CODE", help="Pair with a handheld showing CODE")
+    droidtop.add_argument(
+        "--droidtop-pair-show",
+        action="store_true",
+        help="Show a code and this computer's addresses for a handheld to pair",
+    )
+    droidtop.add_argument("--droidtop-devices", action="store_true", help="List the paired handhelds")
+    droidtop.add_argument(
+        "--droidtop-unpair", metavar="ID", help="Forget a paired handheld (the start of its id is enough)"
+    )
     parser.add_argument(
         "uri",
         nargs="?",
@@ -143,7 +157,11 @@ def _print_steam_list() -> None:
     for path in get_steamapps_dirs() or []:
         for appmanifest_file in get_appmanifests(path):
             appmanifest = AppManifest(os.path.join(path, appmanifest_file))
-            print(" {:8} | {:<60} | {}".format(appmanifest.steamid, appmanifest.name or "-", ", ".join(appmanifest.states)))
+            print(
+                " {:8} | {:<60} | {}".format(
+                    appmanifest.steamid, appmanifest.name or "-", ", ".join(appmanifest.states)
+                )
+            )
 
 
 def _print_runners() -> None:
@@ -161,8 +179,8 @@ def _install_runner(runner_name: str) -> None:
             print(f"Wine version '{runner_name}' is already installed.")
             return
         try:
-            runner = import_runner("wine")
-            runner().install(InstallUIDelegate(), version=runner_name)
+            wine_runner = import_runner("wine")()
+            wine_runner.install(InstallUIDelegate(), version=runner_name)
             print(f"Wine version '{runner_name}' has been installed.")
         except (InvalidRunnerError, RunnerInstallationError) as ex:
             print(ex.message)
@@ -225,6 +243,63 @@ def _execute_command(command: str) -> None:
         monitored_command.stop()
 
 
+def _droidtop_command(args) -> bool:
+    return any(
+        (args.droidtop_serve, args.droidtop_pair, args.droidtop_pair_show, args.droidtop_devices, args.droidtop_unpair)
+    )
+
+
+def _run_droidtop_command(args) -> int:
+    """The droidtop agent's commands (pythia.droidtop): Pythia is this
+    computer's agent while it runs."""
+    from pythia.droidtop import AgentError, pair, service, store  # noqa: PLC0415
+
+    try:
+        if args.droidtop_pair:
+            print(f"Paired with {pair.pair(args.droidtop_pair)}.")
+        elif args.droidtop_pair_show:
+            shown = pair.show()
+            print("On droidtop: Settings > Computers > Pair a computer > Use a code from the computer.")
+            for place in shown["places"]:
+                print(f"Address: {place['address']}  ({place['label']})")
+            print(f"Code:    {shown['code'][:3]} {shown['code'][3:]}")
+            print("Waiting up to 10 minutes; Ctrl+C stops.")
+            try:
+                while (status := pair.status())["state"] == "waiting":
+                    time.sleep(0.5)
+            except KeyboardInterrupt:
+                pair.cancel()
+                return 1
+            if status["state"] != "paired":
+                print(status.get("error", "Pairing stopped."))
+                return 1
+            print(f"Paired with {status['paired']}.")
+        elif args.droidtop_devices:
+            devices = store.devices()
+            if not devices:
+                print("No handheld is paired. On droidtop: Settings > Computers > Pair a computer.")
+            for d in devices:
+                print(f"{d['id'][:16]}  {d['name']}{'  (primary)' if d.get('primary') else ''}")
+        elif args.droidtop_unpair:
+            store.unpair(args.droidtop_unpair)
+            print("Forgotten.")
+        elif args.droidtop_serve:
+            me = store.identity()
+            service.serve()
+            print(f"{me['name']} ({me['id'][:16]}) serves paired droidtop handhelds. Ctrl+C stops.")
+            try:
+                while service.serving()["state"] == "serving":
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                return 0
+            print(service.serving().get("reason", "The agent stopped."))
+            return 1
+    except AgentError as ex:
+        print(ex)
+        return 1
+    return 0
+
+
 def run(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -241,16 +316,21 @@ def run(argv: list[str] | None = None) -> int:
     migrate()
     run_all_checks(async_ops=False)
 
+    if _droidtop_command(args):
+        return _run_droidtop_command(args)
+
     if args.output_script:
-        game = (
+        script_game = (
             games_db.get_game_by_field(args.output_script, "id")
             or games_db.get_game_by_field(args.output_script, "slug")
             or games_db.get_game_by_field(args.output_script, "installer_slug")
         )
-        if not game or not game["id"]:
-            logger.warning("No valid game (%s) provided to generate the script. Use -l to find suitable games!", args.output_script)
+        if not script_game or not script_game["id"]:
+            logger.warning(
+                "No valid game (%s) provided to generate the script. Use -l to find suitable games!", args.output_script
+            )
             return 1
-        generate_script(logger, CommandLineUIDelegate(None), game, f"{game['slug']}.sh")
+        generate_script(logger, CommandLineUIDelegate(None), script_game, f"{script_game['slug']}.sh")
         return 0
 
     if args.list_games:
@@ -274,7 +354,9 @@ def run(argv: list[str] | None = None) -> int:
         service_game_list = ServiceGameCollection.get_service_games()
         for db_game in service_game_list:
             db_game["installed"] = any(
-                ("service_id", db_game["appid"]) in item.items() for item in game_list if item["service"] == db_game["service"]
+                ("service_id", db_game["appid"]) in item.items()
+                for item in game_list
+                if item["service"] == db_game["service"]
             )
         if args.installed:
             service_game_list = [d for d in service_game_list if d["installed"]]
@@ -401,7 +483,9 @@ def run(argv: list[str] | None = None) -> int:
 
     if not action:
         if db_game and db_game["installed"]:
-            print(f"'{db_game['name']}' is already installed. Use --reinstall to reinstall it, or pass a URI to run it.")
+            print(
+                f"'{db_game['name']}' is already installed. Use --reinstall to reinstall it, or pass a URI to run it."
+            )
             return 0
         if game_slug or installer_file or service:
             action = "install"
@@ -429,7 +513,10 @@ def run(argv: list[str] | None = None) -> int:
         try:
             from pythia.installer.interpreter import ScriptInterpreter  # noqa: PLC0415
         except ImportError as ex:
-            print(f"Can't run installers yet: {ex}. ScriptInterpreter still subclasses GObject.Object (real, structural -- not yet ported off GTK/GObject).")
+            print(
+                f"Can't run installers yet: {ex}. ScriptInterpreter still subclasses GObject.Object "
+                "(real, structural -- not yet ported off GTK/GObject)."
+            )
             return 1
 
         ScriptInterpreter(installers[0], launch_ui_delegate).launch_install(launch_ui_delegate)

@@ -1,10 +1,17 @@
-from unittest import TestCase
+from unittest import TestCase, skipIf
 from unittest.mock import patch
 
 import requests
 
 from pythia.installer.errors import ScriptingError
-from pythia.installer.interpreter import ScriptInterpreter
+
+try:
+    from pythia.installer.interpreter import ScriptInterpreter
+except ImportError as ex:  # it still subclasses GObject.Object: no PyGObject, no installer
+    ScriptInterpreter = None  # type: ignore[misc,assignment]
+    NO_INSTALLER = f"The installer needs PyGObject ({ex})"
+else:
+    NO_INSTALLER = ""
 from pythia.util.test_config import setup_test_environment
 
 setup_test_environment()
@@ -19,12 +26,15 @@ TEST_INSTALLER = {
 }
 
 
-class MockInterpreter(ScriptInterpreter):
-    """A script interpreter mock."""
+if ScriptInterpreter is not None:
 
-    runner = "linux"
+    class MockInterpreter(ScriptInterpreter):
+        """A script interpreter mock."""
+
+        runner = "linux"
 
 
+@skipIf(bool(NO_INSTALLER), NO_INSTALLER)
 class TestScriptInterpreter(TestCase):
     def get_moddb_interpreter(self, moddb_url):
         installer = {

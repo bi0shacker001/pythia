@@ -608,7 +608,7 @@ class TestResolveSavePath(unittest.TestCase):
     def test_native_linux_install_var(self):
         loc = CloudSaveLocation(name="saves", location="<?INSTALL?>/saves")
         result = resolve_save_path(loc, "/opt/games/mygame", is_native=True)
-        self.assertEqual(result, "/opt/games/mygame/saves")
+        self.assertEqual(result, os.path.normpath("/opt/games/mygame/saves"))
 
     def test_native_linux_documents_var(self):
         loc = CloudSaveLocation(name="saves", location="<?DOCUMENTS?>/My Games/Test")

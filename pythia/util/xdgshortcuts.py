@@ -8,8 +8,7 @@ from textwrap import dedent
 
 from pythia.api import format_installer_url
 from pythia.settings import CACHE_DIR
-from pythia.util import system
-from pythia.util import xdg
+from pythia.util import system, xdg
 from pythia.util.linux import LINUX_SYSTEM
 from pythia.util.log import logger
 

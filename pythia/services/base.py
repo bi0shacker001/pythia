@@ -13,16 +13,16 @@ from pythia.database import sql
 from pythia.database.games import add_game, get_game_by_field, get_game_for_service, get_games
 from pythia.database.services import ServiceGameCollection
 from pythia.game import GAME_UPDATED, Game
-from pythia.util.app_singleton import get_default as get_default_application
-from pythia.util.media_loader import download_media
-from pythia.util.notifier import NotificationSource
-from pythia.util.image_utils import BANNER_SIZE, ICON_SIZE
 from pythia.services.service_media import ServiceMedia
 from pythia.util import system
+from pythia.util.app_singleton import get_default as get_default_application
 from pythia.util.busy import BusyAsyncCall
 from pythia.util.cookies import WebkitCookieJar
+from pythia.util.image_utils import BANNER_SIZE, ICON_SIZE
 from pythia.util.jobs import AsyncCall
 from pythia.util.log import logger
+from pythia.util.media_loader import download_media
+from pythia.util.notifier import NotificationSource
 from pythia.util.strings import slugify
 
 

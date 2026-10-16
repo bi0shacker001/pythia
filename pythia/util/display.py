@@ -5,6 +5,7 @@ from __future__ import annotations
 # isort:skip_file
 import enum
 import os
+import sys
 import subprocess
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
@@ -53,7 +54,10 @@ if TYPE_CHECKING:
 
 def get_default_dpi() -> int:
     """Computes the DPI to use for the primary monitor
-    which we pass to WINE."""
+    which we pass to WINE. Without GTK (Windows, or no GObject-introspection)
+    it is the standard 96: pythia.runners.wine asks for it while importing."""
+    if not HAS_GTK:
+        return 96
     display = Gdk.Display.get_default()
     if display:
         monitor = display.get_primary_monitor()
@@ -137,7 +141,7 @@ def get_display_manager() -> MutterDisplayManager | DisplayManager | LegacyDispl
             logger.debug("Mutter DBus service not reachable: %s", ex)
         except Exception as ex:  # pylint: disable=broad-except
             logger.exception("Failed to instantiate MutterDisplayConfig. Please report with exception: %s", ex)
-    else:
+    elif sys.platform.startswith("linux"):  # DBus is a Linux desktop's; elsewhere it is not expected
         logger.error("DBus is not available, Pythia was not properly installed.")
 
     if LIB_GNOME_DESKTOP_AVAILABLE:
@@ -408,8 +412,13 @@ class DBusScreenSaverInhibitor:
             except Exception as ex:
                 logger.warning("Failed to inhibit screensaver via D-Bus, falling back to GTK: %s", ex)
 
-        # GTK fallback
-        app: "PythiaApplication" = Gio.Application.get_default()
+        # GTK fallback, when a GTK application runs this process: the Qt UI and
+        # the command line (`pythia pythia:rungameid/<id>`) have none, and the
+        # game then runs without an inhibitor rather than not at all.
+        app: "PythiaApplication | None" = Gio.Application.get_default() if Gio is not None else None
+        if app is None or getattr(app, "window", None) is None:
+            logger.info("No screensaver inhibitor for %s: no D-Bus screensaver and no GTK application", game_name)
+            return None
 
         window = app.window
         flags = Gtk.ApplicationInhibitFlags.SUSPEND | Gtk.ApplicationInhibitFlags.IDLE
@@ -436,8 +445,9 @@ class DBusScreenSaverInhibitor:
                 logger.warning("Failed to uninhibit screensaver via D-Bus: %s", ex)
 
         # GTK fallback
-        app: "PythiaApplication" = Gio.Application.get_default()
-        app.uninhibit(cookie)
+        app: "PythiaApplication | None" = Gio.Application.get_default() if Gio is not None else None
+        if app is not None:
+            app.uninhibit(cookie)
 
 
 def _get_suspend_inhibitor() -> DBusScreenSaverInhibitor:

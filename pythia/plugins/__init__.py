@@ -72,6 +72,19 @@ Pythia actually is (an update/preparation manager, not a launcher):
 Reading binary files (not just filenames/paths) to determine identity -- version
 resources, embedded strings, archive headers -- is also fair game for detection
 (2026-08-02); nothing about "never launches" ever implied "never reads."
+
+**A second exception: starting a game for a paired handheld (2026-10-16).**
+Since Pythia became this computer's droidtop agent, the owner: "given windowcast,
+yeah, have it be able to do general launches", and "It is clearly a new exception
+to that" (this boundary). So Pythia does start a game itself, in this one case: a
+paired handheld the person allowed ("Start games" in Systems & sync, off per
+handheld until turned on) asks for one of this computer's tracked games, which
+windowcast then streams to it. The handheld only names the game by its key; Pythia
+looks the key up among its own tracked games and runs nothing the handheld sent.
+It starts the game through Lutris's runners (`pythia pythia:rungameid/<id>`, in a
+Pythia process of its own, once `Game.check_launchable()` passes), or else hands it
+to its store's launcher as above. See `pythia.droidtop.launch`. Nothing else in
+Pythia starts games on its own account; this exception does not widen to them.
 """
 
 from pathlib import Path

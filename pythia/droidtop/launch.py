@@ -7,9 +7,11 @@ Pythia registers a launcher with the agent's service
 start games here ("Start games" in Systems & sync), every key that is not
 Steam's comes here. Steam keys stay the agent's (Steam Link).
 
-A key is only looked up, never run: it names one of this computer's tracked
-games (``library.game_key``, the key Pythia hands the agent). The game then
-starts the ways Pythia starts games, first that applies:
+This is an exception to Pythia's "never launches anything" boundary, made on
+purpose and recorded with it (``pythia.plugins``, 2026-10-16). A key is only
+looked up, never run: it names one of this computer's tracked games
+(``library.game_key``, the key Pythia hands the agent). The game then starts,
+first way that applies:
 - a variant with a runner set up (Lutris's runners: linux, wine...) starts
   as ``pythia pythia:rungameid/<game id>`` would, in a Pythia process of its
   own, so the window process never carries a game;

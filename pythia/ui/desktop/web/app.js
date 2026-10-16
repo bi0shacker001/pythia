@@ -499,6 +499,7 @@ function managerPaused(page) { const m = model.modes?.manager; return !!m && !m.
 function managerOffBlock(what) {
   return stateBlock({ title: 'Manager mode is off', body: `${what} is part of manager mode.`, actions: [{ label: 'Turn manager mode on', run: async () => { const r = await act('set_manager_mode', [true], 'Manager mode on', { what: 'Turning manager mode on' }); if (ok(r)) { await refreshModes(); renderCurrent(); } } }] });
 }
+const SYNC_CONSENT = 'Pythia will serve your paired droidtop handhelds from this computer. To do that it listens on your network (TCP and UDP port 47610, TCP 47612 while pairing, UDP 47611 for reaching it away from home) and tells a public discovery server this computer\u2019s address, so a paired handheld can find it away from home. If droidtop-agent runs here, Pythia turns it off while it serves. Your system may ask whether Pythia may use the network: allow it on private networks. Nothing of this happens until you turn it on.';
 function renderModes(host) {
   if (!host) return;
   loadInto(host, 'get_modes', [], (r, h) => {
@@ -506,13 +507,15 @@ function renderModes(host) {
     const m = r.manager || {}; const sync = r.sync || {};
     const info = (title, details) => { const b = el('<button class="btn small ghost" type="button">Info</button>'); b.onclick = () => infoSheet({ title, details }); return b; };
     // Sync with droidtop (UX review A9): agent mode, named by its outcome; "agent" is said only in Info.
-    const syncState = !sync.available ? 'Not available' : sync.on ? (sync.serving ? 'On' : 'On from the next start') : sync.serving ? 'Off when Pythia quits' : 'Off';
+    const syncState = !sync.available ? 'Not available' : sync.on ? (sync.serving ? 'On' : 'Starting') : sync.serving ? 'Off when Pythia quits' : 'Off';
     const syncRow = el(`<div class="form-row"><div class="form-label"><strong>Sync with droidtop</strong><small>Your paired droidtop handhelds get this library, its saves and its launches from Pythia. ${esc(syncState)}.</small>${sync.available ? '' : `<small class="locked-reason">${esc(sync.reason || '')}</small>`}</div><span class="mode-controls"><button class="toggle" data-sync-mode aria-label="Sync with droidtop"><span></span></button></span></div>`);
     $('.mode-controls', syncRow).prepend(info('Sync with droidtop', sync.info || ''));
     const syncSwitch = $('[data-sync-mode]', syncRow);
     bindSwitch(syncSwitch, !!sync.on, async (on) => {
-      if (!on && !(await confirm({ title: 'Turn off Sync with droidtop?', body: 'Your handhelds are served by droidtop-agent again from its next start; Pythia stops when it quits.', proceed: 'Turn off' }))) { renderModes(host); return; }
-      await act(on ? 'serve_from_pythia_again' : 'turn_agent_back_on', [], on ? 'Sync with droidtop on from the next start' : 'Sync with droidtop off', { what: 'Changing Sync with droidtop' });
+      // Turning it on is the consent to use the network (docs/SPEC.md 1.7): said plainly first, nothing listens before.
+      if (on && !(await confirm({ title: 'Turn on Sync with droidtop?', body: SYNC_CONSENT, proceed: 'Turn on' }))) { renderModes(host); return; }
+      if (!on && !(await confirm({ title: 'Turn off Sync with droidtop?', body: 'Pythia stops serving your handhelds when it quits. If Pythia had turned droidtop-agent off, it is turned back on.', proceed: 'Turn off' }))) { renderModes(host); return; }
+      await act(on ? 'serve_from_pythia_again' : 'turn_agent_back_on', [], on ? 'Sync with droidtop on' : 'Sync with droidtop off', { what: 'Changing Sync with droidtop' });
       renderModes(host);
     });
     if (!sync.available) { syncSwitch.disabled = true; syncSwitch.dataset.reason = sync.reason || ''; }
@@ -708,9 +711,13 @@ function renderHandhelds() {
 function renderAgentTakeover(h, a) {
   const running = a.running || [];
   if (!a.pythia_serves) {
-    h.appendChild(el(`<p>${visibleStatus('droidtop-agent serves your handhelds, not Pythia. Pythia takes in its pairings and library.', 'neutral', '–')}</p>`));
-    const b = el('<p><button class="btn small">Serve from Pythia again</button></p>');
-    b.querySelector('button').onclick = async () => { const r = await act('serve_from_pythia_again', [], 'Pythia serves your handhelds from its next start, and turns droidtop-agent off then', { what: 'Serving from Pythia' }); if (ok(r)) renderHandhelds(); };
+    h.appendChild(el(`<p>${visibleStatus('Sync with droidtop is off: Pythia does not serve your handhelds or use the network for them.', 'neutral', '–')}</p>`));
+    const b = el('<p><button class="btn small">Turn on Sync with droidtop…</button></p>');
+    b.querySelector('button').onclick = async () => {
+      if (!(await confirm({ title: 'Turn on Sync with droidtop?', body: SYNC_CONSENT, proceed: 'Turn on' }))) return;
+      const r = await act('serve_from_pythia_again', [], 'Sync with droidtop on', { what: 'Turning on Sync with droidtop' });
+      if (ok(r)) renderHandhelds();
+    };
     h.appendChild(b);
     return;
   }

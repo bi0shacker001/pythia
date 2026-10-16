@@ -30,13 +30,42 @@ the droidtop coordinator for this lane. Later sections follow them.
    same as droidtop-agent's own pairing (Droidtop/tracker#556): each device
    has a self-signed certificate over its key, pairing pins the other's
    certificate fingerprint, and every session is mutual TLS 1.3 with those
-   certificates. A computer can also pair with another computer. (Open:
-   droidtop-agent's crates today refuse computer-to-computer pairing,
-   DESIGN.md section 3, "Kinds of device"; the owner's word and the crates
-   disagree, and the crates are not changed until that is settled.)
+   certificates. A computer can also pair with another computer (owner,
+   2026-10-16: "Computer to computer pairing is ABSOLUTELY a pythia
+   feature, it's the whole fucking reason it exists"). droidtop-agent's
+   DESIGN.md section 3 and its crates are changed to match.
 6. **One entry per game across stores.** A game owned on several stores is
    one library entry with several store ids (Droidtop/tracker#133, droidtop
    SPEC 7m), not one entry per store.
+7. **Sync with droidtop starts on only where droidtop is in use.** Owner,
+   2026-10-16, on the Windows retest's B3 (Droidtop/tracker#538): "Pythia
+   isn't necessarily used with droidtop. It's a game library manager, I
+   just happen to be taking advantage of it already knowing the library to
+   make it a more convenient agent for droidtop". The owner also called
+   serving at once "appropriate behavior for a production install" for a
+   droidtop user. So:
+   - On a new profile the switch starts on when droidtop-agent is already
+     on this computer (it has its files, runs, or starts at sign-in), and
+     Pythia then serves at first start: it listens on TCP and UDP 47610,
+     answers discovery, announces this computer to the relay, and writes
+     droidtop-agent's folder, because it is the agent. Otherwise the
+     switch starts off. That first answer is kept as the setting.
+   - While it is off Pythia does not listen on the network for handhelds,
+     look for or answer them, announce this computer, or touch
+     droidtop-agent's folder or its start at sign-in.
+   - Turning it on says first, in plain words, what follows: the ports,
+     the announcement to a public discovery server, and that
+     droidtop-agent is turned off while Pythia serves. Serving starts at
+     once.
+   - Turning it off writes Pythia's state back into droidtop-agent's
+     folder and puts the agent's start at sign-in back only when Pythia
+     had taken the agent's place.
+   - Every folder Pythia's native module uses comes from Pythia's own
+     data folder or the system's folders as this process sees them, so a
+     profile moved with PYTHIA_DATA_DIR, APPDATA and LOCALAPPDATA is never
+     written outside.
+   - Pairing a handheld from Pythia's Devices page is the person's own
+     action, so it listens for that pairing only, while the page shows it.
 
 ## 2. The pad model (handheld shell)
 

@@ -35,9 +35,10 @@ SYNC_INFO = (
     "Sync with droidtop is droidtop's agent mode: Pythia serves your paired droidtop handhelds as this "
     "computer's droidtop agent, syncing the library, saves and launches with them, and turns the separate "
     "droidtop-agent program off so the two never serve at once. While it is on, manager mode stays on, "
-    "because what syncs is the library manager mode keeps. Turning it off puts droidtop-agent's start at "
-    "sign-in back as it was, with Pythia's state written into its folder; Pythia stops serving when it quits. "
-    "Pythia still reads what droidtop-agent records."
+    "because what syncs is the library manager mode keeps. It starts on only where droidtop-agent is already "
+    "on this computer. Turning it off puts droidtop-agent's start at sign-in back as it was, with Pythia's state "
+    "written into its folder; Pythia stops serving when it quits. While it is off Pythia does not use the network "
+    "for handhelds or touch droidtop-agent's folder."
 )
 
 

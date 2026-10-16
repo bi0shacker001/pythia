@@ -263,21 +263,86 @@ class TakeoverTest(TestCase):
         fake.agent.sync.assert_called_once_with(write_back=False)
         self.assertEqual(taken["still_running"], still)
 
-    def test_turning_the_agent_back_on_writes_back_first_and_stops_serving_from_pythia(self):
+    def test_turning_sync_off_after_a_takeover_writes_back_and_turns_the_agent_on(self):
+        fake = self.agent()
+        fake.agent.status.return_value["turned_off"] = {"since": 1, "entries": ["desktop"]}
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(takeover.settings, "write_setting") as write,
+        ):
+            done = takeover.turn_agent_back_on()
+        self.assertEqual([c[0] for c in fake.agent.method_calls], ["status", "sync", "turn_on"])
+        fake.agent.sync.assert_called_once_with(write_back=True)
+        write.assert_called_once_with(takeover.SERVE_SETTING, False)
+        self.assertEqual(done["entries"], ["desktop"])
+
+    def test_turning_sync_off_without_a_takeover_leaves_the_agents_folder_alone(self):
+        """Droidtop/tracker#538 retest B3: droidtop-agent's folder is written only after Pythia took its place."""
         fake = self.agent()
         with (
             mock.patch.object(native, "_module", fake),
             mock.patch.object(takeover.settings, "write_setting") as write,
         ):
             done = takeover.turn_agent_back_on()
-        self.assertEqual([c[0] for c in fake.agent.method_calls], ["sync", "turn_on"])
-        fake.agent.sync.assert_called_once_with(write_back=True)
+        fake.agent.sync.assert_not_called()
+        fake.agent.turn_on.assert_not_called()
         write.assert_called_once_with(takeover.SERVE_SETTING, False)
-        self.assertEqual(done["entries"], ["desktop"])
+        self.assertEqual(done["entries"], [])
 
-    def test_pythia_serves_unless_told_not_to(self):
-        with mock.patch.object(takeover.settings, "read_bool_setting", side_effect=lambda key, default: default):
-            self.assertTrue(takeover.serves())
+    def first_answer(self, fake):
+        written = {}
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(takeover.settings, "read_setting", return_value=""),
+            mock.patch.object(takeover.settings, "write_setting", side_effect=written.__setitem__),
+        ):
+            return takeover.serves(), written
+
+    def test_sync_is_off_on_a_computer_without_droidtop(self):
+        """Pythia is not necessarily used with droidtop (docs/SPEC.md 1.7)."""
+        fake = self.agent()
+        fake.agent.folders.return_value = {"exists": False}
+        on, written = self.first_answer(fake)
+        self.assertFalse(on)
+        self.assertEqual(written, {takeover.SERVE_SETTING: False})
+        fake.agent.sync.assert_not_called()
+
+    def test_sync_is_on_where_droidtop_agent_already_is(self):
+        for exists, starts in ((True, False), (False, True)):
+            fake = self.agent(starts=starts)
+            fake.agent.folders.return_value = {"exists": exists}
+            on, written = self.first_answer(fake)
+            self.assertTrue(on)
+            self.assertEqual(written, {takeover.SERVE_SETTING: True})
+
+    def test_the_persons_choice_stands(self):
+        fake = self.agent(starts=True)
+        fake.agent.folders.return_value = {"exists": True}
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(takeover.settings, "read_setting", return_value="False"),
+        ):
+            self.assertFalse(takeover.serves())
+        fake.agent.folders.assert_not_called()
+
+    def test_with_sync_off_the_start_touches_nothing(self):
+        """With Sync with droidtop off nothing listens, announces or syncs with droidtop-agent (docs/SPEC.md 1.7)."""
+        fake = self.agent()
+        fake.service.serving.return_value = {"state": "off"}
+        threads = []
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(service, "available", return_value=True),
+            mock.patch.object(takeover, "serves", return_value=False),
+            mock.patch.object(
+                service.threading, "Thread", side_effect=lambda target, **kw: threads.append(target) or mock.Mock()
+            ),
+        ):
+            service.start_in_background()
+            threads[0]()
+        fake.agent.sync.assert_not_called()
+        fake.agent.turn_off.assert_not_called()
+        fake.service.serve.assert_not_called()
 
 
 class HandheldLaunchTest(TestCase):
@@ -352,3 +417,21 @@ class HandheldLaunchTest(TestCase):
         with mock.patch.object(native, "_module", fake2):
             self.assertTrue(launch.register())
         fake2.service.set_launcher.assert_called_once_with(launcher=launch.launch_for_handheld)
+
+
+class ProfileFoldersTest(TestCase):
+    """Droidtop/tracker#538 retest B3: with APPDATA and LOCALAPPDATA moved, the native side
+    looks for droidtop-agent's folders there, never in the profile the system names."""
+
+    def test_the_agent_folders_follow_the_overridden_profile(self):
+        if os.name != "nt" or not native.available():
+            self.skipTest("Windows with Pythia's native module only")
+        from pythia import _native  # noqa: PLC0415
+
+        with tempfile.TemporaryDirectory() as tmp:
+            roaming, local = os.path.join(tmp, "Roaming"), os.path.join(tmp, "Local")
+            with mock.patch.dict(os.environ, {"APPDATA": roaming, "LOCALAPPDATA": local}):
+                os.environ.pop("DROIDTOP_AGENT_HOME", None)
+                found = _native.agent.folders()
+        self.assertEqual(Path(found["config"]), Path(roaming) / "droidtop-agent")
+        self.assertEqual(Path(found["data"]), Path(local) / "droidtop-agent")

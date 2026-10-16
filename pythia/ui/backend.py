@@ -1709,14 +1709,16 @@ class Backend(QObject):
     @Slot(result="QVariant")
     @_guarded
     def serve_from_pythia_again(self):
-        """Pythia serves the handhelds again from its next start."""
+        """Sync with droidtop on, which is the person's consent (docs/SPEC.md
+        1.7): Pythia takes droidtop-agent's place and serves now."""
         from pythia import droidtop
 
         if not droidtop.available():
             return self._agent_unavailable("serve_from_pythia_again")
-        from pythia.droidtop import takeover
+        from pythia.droidtop import service, takeover
 
         takeover.serve_from_pythia_again()
+        service.start_in_background()
         self.modesChanged.emit()
         return {"status": "ok"}
 

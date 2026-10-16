@@ -56,8 +56,29 @@ pub(crate) static FOLDER: Mutex<Option<PathBuf>> = Mutex::new(None);
 static AGENT: OnceLock<Arc<Agent>> = OnceLock::new();
 static OPENING: Mutex<()> = Mutex::new(());
 
-/// The computer's identity folder: windowcast's host folder, or the one
-/// folder `DROIDTOP_AGENT_HOME` gives droidtop-agent (as its `Dirs::locate`).
+/// The settings folder (APPDATA on Windows). On Windows the dirs crate asks
+/// the system for the profile's folder and ignores an APPDATA the caller
+/// set; Pythia honours it, so a profile moved with APPDATA and LOCALAPPDATA
+/// (a test profile, a portable install) is never written outside
+/// (Droidtop/tracker#538, retest B3).
+pub(crate) fn config_dir() -> Option<PathBuf> {
+    env_dir("APPDATA").or_else(dirs::config_dir)
+}
+
+/// The local data folder (LOCALAPPDATA on Windows), as [`config_dir`].
+pub(crate) fn data_local_dir() -> Option<PathBuf> {
+    env_dir("LOCALAPPDATA").or_else(dirs::data_local_dir)
+}
+
+fn env_dir(name: &str) -> Option<PathBuf> {
+    if !cfg!(windows) {
+        return None;
+    }
+    std::env::var_os(name).filter(|v| !v.is_empty()).map(PathBuf::from)
+}
+
+/// The computer's identity folder: windowcast's host folder (it honours
+/// APPDATA), or the one folder `DROIDTOP_AGENT_HOME` gives droidtop-agent.
 fn computer_dir() -> PathBuf {
     match std::env::var_os("DROIDTOP_AGENT_HOME") {
         Some(home) => PathBuf::from(home),
@@ -151,4 +172,16 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "service", service::fill)?;
     submodule(m, "pad", pad::fill)?;
     Ok(())
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    #[test]
+    fn a_moved_profile_is_honoured() {
+        let dir = std::env::temp_dir().join("pythia-profile-test");
+        std::env::set_var("APPDATA", dir.join("Roaming"));
+        std::env::set_var("LOCALAPPDATA", dir.join("Local"));
+        assert_eq!(super::config_dir(), Some(dir.join("Roaming")));
+        assert_eq!(super::data_local_dir(), Some(dir.join("Local")));
+    }
 }

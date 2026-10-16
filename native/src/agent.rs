@@ -41,7 +41,7 @@ pub fn fill(m: &Bound<'_, PyModule>) -> PyResult<()> {
 pub(crate) fn agent_folders() -> Option<(PathBuf, PathBuf)> {
     match std::env::var_os("DROIDTOP_AGENT_HOME") {
         Some(home) => Some((PathBuf::from(&home), PathBuf::from(home))),
-        None => Some((dirs::config_dir()?.join("droidtop-agent"), dirs::data_local_dir()?.join("droidtop-agent"))),
+        None => Some((crate::config_dir()?.join("droidtop-agent"), crate::data_local_dir()?.join("droidtop-agent"))),
     }
 }
 

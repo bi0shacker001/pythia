@@ -108,7 +108,8 @@ def look(root: Path | str, progress=None) -> dict:
     is_launcher = scanning._launcher_rule()
     folders, skipped, errors = [], [], []
     titles: set[str] = set()
-    for discovered in scanning._discover_roots(root, enabled, generic):
+    empty: list = []
+    for discovered in scanning._discover_roots(root, enabled, generic, empty):
         launcher = next(
             (f for f in (discovered, *discovered.parents) if f != root and root in f.parents and is_launcher(f)), None
         )
@@ -127,6 +128,7 @@ def look(root: Path | str, progress=None) -> dict:
         titles.add(_key(folder["name"]))
         if progress:
             progress({"folders": len(folders) + len(skipped) + len(errors), "games": len(titles)})
+    skipped += [{"path": str(path), "message": f"{path.name}: {reason}."} for path, reason in empty]
     proposals = group(folders)
     return {
         "status": "ok",

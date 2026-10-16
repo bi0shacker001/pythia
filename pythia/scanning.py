@@ -86,27 +86,40 @@ def _hidden(folder: Path) -> bool:
     return name.startswith((".", "$")) or name.casefold() == "system volume information"
 
 
-def _discover_roots(scan_root: Path, plugins, generic):
+def _discover_roots(scan_root: Path, plugins, generic, skipped: list | None = None):
     """Full discovery: marker-based roots anywhere in the tree, plus a generic
-    fallback -- but *only* for direct children of `scan_root` that had no marker-
-    based root anywhere inside them. See the plan's Detection + scanning section for
-    why generic is restricted this way."""
+    fallback for every folder that holds no marker-based root, at whatever depth
+    a container of games puts it. UX review A16/A17: a mixed folder ("Loose/"
+    with a Ren'Py game beside a Godot demo, an RPG Maker game and an unknown
+    program) kept only its recognised game when scanned from above, though
+    scanning it directly found all four. ``skipped`` collects the folders that
+    turned out to hold no game, as (path, reason)."""
     if _shortcut_roots(scan_root, plugins) is not None or any(p.is_root(scan_root) for p in plugins):
         yield from _marker_roots(scan_root, plugins)
         return
+    yield from _container_roots(scan_root, plugins, generic, skipped)
 
+
+def _container_roots(path: Path, plugins, generic, skipped: list | None):
+    """The game roots in the folders of ``path``, a folder that is not itself a
+    game: a folder holding recognised games is looked into the same way; one
+    holding none is given to the generic fallback."""
     try:
-        children = sorted(p for p in scan_root.iterdir() if p.is_dir() and not _hidden(p))
+        children = sorted(p for p in path.iterdir() if p.is_dir() and not _hidden(p))
     except OSError:
         children = []
-
     for child in children:
-        found_any = False
-        for marker_root in _marker_roots(child, plugins):
-            found_any = True
-            yield marker_root
-        if not found_any and generic is not None:
-            yield from _generic_roots(child, generic)
+        if _shortcut_roots(child, plugins) is not None or any(p.is_root(child) for p in plugins):
+            yield from _marker_roots(child, plugins)
+        elif next(_marker_roots(child, plugins), None) is not None:
+            yield from _container_roots(child, plugins, generic, skipped)
+        elif generic is not None:
+            found = False
+            for root in _generic_roots(child, generic):
+                found = True
+                yield root
+            if not found and skipped is not None:
+                skipped.append((child, "no game found in it"))
 
 
 def scan_library(root: Path | str):

@@ -72,3 +72,37 @@ class LookTest(TestCase):
         (proposal,) = look.group(folders)
         self.assertEqual(proposal["match"]["game_id"], "g1")
         self.assertIn("already in the library", proposal["match"]["reason"])
+
+
+class MixedFolderTest(TestCase):
+    """UX review A17: a mixed folder keeps its unidentified games when scanned from above."""
+
+    def test_loose_games_beside_a_recognised_one_are_found_from_above(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = Path(tmp) / "library"
+            renpy(lib / "Versions" / "UX Test Novel" / "UX Test Novel v1.0")
+            renpy(lib / "Loose" / "UX Test Lone Novel")
+            godot = lib / "Loose" / "UX Test Godot Demo"
+            godot.mkdir(parents=True)
+            (godot / "UX Test Godot Demo.exe").write_bytes(b"MZ")
+            (godot / "UX Test Godot Demo.pck").write_bytes(b"GDPC")
+            rpgm = lib / "Loose" / "UX Test RPG Maker Quest"
+            (rpgm / "www" / "data").mkdir(parents=True)
+            (rpgm / "Game.exe").write_bytes(b"MZ")
+            unknown = lib / "Loose" / "UX Test Unknown Program"
+            unknown.mkdir(parents=True)
+            (unknown / "program.exe").write_bytes(b"MZ")
+            empty = lib / "Loose" / "Screenshots"
+            empty.mkdir(parents=True)
+            (empty / "shot.png").write_bytes(b"\\x89PNG")
+            with (
+                mock.patch.object(onboarding, "get_system_uuid", return_value="me"),
+                mock.patch.object(onboarding.datadir, "list_all_entries", return_value=[]),
+            ):
+                from_above = look.look(lib)
+                direct = look.look(lib / "Loose")
+        names = lambda r: sorted(Path(f["path"]).name for p in r["proposals"] for f in p["folders"])  # noqa: E731
+        loose = ["UX Test Godot Demo", "UX Test Lone Novel", "UX Test RPG Maker Quest", "UX Test Unknown Program"]
+        self.assertEqual(names(direct), loose)
+        self.assertEqual(names(from_above), sorted(loose + ["UX Test Novel v1.0"]))
+        self.assertIn("Screenshots: no game found in it.", [s["message"] for s in from_above["skipped"]])

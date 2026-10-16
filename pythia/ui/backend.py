@@ -693,6 +693,77 @@ class Backend(QObject):
 
         return self._edit_variant(game_id, path, change)
 
+    # ---- store links on a game or a folder (pythia.store_links; UX review A15) ---
+    def _edit_links(self, game_id: str, path: str, change) -> dict:
+        """``change(holder, entry)`` on the game's entry (``path`` empty) or on its folder at ``path``."""
+        uuid = get_system_uuid()
+        for entry in datadir.list_all_entries():
+            if entry.get("system_uuid") != uuid or entry.get("game_id") != game_id:
+                continue
+            holder = entry
+            if path:
+                holder = next(
+                    (v for g in entry.get("versions") or [] for v in g.get("variants") or [] if v.get("path") == path),
+                    None,
+                )
+                if holder is None:
+                    return {"status": "error", "message": "That folder is not one of this game's folders here."}
+            result = change(holder, entry)
+            if result.get("status") == "ok":
+                games_db.save_entry_and_sync_cache(entry)
+                self.refresh_games()
+            return result
+        return {"status": "error", "message": "This computer has no record of that game."}
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    def set_store_link(self, game_id: str, path: str, text: str):
+        """Records a pasted store link or id on the game (``path`` empty) or on
+        one folder. ``link`` says the store and whether Pythia checks it for
+        updates (only F95zone does yet)."""
+        from pythia import store_links
+
+        try:
+            link = store_links.parse(text)
+        except store_links.LinkError as ex:
+            return {"status": "error", "message": str(ex)}
+
+        def change(holder, entry):
+            store_links.put(holder, link)
+            datadir.add_timeline_event(entry, "store_linked", f"{path or 'game'}: {link['platform']} {link['id']}")
+            return {"status": "ok", "link": store_links.describe(link)}
+
+        return self._edit_links(game_id, path, change)
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    def remove_store_link(self, game_id: str, path: str, platform: str):
+        from pythia import store_links
+
+        def change(holder, entry):
+            if not store_links.remove(holder, platform):
+                return {"status": "error", "message": f"No {platform} link there."}
+            datadir.add_timeline_event(entry, "store_unlinked", f"{path or 'game'}: {platform}")
+            return {"status": "ok"}
+
+        return self._edit_links(game_id, path, change)
+
+    @Slot(result="QVariant")
+    @_guarded
+    def describe_store_links(self):
+        """Store names and which stores have an update check, for the page."""
+        from pythia import store_links
+
+        return {"status": "ok", "stores": store_links.STORE_NAMES, "update_checks": sorted(store_links.UPDATE_CHECKS)}
+
+    @Slot(result="QVariant")
+    @_guarded
+    def read_clipboard(self):
+        """The clipboard's text, for "Paste link"."""
+        from PySide6.QtGui import QGuiApplication
+
+        return {"status": "ok", "text": QGuiApplication.clipboard().text()}
+
     # 2026-08-04, Lutris-base port: the old direct-launch variant flag (set_variant_
     # direct) isn't ported -- Lutris's own "linux" runner already covers "just run
     # this executable directly, no compatibility layer needed" (see

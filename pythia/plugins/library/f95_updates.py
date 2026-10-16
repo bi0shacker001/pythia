@@ -164,7 +164,14 @@ def run_update_check(log=None) -> dict:
     log = log or (lambda msg: None)
     uuid = get_system_uuid()
 
-    entries_by_thread: dict[int, dict] = {}
+    # What to check (UX review A15): every F95zone link this system's entries
+    # carry, on the game or on one folder. A game's link is compared with the
+    # version it counts as installed (an F95Checker import's own version, else
+    # Current, else the latest installed); a folder's own link with that
+    # folder's version, so a translation is checked against its own thread.
+    from pythia import versions
+
+    targets_by_thread: dict[int, list[tuple[dict, str | None, str | None]]] = {}
     for entry in datadir.list_all_entries():
         if entry.get("system_uuid") != uuid:
             continue
@@ -173,12 +180,27 @@ def run_update_check(log=None) -> dict:
             None,
         )
         if thread_id is not None:
-            entries_by_thread[int(thread_id)] = entry
+            imported = next(
+                (
+                    group.get("version")
+                    for group in entry.get("versions", [])
+                    for variant in group.get("variants", [])
+                    if (variant.get("source") or {}).get("kind") == "f95"
+                ),
+                None,
+            )
+            targets_by_thread.setdefault(int(thread_id), []).append((entry, imported or versions.in_use(entry), None))
+        for group in entry.get("versions", []):
+            for variant in group.get("variants", []):
+                own = next((p.get("id") for p in variant.get("platform_ids", []) if p.get("platform") == "f95"), None)
+                if own is not None:
+                    target = (entry, group.get("version"), variant.get("path"))
+                    targets_by_thread.setdefault(int(own), []).append(target)
 
-    if not entries_by_thread:
+    if not targets_by_thread:
         return {"checked": 0, "updated": 0, "errors": []}
 
-    thread_ids = list(entries_by_thread.keys())
+    thread_ids = list(targets_by_thread.keys())
     errors = []
     checked = 0
     updated = 0
@@ -188,51 +210,70 @@ def run_update_check(log=None) -> dict:
     except (F95ApiError, OSError) as exc:
         return {"checked": 0, "updated": 0, "errors": [f"fast_check failed: {exc}"]}
 
-    for thread_id, entry in entries_by_thread.items():
+    for thread_id, targets in targets_by_thread.items():
         last_changed = last_changes.get(thread_id)
         if last_changed is None:
             continue
-        if last_changed <= (entry.get("f95_last_full_check") or 0):
+        # One thread's last full check is kept per entry and per folder ("f95_checked").
+        if all(last_changed <= _last_check(entry, thread_id) for entry, _v, _p in targets):
             continue  # nothing new since our last full check
 
         checked += 1
-        log(f"Checking F95zone thread {thread_id} ({entry.get('canonical_name')})...")
+        log(f"Checking F95zone thread {thread_id} ({targets[0][0].get('canonical_name')})...")
         try:
             result = full_check(thread_id, last_changed)
         except (F95ApiError, OSError) as exc:
             errors.append(f"thread {thread_id}: {exc}")
             continue
 
-        entry["f95_last_full_check"] = last_changed
-        if result is None:
-            log(f"  -> thread {thread_id} not found (privated/moved/deleted).")
-            save_entry_and_sync_cache(entry)
-            continue
-
-        installed_version = None
-        for group in entry.get("versions", []):
-            for variant in group.get("variants", []):
-                if (variant.get("source") or {}).get("kind") == "f95":
-                    installed_version = group.get("version")
-
-        available_updates = [u for u in entry.get("available_updates", []) if u.get("source") != "f95checker"]
-        if installed_version and result["version"] and result["version"] != installed_version:
-            available_updates.append(
-                {
+        for entry, installed_version, scope in targets:
+            _set_last_check(entry, thread_id, last_changed)
+            if result is None:
+                log(f"  -> thread {thread_id} not found (privated/moved/deleted).")
+                save_entry_and_sync_cache(entry)
+                continue
+            available_updates = [
+                u
+                for u in entry.get("available_updates", [])
+                if not (u.get("source") == "f95checker" and u.get("for") == scope)
+            ]
+            if installed_version and result["version"] and result["version"] != installed_version:
+                update = {
                     "platform": "unknown",
                     "version": result["version"],
                     "source": "f95checker",
                     "detected_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 }
-            )
-            updated += 1
-            log(f"  -> update available: {installed_version} -> {result['version']}")
-            datadir.add_timeline_event(entry, "f95_update_detected", f"{installed_version} -> {result['version']}")
-        entry["available_updates"] = available_updates
-
-        save_entry_and_sync_cache(entry)
+                if scope:
+                    update["for"] = scope
+                available_updates.append(update)
+                updated += 1
+                where = f" for {scope}" if scope else ""
+                log(f"  -> update available{where}: {installed_version} -> {result['version']}")
+                datadir.add_timeline_event(
+                    entry, "f95_update_detected", f"{installed_version} -> {result['version']}{where}"
+                )
+            entry["available_updates"] = available_updates
+            save_entry_and_sync_cache(entry)
 
     return {"checked": checked, "updated": updated, "errors": errors}
+
+
+def _last_check(entry: dict, thread_id: int) -> int:
+    """When ``thread_id`` was last fully checked for ``entry``. The older
+    ``f95_last_full_check`` counts for the game's own thread."""
+    by_thread = entry.get("f95_checked") or {}
+    if str(thread_id) in by_thread:
+        return by_thread[str(thread_id)]
+    own = next((p.get("id") for p in entry.get("platform_ids", []) if p.get("platform") == "f95"), None)
+    return (entry.get("f95_last_full_check") or 0) if own is not None and int(own) == thread_id else 0
+
+
+def _set_last_check(entry: dict, thread_id: int, when: int) -> None:
+    entry.setdefault("f95_checked", {})[str(thread_id)] = when
+    own = next((p.get("id") for p in entry.get("platform_ids", []) if p.get("platform") == "f95"), None)
+    if own is not None and int(own) == thread_id:
+        entry["f95_last_full_check"] = when
 
 
 def full_check(thread_id: int, last_changed: int) -> dict | None:

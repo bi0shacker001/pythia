@@ -248,3 +248,6 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
 /* A disabled primary action looks unavailable, everywhere (the slot's Play or Install with its reason). */
 .btn.primary:disabled,.hh-action.primary[aria-disabled="true"],.hh-action.primary:disabled{background:var(--surface-2);border-color:var(--border);color:var(--text-secondary)}
 .detail-actions{align-items:flex-start}
+/* UX review A15: store links, each with whether Pythia checks it for updates */
+.store-link{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin-right:8px}
+.store-link small,.store-none{color:var(--text-secondary)}

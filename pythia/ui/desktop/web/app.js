@@ -308,12 +308,45 @@ async function detailAction(a, g, btn) {
 }
 
 // ---- Downloads & intake ---------------------------------------------------------------
+// Modes (backend pythia.modes): manager mode is #214's library and version manager; while Pythia is the
+// droidtop agent it is forced on, and the switch shows locked with the reason instead of hiding.
+async function refreshModes() {
+  const r = await call('get_modes');
+  model.modes = ok(r) ? r : null;
+  if (!ok(r)) model.modesError = r;
+  return r;
+}
+function managerPaused(page) { const m = model.modes?.manager; return !!m && !m.on && (m.pages || []).includes(page); }
+function managerOffBlock(what) {
+  return stateBlock({ title: 'Manager mode is off', body: `${what} is part of manager mode.`, actions: [{ label: 'Turn manager mode on', run: async () => { const r = await act('set_manager_mode', [true], 'Manager mode on', { what: 'Turning manager mode on' }); if (ok(r)) { await refreshModes(); renderCurrent(); } } }] });
+}
+function renderModes(host) {
+  if (!host) return;
+  loadInto(host, 'get_modes', [], (r, h) => {
+    model.modes = r;
+    const m = r.manager || {};
+    const row = el(`<div class="form-row"><div class="form-label"><strong>Manager mode</strong><small>The library and version manager: tagging game folders, versions against the latest release, and tagging downloads with their game and kind.</small>${m.locked ? `<small class="locked-reason">${visibleStatus('Locked on', 'neutral', '🔒')} ${esc(m.reason || '')}</small>` : ''}</div><button class="toggle" data-manager-mode aria-label="Manager mode"><span></span></button></div>`);
+    const sw = $('[data-manager-mode]', row);
+    bindSwitch(sw, !!m.on, async (on, node) => {
+      const r2 = await act('set_manager_mode', [on], on ? 'Manager mode on' : 'Manager mode off', { what: 'Changing manager mode' });
+      if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); }
+      renderModes(host);
+    });
+    if (m.locked) { sw.disabled = true; sw.setAttribute('aria-disabled', 'true'); sw.title = m.reason || ''; }
+    h.appendChild(row);
+    h.appendChild(el(`<div class="form-row"><div class="form-label"><strong>Agent mode</strong><small>Pythia serves your droidtop handhelds as this computer's agent. Change it in Systems &amp; sync.</small></div><span class="status-inline ${r.agent ? '' : 'neutral'}">${r.agent ? `${routineStatus('On')} On` : 'Off'}</span></div>`));
+  }, { what: 'Modes' });
+}
 function renderDownloads() {
   const q = state.view === 'downloads' ? state.search.toLowerCase() : '';
   const { detected, decisions, watcher } = model.intake;
   const running = model.jobs.filter((j) => j.state === 'running').length;
   $('#downloadsSummary').textContent = `${fmt.n(detected.length + decisions.length, 'intake item')} · ${watcher ? `watching ${watcher.folder}` : 'no folder watched'} · ${fmt.n(running, 'job')} running`;
   $('#watchButton').textContent = watcher ? 'Stop watching' : 'Watch a folder';
+  const paused = managerPaused('downloads');
+  $('#watchButton').disabled = paused && !watcher;
+  const dn = $('#downloadsNotice'); dn.innerHTML = '';
+  if (paused) dn.appendChild(managerOffBlock('Watching download folders and tagging what arrives'));
   $('#intakeCount').textContent = fmt.n(detected.length + decisions.length, 'item');
   const rows = [];
   decisions.forEach((d) => { const s = (d.candidates?.suggested || [])[0]; rows.push({ cells: [fileName(d.path), 'Scan', s ? `${s.canonical_name} · similar name` : 'New game', 'pending', 'Needs decision'], action: '<button class="btn small primary" data-nav="reconcile">Review</button>', text: `${d.path} ${d.name}` }); });
@@ -583,6 +616,7 @@ function renderSettingsSearch() { const q = state.search.toLowerCase(); $$('.for
 function openSettingsPane(name) { state.settingsPane = name; const btn = $$('[data-settings]').find((b) => b.dataset.settings === name); if (btn) { $$('[data-settings]').forEach((x) => x.classList.toggle('active', x === btn)); $$('.settings-pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === name)); } if (state.view !== 'settings') navigate('settings'); else renderSettingsPane(name); }
 function renderSettingsPane(name) {
   const info = model.info || {}; const app = model.app || {};
+  if (name === 'general') renderModes($('#modesState'));
   if (name === 'general') { $('#appDataPath').textContent = info.app_data_folder || ''; call('get_ui_mode').then((m) => { $('#uiModeSelect').value = typeof m === 'string' ? m : ''; }); }
   if (name === 'library') { loadInto($('#libraryFolders'), 'get_library_folders', [], (r, host) => { (r.folders || []).forEach((f) => host.appendChild(el(`<div class="account-row"><div class="card-icon">F</div><div><strong>${esc(f.path)}</strong></div></div>`))); if (!(r.folders || []).length) host.appendChild(stateBlock({ title: 'No folders tracked' })); }, { what: 'Tracked folders', actions: [{ label: 'Scan a folder', primary: true, run: scanLibrary }] }); loadInto($('#scanSettings'), 'get_scan_settings', [], () => {}, { what: 'Scan settings' }); }
   if (['sources', 'downloaders', 'metadata', 'managers', 'engines', 'mods', 'patchers'].includes(name)) {
@@ -754,6 +788,7 @@ function renderHHAttention(q = '') {
 }
 function renderHHDownloads() {
   const { detected, decisions, watcher } = model.intake; const host = $('#hhContent');
+  if (managerPaused('downloads')) { host.replaceChildren(managerOffBlock('Watching download folders and tagging what arrives')); return; }
   host.innerHTML = `<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-head"><h2>Intake queue</h2><span class="spacer"></span><button class="hh-action primary" data-hh-add>＋ Add</button></div><div class="hh-panel-body hh-summary-list" id="hhIntake">${decisions.map((d) => `<button class="hh-summary" data-hh-review><span class="art art-a">${esc(initials(d.name || fileName(d.path)))}</span><span><strong>${esc(fileName(d.path))}</strong><small>Scan · ${(d.candidates?.suggested || []).length ? `similar to ${esc(d.candidates.suggested[0].canonical_name)}` : 'new game'}</small></span>${visibleStatus('Decide', 'pending')}</button>`).join('')}${detected.map((d) => `<button class="hh-summary" data-hh-onboard="${esc(d.path)}"><span class="art art-d">⇩</span><span><strong>${esc(fileName(d.path))}</strong><small>Watched folder · ${esc(fmt.time(d.at))}</small></span>${visibleStatus('Add', 'pending', '＋')}</button>`).join('')}</div></section><section class="hh-panel"><div class="hh-panel-head"><h2>Watcher</h2><span class="spacer"></span><button class="hh-action" data-hh-watch>${watcher ? 'Stop' : 'Watch a folder'}</button></div><div class="hh-panel-body hh-summary-list"><div class="hh-summary" style="cursor:default"><span class="art" style="background:${watcher ? 'var(--positive-soft)' : 'var(--surface-2)'};color:${watcher ? 'var(--positive)' : 'var(--text-secondary)'}">⇩</span><span><strong>${esc(watcher ? watcher.folder : 'Not watching')}</strong><small>${esc(watcher ? (watcher.program ? `Running ${fileName(watcher.program)}` : 'Folder only') : 'New files in a watched folder show above')}</small></span>${watcher ? routineStatus('Watching') : visibleStatus('Idle', 'neutral', '–')}</div></div></section></div>`;
   if (!decisions.length && !detected.length) $('#hhIntake', host).appendChild(stateBlock({ title: 'Nothing waiting', body: 'Scan results needing a decision and new downloads land here.' }));
 }
@@ -950,6 +985,7 @@ function connect() {
     pythia.asyncResult.connect(asyncArrived);
     window.pythia = pythia;
     pythia.gamesChanged.connect(refreshGames);
+    pythia.modesChanged.connect(() => refreshModes().then(() => renderCurrent()));
     pythia.handheldsChanged.connect(() => { if (state.view === 'systems') renderHandhelds(); if (state.shell === 'handheld' && state.hhPage === 'systems') renderHandheld(); });
     pythia.pairingFinished.connect((r) => flash(r.status === 'ok' ? `Paired with ${r.paired}` : `Not paired: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'));
     pythia.logLine.connect(() => { if (state.view === 'activity') renderJobs(); });
@@ -967,7 +1003,7 @@ function connect() {
     pythia.platformEnableComplete.connect((r) => { flash(r.status === 'ok' || !r.status ? `${platformName(r.platform)} prepared` : `Could not prepare: ${r.message}`, r.status === 'ok' || !r.status ? 'info' : 'caution'); if (state.view === 'library') renderLibrary(); });
     pythia.get_system_uuid((uuid) => {
       model.mySystem = uuid;
-      Promise.all([call('get_system_info'), call('get_app_info'), call('get_ui_config'), call('get_jobs'), call('get_intake'), call('get_ui_log'), refreshPlugins()]).then(([info, app, config, jobs, intake, log]) => {
+      Promise.all([call('get_system_info'), call('get_app_info'), call('get_ui_config'), call('get_jobs'), call('get_intake'), call('get_ui_log'), refreshPlugins(), refreshModes()]).then(([info, app, config, jobs, intake, log]) => {
         if (ok(info)) model.info = info; if (ok(app)) model.app = app; if (ok(config)) model.config = config;
         if (ok(jobs)) model.jobs = jobs.jobs || []; if (ok(intake)) model.intake = { detected: intake.detected || [], decisions: intake.decisions || [], watcher: intake.watcher || null };
         if (ok(log)) model.events = log.entries || [];

@@ -403,6 +403,7 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
       </section>
       <section class="panel">
         <div class="settings-pane active" data-pane="general">
+          <div class="form-section"><h3>Modes</h3><div id="modesState"></div></div>
           <div class="form-section"><h3>General</h3>
             <div class="form-row"><div class="form-label"><strong>Application data directory</strong><small class="mono" id="appDataPath"></small></div><div class="inline-actions"><button class="btn" data-open-path="app_data_folder">Open folder</button><button class="btn" data-option-action="move_app_data">Move application data…</button></div></div>
             <div class="form-row"><div class="form-label"><strong>Resident watcher</strong><small>Offer to register newly added game folders and versions.</small></div><button class="toggle" data-option="resident_watcher" aria-label="Resident watcher"><span></span></button></div>
@@ -422,7 +423,7 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
 
         <div class="settings-pane" data-pane="metadata"><div class="form-section"><h3>Metadata</h3><p>Names, platforms and DLC from a store's public listing.</p><div data-capability-list="metadata"></div></div></div>
 
-        <div class="settings-pane" data-pane="managers"><div class="form-section"><h3>Open games with</h3><p>Launchers Pythia can hand a game to. A launcher opens its own game; Pythia never runs the game itself.</p><div data-capability-list="manager"></div></div></div>
+        <div class="settings-pane" data-pane="managers"><div class="form-section"><h3>Open games with</h3><p>Launchers Pythia can hand a game to. A launcher opens its own game; Pythia runs a game itself only for a paired handheld you let start games here.</p><div data-capability-list="manager"></div></div></div>
 
         <div class="settings-pane" data-pane="engines"><div class="form-section"><h3>Engine detection</h3><p>Detects game engines and provides enablement actions when available.</p><div data-capability-list="engine"></div></div></div>
 

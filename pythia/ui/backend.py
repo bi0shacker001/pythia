@@ -158,6 +158,7 @@ class Backend(QObject):
     intakeChanged = Signal("QVariant")  # {"detected": [...], "decisions": [...]}
     uiLog = Signal("QVariant")  # one {"ts", "level", "source", "slot", "message"} entry
     handheldsChanged = Signal()  # a handheld was paired, forgotten or changed
+    modesChanged = Signal()  # manager mode turned on or off (pythia.modes)
     pairingFinished = Signal("QVariant")  # {"status": "ok", "paired": name} or an error result
     asyncResult = Signal("QVariant")  # a slow slot's answer: {"request": id, ...its result}
 
@@ -459,7 +460,14 @@ class Backend(QObject):
         """Launch `command_str` (a single executable path -- no argument splitting
         yet) and watch `watch_dir_str` for new files, emitting downloadDetected for
         each. See downloads.launch_and_watch; this doesn't move or import anything
-        itself, that's a separate start_onboard() call once the user picks one."""
+        itself, that's a separate start_onboard() call once the user picks one.
+        Nothing starts while manager mode is off (pythia.modes)."""
+        from pythia import modes
+
+        manager = modes.manager_mode()
+        if not manager["on"] and "downloads" in manager["pages"]:
+            self._record("warn", "pythia", "Not watching: manager mode is off", "start_watch")
+            return
         watch_dir_str = _normalize_path(watch_dir_str)
         self.stop_watch()
         self._watch_stop_event = threading.Event()
@@ -1276,6 +1284,7 @@ class Backend(QObject):
         from pythia.droidtop import takeover
 
         done = takeover.turn_agent_back_on()
+        self.modesChanged.emit()
         kept = ", ".join(done["entries"]) or "no start entry kept"
         self._record("info", "pythia", f"droidtop-agent turned back on ({kept})")
         return {"status": "ok", **done}
@@ -1291,6 +1300,7 @@ class Backend(QObject):
         from pythia.droidtop import takeover
 
         takeover.serve_from_pythia_again()
+        self.modesChanged.emit()
         return {"status": "ok"}
 
     @Slot(result="QVariant")
@@ -1579,6 +1589,32 @@ class Backend(QObject):
     @_guarded
     def set_sync_folder(self, path: str):
         return self._unavailable("set_sync_folder", "The library folder is set by PYTHIA_DATADIR_OVERRIDE for now.")
+
+    # ---- modes (pythia.modes): agent mode forces manager mode ----------------
+    @Slot(result="QVariant")
+    @_guarded
+    def get_modes(self):
+        """Manager mode (``on``, ``locked`` while Pythia is the agent, the
+        ``reason``, the ``pages`` it covers) and agent mode."""
+        from pythia import modes
+
+        return {"status": "ok", "manager": modes.manager_mode(), "agent": modes.agent_mode()}
+
+    @Slot(bool, result="QVariant")
+    @_guarded
+    def set_manager_mode(self, on: bool):
+        """Turns manager mode on or off; refused, with the reason, while Pythia
+        is the agent (owner, 2026-10-16: "agent mode should force manager mode")."""
+        from pythia import modes
+
+        try:
+            manager = modes.set_manager_mode(on)
+        except modes.ModeLocked as ex:
+            self._record("warn", "pythia", f"Manager mode stays on: {ex}", "set_manager_mode")
+            return {"status": "error", "message": str(ex), "locked": True}
+        self._record("info", "pythia", f"Manager mode {'on' if manager['on'] else 'off'}", "set_manager_mode")
+        self.modesChanged.emit()
+        return {"status": "ok", "manager": manager}
 
     @Slot(str, str, result="QVariant")
     @_guarded

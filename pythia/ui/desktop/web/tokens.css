@@ -27,7 +27,38 @@
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"Cascadia Code","SFMono-Regular",Consolas,monospace;
 
-  /* Short role aliases index.html's stylesheet reads; they resolve per theme. */
+  /* Placeholder cover art: two tones per letter (art-a to art-l), the same in
+     every theme because a cover is a picture, not chrome; text on it is
+     --on-art, lifted by --art-shadow (UX review A10). */
+  --art-a1:#643838;
+  --art-a2:#1d1820;
+  --art-b1:#2c506a;
+  --art-b2:#18232c;
+  --art-c1:#5a4830;
+  --art-c2:#1e1b17;
+  --art-d1:#4d3762;
+  --art-d2:#201926;
+  --art-e1:#365b4b;
+  --art-e2:#17211d;
+  --art-f1:#745a2c;
+  --art-f2:#241d13;
+  --art-g1:#3d5360;
+  --art-g2:#172027;
+  --art-h1:#5a323d;
+  --art-h2:#21171b;
+  --art-i1:#354260;
+  --art-i2:#171b26;
+  --art-j1:#24556a;
+  --art-j2:#142128;
+  --art-k1:#65506f;
+  --art-k2:#241d29;
+  --art-l1:#66523d;
+  --art-l2:#261f18;
+  --on-art:#ffffff;--on-art-warm:#f5e5c9;--art-shadow:#000000;
+  /* The theme picker's previews: each theme's own colours, whichever is on. */
+  --swatch-ink-1:#14131f;--swatch-ink-2:#d9a441;--swatch-ink-3:#201e30;--swatch-parchment-1:#f2efe6;--swatch-parchment-2:#8e5a23;--swatch-parchment-3:#ffffff;--swatch-cobalt-1:#10161f;--swatch-cobalt-2:#5fa9d8;--swatch-cobalt-3:#16202c;
+
+  /* Short role aliases app.css reads; they resolve per theme. */
   --bg0:var(--page);--bg1:var(--surface-0);--bg2:var(--surface-1);--bg3:var(--surface-2);--bg4:var(--surface-3);
   --line:var(--border);--line2:var(--border-strong);--text:var(--text-primary);--muted:var(--text-secondary);--dim:var(--text-tertiary);
   --amber:var(--accent);--amber2:var(--accent-hover);--amber-bg:var(--accent-soft);
@@ -38,10 +69,10 @@
 /* ---- Colour roles. Ink & Amber is the default (dark). ---- */
 :root,html[data-theme="ink"]{
   color-scheme:dark;
-  --page:#12111a;--chrome:#181722;--sidebar-surface:#15141e;
+  --page:#12111a;--shadow-ink:#000000;--chrome:#181722;--sidebar-surface:#15141e;
   --surface-0:#191824;--surface-1:#201e2d;--surface-2:#282537;--surface-3:#302c42;
   --border:#39364d;--border-strong:#4a4661;
-  --text-primary:#eeeaf5;--text-secondary:#b4afc6;--text-tertiary:#8b86a0;
+  --text-primary:#eeeaf5;--text-secondary:#b4afc6;--text-tertiary:#918ca6;
   --accent:#d9a441;--accent-hover:#ebba63;--accent-soft:#39301d;--on-accent:#251b08;
   --positive:#63bd91;--positive-soft:#192c24;--warning:#ee8b4a;--warning-soft:#36231a;
   --critical-token:#df6976;--critical-soft-token:#351d25;--informational:#78a9dc;--informational-soft:#182a3c;
@@ -59,13 +90,13 @@
 }
 html[data-theme="parchment"]{
   color-scheme:light;
-  --page:#ece7da;--chrome:#f7f4ec;--sidebar-surface:#e7e1d2;
+  --page:#ece7da;--shadow-ink:#49371f;--chrome:#f7f4ec;--sidebar-surface:#e7e1d2;
   --surface-0:#faf8f2;--surface-1:#ffffff;--surface-2:#f3eee2;--surface-3:#e9e1d0;
   --border:#d5ccb8;--border-strong:#bdb19a;
-  --text-primary:#28241f;--text-secondary:#5c5448;--text-tertiary:#7d7363;
-  --accent:#a8672a;--accent-hover:#bd7a36;--accent-soft:#f0dfc2;--on-accent:#fff9ed;
-  --positive:#2f8f5e;--positive-soft:#e2f2e7;--warning:#8a6a00;--warning-soft:#f3ebc8;
-  --critical-token:#b8433f;--critical-soft-token:#f7e2df;--informational:#356f9c;--informational-soft:#e0edf6;
+  --text-primary:#28241f;--text-secondary:#5c5448;--text-tertiary:#6f6555;
+  --accent:#8e5a23;--accent-hover:#bd7a36;--accent-soft:#f3e4cc;--on-accent:#fff9ed;
+  --positive:#217350;--positive-soft:#e2f2e7;--warning:#7e6200;--warning-soft:#f3ebc8;
+  --critical-token:#b03f3b;--critical-soft-token:#f7e2df;--informational:#316b94;--informational-soft:#e0edf6;
   --selection:#eee1c8;--focus:#8f561e;--focus-ring:#1d5fb8;--focus-inner:#ffffff;--overlay:rgba(49,42,32,.42);
   --shadow:0 18px 48px rgba(73,55,31,.16);
   --info-ink:#28241f;--info-plate:#e9e3d4;--on-info:#3f3a33;
@@ -75,10 +106,10 @@ html[data-theme="parchment"]{
 }
 html[data-theme="cobalt"]{
   color-scheme:dark;
-  --page:#0e141d;--chrome:#121b26;--sidebar-surface:#101823;
+  --page:#0e141d;--shadow-ink:#000000;--chrome:#121b26;--sidebar-surface:#101823;
   --surface-0:#151f2b;--surface-1:#1a2634;--surface-2:#223142;--surface-3:#293b4e;
   --border:#314559;--border-strong:#466078;
-  --text-primary:#e7edf3;--text-secondary:#aebccb;--text-tertiary:#8496a8;
+  --text-primary:#e7edf3;--text-secondary:#aebccb;--text-tertiary:#8a9bad;
   --accent:#5fa9d8;--accent-hover:#7dbce2;--accent-soft:#1b3446;--on-accent:#07141f;
   --positive:#63bd91;--positive-soft:#173128;--warning:#d4a95d;--warning-soft:#302819;
   --critical-token:#df6976;--critical-soft-token:#391e27;--informational:#78a9dc;--informational-soft:#182c40;

@@ -16,7 +16,8 @@ from the same model and the same backend.
 
 | File | What |
 |---|---|
-| `index.html` | the markup of both shells and the page's own stylesheet (shell, pages, handheld) |
+| `index.html` | the markup of both shells; it has no styles of its own |
+| `app.css` | the page's own stylesheet (shell, pages, handheld); it reads only `tokens.css` roles, no colour values (UX review A10) |
 | `tokens.css` | every colour and number the themes, text size, motion and focus ring are made of |
 | `components.css` | the shared components: focus ring, notices, dialogs, flashes, state blocks, menus, the error console |
 | `components.js` | the component library (`window.UI`) |
@@ -91,12 +92,20 @@ It shows the same log the Activity page shows; there is no second logging path.
   (amber) and danger (red) hues are locked; a theme only moves their lightness. Info follows
   the accent unless the accent is amber, where info uses neutral ink and the circle-i glyph.
 - `--text-scale` (1.0 to 1.5, Settings > Interface > Text size) scales the root font size;
-  every font size in `index.html` is in rem. At 1.3 and above `html[data-large-text="1"]`
+  every font size in `app.css` is in rem. In the handheld shell `--hh-scale` (from the window's
+  short side, UX review A6) multiplies it. At 1.3 and above `html[data-large-text="1"]`
   stacks the library's two panes and lets rows wrap.
 - `--motion-fast` 150ms and `--motion-dialog` 200ms; `prefers-reduced-motion` and
   `html[data-motion="off"]` (Reduce motion) zero both; skeletons and progress bars stop.
 - The focus ring: `--ring-outer` 3px in `--focus` over `--ring-inner` 1px in `--focus-inner`,
-  keyboard only (`:focus-visible`).
+  keyboard only (`:focus-visible`). The handheld shell's ring is `--focus-ring`, a colour of its
+  own in every theme, shown on every focused element (docs/SPEC.md 2.6).
+- Fixed colours that are not chrome: the placeholder cover art (`--art-a1` to `--art-l2`), text
+  on it (`--on-art`, `--on-art-warm`, `--art-shadow`), the theme picker's previews
+  (`--swatch-<theme>-1..3`), and `--shadow-ink` per theme.
+- Contrast: tests/_test_ui_tokens.py checks text roles against the grounds they sit on (4.5:1)
+  and the handheld ring (3:1) in all three themes, and that no colour value is written outside
+  this file.
 
 ## Components (`components.js`, `window.UI`)
 

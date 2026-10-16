@@ -229,14 +229,15 @@
   }
 
   // ---- Menu ----------------------------------------------------------------
-  function menu(anchor, items) {
+  // `returnTo`: where focus goes when the menu closes (default: the anchor).
+  function menu(anchor, items, { returnTo } = {}) {
     $$('.ctx-menu').forEach((m) => m.remove());
     const node = el(`<div class="ctx-menu" role="menu">${items.map((i, n) => i.rule ? '<hr>' : `<button type="button" role="menuitem" class="${i.danger ? 'danger-item' : ''}" data-i="${n}" ${i.disabled ? 'disabled' : ''}>${esc(i.label)}</button>`).join('')}</div>`);
     const r = anchor.getBoundingClientRect();
     node.style.top = `${Math.min(r.bottom + 4, window.innerHeight - 40)}px`;
     node.style.left = `${Math.min(r.left, window.innerWidth - 220)}px`;
     document.body.appendChild(node);
-    const close = () => { node.remove(); document.removeEventListener('mousedown', outside, true); document.removeEventListener('keydown', key, true); anchor.focus(); };
+    const close = () => { node.remove(); document.removeEventListener('mousedown', outside, true); document.removeEventListener('keydown', key, true); (returnTo && returnTo.isConnected ? returnTo : anchor).focus(); };
     const outside = (e) => { if (!node.contains(e.target)) close(); };
     const key = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
     document.addEventListener('mousedown', outside, true);

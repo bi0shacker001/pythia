@@ -765,12 +765,12 @@ function exitHandheld() { state.shell = 'desktop'; localStorage.setItem('pythia-
 function navigateHandheld(page, push = true) { if (page === state.hhPage) { renderHandheld(); return; } if (push) state.hhHistory.push(state.hhPage); state.hhPage = page; state.hhSelected = null; if (page !== 'settings') state.hhSettingsPage = 'root'; renderHandheld(); }
 function handheldTitle() {
   if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') {
-    const labels = { library: 'Library', capabilities: 'Plugin capabilities', plugins: 'Installed plugins', sync: 'Systems & sync', interface: 'Interface', advanced: 'Advanced', sources: 'Sources', downloaders: 'Downloaders', metadata: 'Metadata', managers: 'Managers', engines: 'Engine detection', mods: 'Mods', patchers: 'Patchers' };
+    const labels = { general: 'General', library: 'Library', capabilities: 'Plugin capabilities', plugins: 'Installed plugins', sync: 'Systems & sync', interface: 'Interface', advanced: 'Advanced', sources: 'Sources', downloaders: 'Downloaders', metadata: 'Metadata', managers: 'Managers', engines: 'Engine detection', mods: 'Mods', patchers: 'Patchers' };
     return [labels[state.hhSettingsPage] || 'Settings', 'Settings'];
   }
   const attention = games.filter((g) => g.status !== 'ok').length; const running = model.jobs.filter((j) => j.state === 'running').length;
   const { detected, decisions, watcher } = model.intake;
-  return { home: ['Home', model.ready ? `${attention} need attention · ${fmt.n(running, 'job')} running` : 'Connecting'], library: ['Library', `${games.length} games`], attention: ['Needs attention', `${attention} items`], downloads: ['Downloads & intake', `${fmt.n(detected.length + decisions.length, 'item')} · ${watcher ? 'watching' : 'not watching'}`], systems: ['Systems', `${fmt.n(systems.length, 'system')}`], settings: ['Settings', 'Library, plugins, systems, and interface'], detail: ['Game details', 'Versions, systems, and actions'], decision: ['Review', 'No changes applied'], plan: ['Available update', 'Review before applying'] }[state.hhPage] || ['Pythia', ''];
+  return { home: ['Home', model.ready ? `${attention} need attention · ${fmt.n(running, 'job')} running` : 'Connecting'], library: ['Library', `${games.length} games`], attention: ['Needs attention', `${attention} items`], downloads: ['Downloads & intake', `${fmt.n(detected.length + decisions.length, 'item')} · ${watcher ? 'watching' : 'not watching'}`], systems: ['Systems', `${fmt.n(systems.length, 'system')}`], settings: ['Settings', 'Library, plugins, systems, and interface'], activity: ['Activity & jobs', `${fmt.n(running, 'job')} running`], saves: ['Save backups', 'Copies of saves kept on this computer'], launcher: ['Launcher entries', "What this computer's launchers list"], duplicates: ['Duplicates', 'Records that may be the same game'], detail: ['Game details', 'Versions, systems, and actions'], decision: ['Review', 'No changes applied'], plan: ['Available update', 'Review before applying'] }[state.hhPage] || ['Pythia', ''];
 }
 function renderHandheld() {
   const [title, sub] = handheldTitle(); $('#hhTitle').textContent = title; $('#hhSubtitle').textContent = sub;
@@ -780,8 +780,9 @@ function renderHandheld() {
   $('#hhFooterRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(running, 'job')} running` : 'Connecting';
   const q = state.hhSearch.toLowerCase();
   const page = state.hhPage;
-  if (page === 'home') renderHHHome(); else if (page === 'library') renderHHLibrary(q); else if (page === 'attention') renderHHAttention(q); else if (page === 'downloads') renderHHDownloads(); else if (page === 'systems') renderHHSystems(); else if (page === 'settings') renderHHSettings(); else if (page === 'detail') renderHHDetail(games.find((g) => g.id === state.hhSelected)); else if (page === 'decision') renderHHDecision(games.find((g) => g.id === state.hhSelected)); else if (page === 'plan') renderHHPlan(games.find((g) => g.id === state.hhSelected));
+  if (page === 'home') renderHHHome(); else if (page === 'library') renderHHLibrary(q); else if (page === 'attention') renderHHAttention(q); else if (page === 'downloads') renderHHDownloads(); else if (page === 'systems') renderHHSystems(); else if (page === 'settings') renderHHSettings(); else if (page === 'detail') renderHHDetail(games.find((g) => g.id === state.hhSelected)); else if (page === 'decision') renderHHDecision(games.find((g) => g.id === state.hhSelected)); else if (page === 'plan') renderHHPlan(games.find((g) => g.id === state.hhSelected)); else if (page === 'activity') renderHHActivity(); else if (page === 'saves') renderHHSaves(); else if (page === 'launcher') renderHHLauncher(); else if (page === 'duplicates') renderHHDuplicates();
   bindHandheldActions();
+  hhKeepFocus();
 }
 function hhSummaryGame(g) { return `<button class="hh-summary" data-hh-game="${g.id}"><span class="art art-${g.art}">${esc(initials(g.name))}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)} · ${esc(g.systems.join(' / '))}</small></span>${gameStatus(g)}</button>`; }
 function hhJob(j) { return `<div class="hh-summary" style="cursor:default"><span class="art" style="background:${j.state === 'failed' ? 'var(--critical-soft-token)' : 'var(--informational-soft)'};color:${j.state === 'failed' ? 'var(--critical-token)' : 'var(--informational)'}">${j.state === 'running' ? '↻' : j.state === 'done' ? '✓' : '!'}</span><span><strong>${esc(j.title)}</strong><small>${esc(j.state === 'running' ? (j.log[j.log.length - 1] || j.detail || 'Running') : (j.summary || ''))}</small></span>${j.state === 'running' ? visibleStatus('Running', 'pending', '↻') : j.state === 'done' ? routineStatus('Done') : visibleStatus('Failed', 'critical')}</div>`; }
@@ -795,6 +796,7 @@ function renderHHHome() {
     ${games.length ? `<section class="hh-panel"><div class="hh-panel-head"><h2>Needs attention</h2><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="attention">All ${attention.length}</button></div><div class="hh-panel-body hh-summary-list" id="hhAttention"></div></section>` : ''}
     <section class="hh-panel"><div class="hh-panel-head"><h2>Active work</h2><span class="spacer"></span><small>${fmt.n(model.jobs.filter((j) => j.state === 'running').length, 'job')} running</small></div><div class="hh-panel-body hh-summary-list" id="hhJobs"></div></section>
     <section class="hh-panel"><div class="hh-panel-head"><h2>${games.length ? 'Recently added' : 'Your library'}</h2><span class="spacer"></span><button class="hh-action" data-hh-nav-jump="library">Library</button></div><div class="hh-panel-body hh-summary-list" id="hhRecent"></div></section>
+    <section class="hh-panel"><div class="hh-panel-head"><h2>More</h2></div><div class="hh-panel-body hh-toolbar"><button class="hh-action" data-hh-nav-jump="activity">Activity &amp; jobs</button><button class="hh-action" data-hh-nav-jump="saves">Save backups</button><button class="hh-action" data-hh-nav-jump="launcher">Launcher entries</button><button class="hh-action" data-hh-nav-jump="duplicates">Duplicates</button></div></section>
     ${failed ? `<section class="hh-alert-strip" style="border-color:color-mix(in srgb,var(--warning) 45%,var(--border));background:var(--warning-soft)"><span class="status-icon pending" aria-hidden="true">!</span><div><strong>${fmt.n(failed, 'job')} failed</strong><small>${esc(model.jobs.find((j) => j.state === 'failed').summary)}</small></div><button class="hh-action" style="margin-left:auto" data-hh-jobs>Details</button></section>` : ''}</div>`;
   const a = $('#hhAttention', host); if (a) { a.innerHTML = attention.slice(0, 4).map(hhSummaryGame).join(''); if (!attention.length) a.appendChild(stateBlock({ glyph: '✓', title: 'Nothing needs attention' })); }
   const j = $('#hhJobs', host); j.innerHTML = jobs.map(hhJob).join(''); if (!jobs.length) j.appendChild(stateBlock({ title: 'Nothing has run yet', body: 'Scans and adds show here.', actions: [{ label: 'Scan library', run: scanLibrary }] }));
@@ -803,7 +805,7 @@ function renderHHHome() {
 function handheldGames(q = '') { return games.filter((g) => !q || [g.name, g.source, g.engine, g.version, g.statusText, ...g.systems].join(' ').toLowerCase().includes(q)); }
 function renderHHLibrary(q = '') {
   const sources = [...new Set(games.map((g) => g.source))].sort();
-  const list = handheldGames(q).filter((g) => state.hhSource === 'all' || g.source === state.hhSource);
+  const list = handheldGames(q).filter((g) => state.hhSource === 'all' || g.source === state.hhSource).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
   const host = $('#hhContent');
   host.innerHTML = `<div class="hh-toolbar"><div class="hh-seg"><button data-hh-library-mode="list" class="${state.hhLibraryMode === 'list' ? 'active' : ''}">☰ List</button><button data-hh-library-mode="grid" class="${state.hhLibraryMode === 'grid' ? 'active' : ''}">▦ Grid</button></div><select class="hh-filter" id="hhSourceFilter"><option value="all">All sources</option>${sources.map((s) => `<option value="${esc(s)}" ${state.hhSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select><button class="hh-action" data-hh-nav-jump="attention">Needs attention</button><span class="spacer"></span><small>${list.length} of ${games.length}</small></div>${state.hhLibraryMode === 'grid' ? `<div class="hh-library-grid">${list.map((g) => `<button class="hh-game-card" data-hh-game="${g.id}"><div class="hh-card-art art-${g.art}"><strong>${esc(g.name)}</strong></div><div class="hh-card-copy"><small>${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</small>${gameStatus(g)}</div></button>`).join('')}</div>` : `<div class="hh-library-list">${list.map((g) => `<button class="hh-game-row" data-hh-game="${g.id}"><span class="art art-${g.art}">${esc(initials(g.name))}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.source)} · ${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</small></span><span class="system">${esc(g.systems.join(' · '))}</span><span class="state">${gameStatus(g)}</span></button>`).join('')}</div>`}`;
   if (!model.ready) host.appendChild(stateBlock({ kind: 'loading' }));
@@ -837,16 +839,19 @@ function renderHHSettings() {
   const page = state.hhSettingsPage; const host = $('#hhContent');
   const back = `<button class="hh-action" data-hh-settings-page="root">‹ Settings</button>`;
   if (page === 'root') {
-    host.innerHTML = `<div class="hh-settings-menu"><button class="hh-settings-link" data-hh-settings-page="library"><span><strong>Library</strong><small>Tracked folders and scanning</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="capabilities"><span><strong>Plugin capabilities</strong><small>Sources, downloaders, metadata, managers, engines, mods, and patchers</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="plugins"><span><strong>Installed plugins</strong><small>${plugins.length} installed</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="sync"><span><strong>Systems & sync</strong><small>Metadata folder and game transfer</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="interface"><span><strong>Interface</strong><small>Theme, text size, startup shell, and library view</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="advanced"><span><strong>Advanced</strong><small>Diagnostics and recovery</small></span><span class="go">›</span></button></div>`;
+    host.innerHTML = `<div class="hh-settings-menu"><button class="hh-settings-link" data-hh-settings-page="general"><span><strong>General</strong><small>Modes and the application data folder</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="library"><span><strong>Library</strong><small>Tracked folders and scanning</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="capabilities"><span><strong>Plugin capabilities</strong><small>Sources, downloaders, metadata, managers, engines, mods, and patchers</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="plugins"><span><strong>Installed plugins</strong><small>${plugins.length} installed</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="sync"><span><strong>Systems & sync</strong><small>Metadata folder and game transfer</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="interface"><span><strong>Interface</strong><small>Theme, text size, startup shell, and library view</small></span><span class="go">›</span></button><button class="hh-settings-link" data-hh-settings-page="advanced"><span><strong>Advanced</strong><small>Diagnostics and recovery</small></span><span class="go">›</span></button></div>`;
   } else if (page === 'capabilities') {
     host.innerHTML = `<div class="hh-stack">${back}<div class="hh-settings-menu">${[['sources', 'Sources'], ['downloaders', 'Downloaders'], ['metadata', 'Metadata'], ['managers', 'Managers'], ['engines', 'Engine detection'], ['mods', 'Mods'], ['patchers', 'Patchers']].map((x) => `<button class="hh-settings-link" data-hh-settings-page="${x[0]}"><span><strong>${x[1]}</strong></span><span class="go">›</span></button>`).join('')}</div></div>`;
   } else if (['sources', 'downloaders', 'metadata', 'managers', 'engines', 'mods', 'patchers'].includes(page)) {
     const cat = { sources: 'library', downloaders: 'downloader', metadata: 'metadata', managers: 'manager', engines: 'engine', mods: 'mod', patchers: 'patcher' }[page];
     host.innerHTML = `<div class="hh-stack">${back}<div class="hh-capability-list" id="hhCapabilities"></div></div>`;
     loadInto($('#hhCapabilities', host), 'get_capabilities', [cat], (r, h) => {
-      (r.plugins || []).forEach((p) => { const s = p.state || {}; const status = !p.enabled ? visibleStatus('Turned off', 'neutral', '–') : s.error ? visibleStatus('Check failed', 'critical') : cat === 'library' && s.has_account ? (s.connected ? routineStatus('Connected') : visibleStatus('Not connected', 'pending')) : cat === 'manager' ? (s.available ? routineStatus('Installed here') : visibleStatus('Not found', 'pending')) : routineStatus('Ready'); const row = el(`<div class="hh-capability"><span class="art">${esc(p.display_name.slice(0, 2).toUpperCase())}</span><span><strong>${esc(p.display_name)}</strong>${s.error ? `<small>${esc(s.error)}</small>` : ''}</span><span class="controls">${status}<button class="toggle" aria-label="Enable ${esc(p.display_name)}"><span></span></button></span></div>`); bindSwitch($('.toggle', row), p.enabled, (on) => act('set_plugin_enabled', [p.id, on], on ? 'Turned on' : 'Turned off', { what: 'Turning the plugin' }).then(() => refreshPlugins().then(renderHandheld))); h.appendChild(row); });
+      (r.plugins || []).forEach((p) => { const s = p.state || {}; const status = !p.enabled ? visibleStatus('Turned off', 'neutral', '–') : s.error ? visibleStatus('Check failed', 'critical') : cat === 'library' && s.has_account ? (s.connected ? routineStatus('Connected') : visibleStatus('Not connected', 'pending')) : cat === 'manager' ? (s.available ? routineStatus('Installed here') : visibleStatus('Not found', 'pending')) : routineStatus('Ready'); const row = el(`<div class="hh-capability"><span class="art">${esc(p.display_name.slice(0, 2).toUpperCase())}</span><span><strong>${esc(p.display_name)}</strong>${s.error ? `<small>${esc(s.error)}</small>` : ''}</span><span class="controls">${status}<button class="toggle" aria-label="Enable ${esc(p.display_name)}"><span></span></button></span></div>`); bindSwitch($('.toggle', row), p.enabled, (on) => act('set_plugin_enabled', [p.id, on], on ? 'Turned on' : 'Turned off', { what: 'Turning the plugin' }).then(() => refreshPlugins().then(renderHandheld))); if (cat === 'library' && s.has_account) { const connect = el(`<button class="hh-action">${s.connected ? 'Account…' : 'Connect…'}</button>`); connect.onclick = () => accountDialog(p.id); $('.controls', row).prepend(connect); } h.appendChild(row); });
       if (!(r.plugins || []).length) h.appendChild(stateBlock({ title: `No ${CATEGORY_NAMES[cat].toLowerCase()} plugins` }));
     }, { what: `${CATEGORY_NAMES[cat]} plugins` });
+  } else if (page === 'general') {
+    host.innerHTML = `<div class="hh-stack">${back}<div class="hh-settings" id="hhModes"></div><div class="hh-setting"><strong>Application data folder</strong><small class="mono" style="word-break:break-all">${esc(model.info?.app_data_folder || '')}</small><button class="hh-action" data-open-path="app_data_folder">Open folder</button></div></div>`;
+    renderModes($('#hhModes', host));
   } else if (page === 'library') {
     host.innerHTML = `<div class="hh-stack">${back}<div class="hh-capability-list" id="hhFolders"></div><button class="hh-action primary" data-hh-scan>Scan a folder</button></div>`;
     loadInto($('#hhFolders', host), 'get_library_folders', [], (r, h) => { if (!(r.folders || []).length) h.appendChild(stateBlock({ title: 'No folders tracked' })); }, { what: 'Tracked folders' });
@@ -892,6 +897,55 @@ function renderHHPlan(g) {
   const u = g.updates[0];
   $('#hhContent').innerHTML = `<section class="hh-decision"><div class="hh-state pending">Seen, not applied</div><h1 style="margin:5px 0 0;font:500 1.625rem var(--serif)">Available update · ${esc(g.name)}</h1><div class="hh-plan">${u ? `<div class="hh-plan-row"><b>Installed</b><span>${esc(versionText(g))}</span></div><div class="hh-plan-row"><b>Available</b><span>${esc(u.version || '?')} · ${esc(platformName(u.platform))}</span></div><div class="hh-plan-row"><b>Seen via</b><span>${esc(u.source || '?')}${u.detected_at ? ` on ${esc(fmt.date(u.detected_at))}` : ''}</span></div><div class="hh-plan-row"><b>Files</b><span>Pythia records updates; it does not download or apply them yet.</span></div>` : '<div class="hh-plan-row"><b>Update</b><span>No update is recorded for this game.</span></div>'}</div><div class="actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="hh-action" data-hh-plan-back>Back</button><button class="hh-action primary" data-hh-apply ${u ? '' : 'disabled'}>Apply update</button></div></section>`;
 }
+// ---- Handheld pages the desktop has (Droidtop/tracker#538): the same slots, drawn for the handheld -------------
+function hhList(rows) { return `<div class="hh-summary-list">${rows.join('')}</div>`; }
+function hhRow({ art = '', title, sub = '', status = '', actions = '' }) { return `<div class="hh-summary" style="cursor:default"><span class="art">${esc(art)}</span><span><strong>${esc(title)}</strong>${sub ? `<small>${esc(sub)}</small>` : ''}</span>${status}${actions}</div>`; }
+function renderHHActivity() {
+  const host = $('#hhContent');
+  host.innerHTML = `<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-head"><h2>Jobs</h2><span class="spacer"></span><button class="hh-action" data-hh-clear-jobs>Clear completed</button></div><div class="hh-panel-body hh-summary-list" id="hhJobList"></div></section><section class="hh-panel"><div class="hh-panel-head"><h2>Event log</h2></div><div class="hh-panel-body hh-summary-list" id="hhEvents"></div></section></div>`;
+  const jobs = $('#hhJobList', host); jobs.innerHTML = model.jobs.map(hhJob).join('');
+  if (!model.jobs.length) jobs.appendChild(stateBlock({ title: 'Nothing has run yet', body: 'Scans, adds and syncs show here.' }));
+  const events = $('#hhEvents', host); const recent = (model.events || []).slice(-40).reverse();
+  events.innerHTML = recent.map((e) => hhRow({ art: e.level === 'error' ? '!' : e.level === 'warn' ? '!' : 'i', title: e.message, sub: `${fmt.time ? fmt.time(e.ts) : e.ts} · ${e.source}` })).join('');
+  if (!recent.length) events.appendChild(stateBlock({ title: 'No events yet' }));
+  $('[data-hh-clear-jobs]', host).onclick = async () => { await act('clear_finished_jobs', [], 'Cleared', { what: 'Clearing' }); renderHHActivity(); };
+}
+function renderHHSaves() {
+  const host = $('#hhContent');
+  host.innerHTML = `<div class="hh-stack"><div class="hh-toolbar"><button class="hh-action primary" data-action="backup-now">Back up now</button></div><div id="hhSaveList"></div></div>`;
+  $('[data-action="backup-now"]', host).onclick = () => action('backup-now').then(() => { if (state.hhPage === 'saves') renderHHSaves(); });
+  loadInto($('#hhSaveList', host), 'get_save_backups', [], (r, h) => {
+    const backups = r.backups || [];
+    h.innerHTML = hhList(backups.map((b, i) => hhRow({ art: '⟲', title: b.game, sub: `${b.system || ''} · ${fmt.dateTime(b.last_snapshot)} · ${b.size || ''}`, actions: `<button class="hh-action" data-hh-restore="${i}">Put back…</button>` })));
+    $$('[data-hh-restore]', h).forEach((btn) => (btn.onclick = async () => {
+      const b = backups[Number(btn.dataset.hhRestore)];
+      if (!(await confirm({ tone: 'caution', title: `Put this copy of ${b.game}'s saves back?`, body: 'The saves there now are kept first, as this computer\'s own copy, so nothing is lost.', details: `${b.system}\n${b.path}`, proceed: 'Put back' }))) return;
+      const r2 = await act('restore_save_copy', [b.key || '', b.path, b.title || ''], null, { what: 'Putting the saves back' });
+      if (ok(r2)) { flash(r2.files ? `Put back ${fmt.n(r2.files, 'file')}` : 'Nothing in that copy matches where the game keeps its saves; nothing was put back.', r2.files ? 'info' : 'caution'); renderHHSaves(); }
+    }));
+    if (!backups.length) h.appendChild(stateBlock({ title: 'No copies of saves kept', body: 'Back up now keeps one; a sync with a handheld keeps one before it overwrites saves that differ.' }));
+  }, { what: 'Save backups' });
+}
+function renderHHLauncher() {
+  const host = $('#hhContent'); host.innerHTML = '<div id="hhLauncherList"></div>';
+  loadInto($('#hhLauncherList', host), 'get_launcher_entries', [], (r, h) => {
+    const entries = r.entries || [];
+    const label = { tracked: routineStatus('In library'), drifted: '<span class="state-pill critical">Drifted</span>', untracked: '<span class="state-pill info">Not in library</span>' };
+    h.innerHTML = hhList(entries.map((e, i) => hhRow({ art: '▶', title: e.game, sub: `${e.manager} · ${e.folder}`, status: label[e.state] || '', actions: e.state === 'untracked' ? `<button class="hh-action" data-hh-record="${i}">Record</button>` : '' })));
+    $$('[data-hh-record]', h).forEach((btn) => (btn.onclick = async () => { const e = entries[Number(btn.dataset.hhRecord)]; btn.disabled = true; const r2 = await act('record_launcher_entry', [e.folder, e.key], `Recorded ${e.game}`, { what: `Recording ${e.game}` }); if (ok(r2)) renderHHLauncher(); else btn.disabled = false; }));
+    if (!entries.length) h.appendChild(stateBlock({ title: 'No launcher lists a game here', body: 'Games Steam, Epic, GOG, Amazon, itch, Battle.net, Lutris, Bottles or Minigalaxy have installed show here.' }));
+  }, { what: 'Launcher entries' });
+}
+function renderHHDuplicates() {
+  const host = $('#hhContent');
+  if (model.merges === null || model.merges === undefined) { host.replaceChildren(stateBlock({ kind: 'loading' })); pythia.refresh_merge_candidates(); return; }
+  if (model.merges.status) { host.replaceChildren(fromResult(model.merges, { what: 'The duplicate search', retry: () => { model.merges = null; renderHHDuplicates(); } })); return; }
+  const open = (Array.isArray(model.merges) ? model.merges : []).filter((c) => !dismissed(c));
+  if (!open.length) { host.replaceChildren(stateBlock({ glyph: '✓', title: 'No possible duplicates', body: 'Two records with the same or a similar name would show here.' })); return; }
+  host.innerHTML = `<div class="hh-stack">${open.map((c, i) => `<section class="hh-panel"><div class="hh-panel-head"><h2>${esc(c.a.name)} · ${esc(c.b.name)}</h2><span class="spacer"></span><small>${c.reason === 'parts' ? 'Parts of one game' : `${Math.round((c.score || 0) * 100)}% alike`}</small></div><div class="hh-panel-body hh-summary-list">${hhRow({ art: 'A', title: c.a.name, sub: c.a.path || '' })}${hhRow({ art: 'B', title: c.b.name, sub: c.b.path || '' })}<div class="hh-toolbar"><button class="hh-action" data-hh-keep="${i}:a">Keep A</button><button class="hh-action" data-hh-keep="${i}:b">Keep B</button><button class="hh-action" data-hh-apart="${i}">Not the same</button></div></div></section>`).join('')}</div>`;
+  $$('[data-hh-keep]', host).forEach((b) => (b.onclick = () => { const [i, side] = b.dataset.hhKeep.split(':'); const c = open[Number(i)]; const keep = side === 'a' ? c.a : c.b; const fold = side === 'a' ? c.b : c.a; mergeInto(c, keep.game_id, fold.game_id); }));
+  $$('[data-hh-apart]', host).forEach((b) => (b.onclick = () => { const c = open[Number(b.dataset.hhApart)]; const set = dismissedSet(); set.add(pairKey(c)); try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...set])); } catch (e) { /* storage may be unavailable */ } flash('Kept apart'); renderHHDuplicates(); }));
+}
 function bindHandheldActions() {
   const host = $('#handheldShell');
   $$('[data-hh-nav-jump]', host).forEach((b) => (b.onclick = () => navigateHandheld(b.dataset.hhNavJump)));
@@ -917,7 +971,7 @@ function bindHandheldActions() {
   $$('[data-hh-watch]', host).forEach((b) => (b.onclick = () => (model.intake.watcher ? stopWatching() : watchFolder())));
   $$('[data-hh-add]', host).forEach((b) => (b.onclick = addFolder));
   $$('[data-hh-scan]', host).forEach((b) => (b.onclick = scanLibrary));
-  $$('[data-hh-jobs]', host).forEach((b) => (b.onclick = () => infoSheet({ title: 'Jobs', details: model.jobs.map((j) => `${j.state.toUpperCase()} ${j.title}: ${j.summary || j.detail}`).join('\n') })));
+  $$('[data-hh-jobs]', host).forEach((b) => (b.onclick = () => navigateHandheld('activity')));
   $$('[data-hh-action]', host).forEach((b) => (b.onclick = () => action(b.dataset.hhAction)));
   $$('[data-open-path]', host).forEach((b) => (b.onclick = () => openKnownPath(b.dataset.openPath)));
   $('[data-hh-plan-back]')?.addEventListener('click', () => { state.hhPage = 'decision'; renderHandheld(); });
@@ -929,12 +983,76 @@ function bindHandheldActions() {
   $('#hhSettingsDesktop')?.addEventListener('click', exitHandheld);
 }
 function rescanHH(g) { if (!g || !g.path) return; pythia.start_onboard(g.path); flash('Rescanning'); navigateHandheld('home', false); }
-function moveHandheldFocus(direction) {
-  const items = $$('#handheldShell button:not([disabled]),#handheldShell input:not([disabled]),#handheldShell select:not([disabled])').filter((x) => x.offsetParent !== null); if (!items.length) return;
-  const current = document.activeElement; const from = current && items.includes(current) ? current : items[0]; const r = from.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+// Handheld focus (Droidtop/tracker#538): the D-pad moves within one zone (the rail, the top bar, the page, or an open
+// dialog or menu) and crosses to the next zone only at its edge, so Down from the top bar enters the page, not the rail.
+function hhFocusables(root) { return root ? $$('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]', root).filter((x) => x.offsetParent !== null) : []; }
+function hhNearest(items, from, direction) {
+  const r = from.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   let best = null, bestScore = Infinity;
   for (const x of items) { if (x === from) continue; const q = x.getBoundingClientRect(), xx = q.left + q.width / 2, y = q.top + q.height / 2, dx = xx - cx, dy = y - cy; const valid = direction === 'left' ? dx < 0 && Math.abs(dx) >= Math.abs(dy) * .35 : direction === 'right' ? dx > 0 && Math.abs(dx) >= Math.abs(dy) * .35 : direction === 'up' ? dy < 0 && Math.abs(dy) >= Math.abs(dx) * .35 : dy > 0 && Math.abs(dy) >= Math.abs(dx) * .35; if (!valid) continue; const primary = direction === 'left' || direction === 'right' ? Math.abs(dx) : Math.abs(dy), cross = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx), score = primary + cross * 2.2; if (score < bestScore) { best = x; bestScore = score; } }
-  (best || from).focus();
+  return best;
+}
+function hhFocus(node) { if (!node) return false; node.focus(); node.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true; }
+function hhFocusRail() { return hhFocus($('.hh-rail .hh-nav.active') || hhFocusables($('.hh-rail'))[0]); }
+function hhFocusPage() { return hhFocus(hhFocusables($('#hhContent'))[0]); }
+function moveHandheldFocus(direction) {
+  const overlay = [...$$('.ctx-menu'), ...$$('.scrim')].pop();
+  const current = document.activeElement;
+  if (overlay) { const items = hhFocusables(overlay); if (!items.length) return; hhFocus(items.includes(current) ? hhNearest(items, current, direction) || current : items[0]); return; }
+  const rail = $('.hh-rail'), top = $('.hh-topbar'), page = $('#hhContent');
+  const zone = [rail, top, page].find((z) => z.contains(current));
+  if (!zone) { if (!hhFocusPage()) hhFocusRail(); return; }
+  const items = hhFocusables(zone);
+  const next = items.includes(current) ? hhNearest(items, current, direction) : items[0];
+  if (next) { hhFocus(next); return; }
+  if (zone === page && direction === 'left') hhFocusRail();
+  else if (zone === page && direction === 'up') hhFocus(hhFocusables(top)[0]);
+  else if (zone === top && direction === 'down') hhFocusPage() || hhFocusRail();
+  else if (zone === top && direction === 'left') hhFocusRail();
+  else if (zone === rail && direction === 'right') hhFocusPage() || hhFocus(hhFocusables(top)[0]);
+}
+// After a page is drawn, focus lands on its first item unless it is still somewhere in the shell (the rail, the top bar).
+function hhKeepFocus() {
+  const current = document.activeElement;
+  const zones = [$('.hh-rail'), $('.hh-topbar'), $('#hhContent')];
+  if (current && current.isConnected && zones.some((z) => z.contains(current))) return;
+  if (!hhFocusPage()) hhFocusRail();
+}
+function hhBack() { if (state.hhHistory.length) { state.hhPage = state.hhHistory.pop(); renderHandheld(); } else if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') { state.hhSettingsPage = 'root'; renderHandheld(); } else exitHandheld(); }
+function hhMenu(anchor) {
+  const before = document.activeElement;
+  const returnTo = before && [$('.hh-rail'), $('.hh-topbar'), $('#hhContent')].some((z) => z.contains(before)) ? before : hhFocusables($('#hhContent'))[0];
+  menu(anchor || $('#hhMenuHint'), [
+    { label: 'Search', run: () => $('#hhSearch').focus() },
+    { label: 'Add a game…', run: () => $('#hhAdd').click() },
+    { label: 'Activity & jobs', run: () => navigateHandheld('activity') },
+    { label: 'Save backups', run: () => navigateHandheld('saves') },
+    { label: 'Launcher entries', run: () => navigateHandheld('launcher') },
+    { label: 'Duplicates', run: () => navigateHandheld('duplicates') },
+    { rule: true },
+    { label: 'Switch to the desktop layout', run: () => exitHandheld() },
+  ], { returnTo });
+}
+// Gamepads (the Web Gamepad API, standard mapping): D-pad or left stick moves, A selects, B goes back, Start opens the
+// Menu. Only while the handheld shell is shown; a held direction repeats.
+const pad = { held: {}, since: {}, last: {} };
+function hhPadPoll() {
+  requestAnimationFrame(hhPadPoll);
+  if (state.shell !== 'handheld' || !navigator.getGamepads) return;
+  const gp = [...navigator.getGamepads()].find((g) => g && g.connected); if (!gp) return;
+  const b = (i) => !!gp.buttons[i]?.pressed; const ax = (i) => gp.axes[i] || 0;
+  const now = performance.now();
+  const inputs = { up: b(12) || ax(1) < -0.5, down: b(13) || ax(1) > 0.5, left: b(14) || ax(0) < -0.5, right: b(15) || ax(0) > 0.5, a: b(0), b: b(1), start: b(9) };
+  for (const [name, down] of Object.entries(inputs)) {
+    if (!down) { pad.held[name] = false; continue; }
+    const first = !pad.held[name]; if (first) { pad.held[name] = true; pad.since[name] = now; pad.last[name] = now; }
+    const repeat = !first && ['up', 'down', 'left', 'right'].includes(name) && now - pad.since[name] > 400 && now - pad.last[name] > 120;
+    if (!first && !repeat) continue; pad.last[name] = now;
+    if (['up', 'down', 'left', 'right'].includes(name)) moveHandheldFocus(name);
+    else if (name === 'a') { const f = document.activeElement; if (f && f !== document.body) f.click(); }
+    else if (name === 'b') { const overlay = [...$$('.ctx-menu'), ...$$('.scrim')].pop(); if (overlay) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); else hhBack(); }
+    else if (name === 'start') hhMenu();
+  }
 }
 
 // ---- Menu bar, theme, interface preferences ----------------------------------------------
@@ -1057,6 +1175,7 @@ function renderNoBackend() {
 function setup() {
   applyTheme(prefs.get('theme', 'ink')); applyInterface();
   ErrorConsole.init();
+  requestAnimationFrame(hhPadPoll);
   updateBulkToolbar();
   $$('[data-nav]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.nav)));
   $$('[data-filter-nav]').forEach((b) => (b.onclick = () => { state.filterStatus = b.dataset.filterNav; navigate('library'); renderLibrary(); }));
@@ -1067,7 +1186,16 @@ function setup() {
   $('#backButton').onclick = () => { const prev = state.history.pop(); if (prev) navigate(prev, false); $('#backButton').disabled = !state.history.length; };
   $('#globalSearch').addEventListener('input', (e) => { state.search = e.target.value; renderCurrent(); });
   document.addEventListener('keydown', (e) => {
-    if (state.shell === 'handheld') { if ($('.scrim')) return; if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) { e.preventDefault(); moveHandheldFocus(e.key.replace('Arrow', '').toLowerCase()); } if (e.key === 'Escape') { e.preventDefault(); if (state.hhHistory.length) { state.hhPage = state.hhHistory.pop(); renderHandheld(); } else exitHandheld(); } return; }
+    if (state.shell === 'handheld') {
+      if (e.defaultPrevented) return; // a dialog or menu already handled this key (its Escape, say)
+      const overlay = $('.scrim') || $('.ctx-menu');
+      const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) && ['ArrowLeft', 'ArrowRight'].includes(e.key);
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) && !typing) { e.preventDefault(); moveHandheldFocus(e.key.replace('Arrow', '').toLowerCase()); return; }
+      if (overlay) return; // the dialog or menu handles Escape itself
+      if (e.key === 'Escape') { e.preventDefault(); hhBack(); }
+      if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) { e.preventDefault(); hhMenu(); }
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#globalSearch').focus(); }
   });
   $('#sourceFilter').onchange = (e) => { state.source = e.target.value; renderLibrary(); };
@@ -1088,6 +1216,11 @@ function setup() {
   document.addEventListener('click', (e) => { if (!e.target.closest('#themePopover') && !e.target.closest('#themeButton')) toggleThemePopover(false); if (!e.target.closest('#addPopover') && !e.target.closest('#addButton')) { $('#addPopover').classList.add('hidden'); $('#addButton').setAttribute('aria-expanded', 'false'); } if (!e.target.closest('.menu-item')) closeAllMenus(); });
   $('#recentButton').onclick = (e) => { e.stopPropagation(); const existing = $('.recent-popover'); if (existing) { existing.remove(); return; } const pop = el('<div class="recent-popover" role="dialog" aria-label="Recent"></div>'); if (!flash.recent.length) pop.appendChild(stateBlock({ title: 'Nothing recent', body: 'Acknowledgements show here for a while.' })); else flash.recent.forEach((r) => pop.appendChild(el(`<div class="line"><span>${esc(r.text)}</span><time>${esc(fmt.time(r.at))}</time></div>`))); document.body.appendChild(pop); const close = (ev) => { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('mousedown', close); } }; setTimeout(() => document.addEventListener('mousedown', close), 0); };
   $('#enterHandheldButton').onclick = () => enterHandheld('home'); $('#exitHandheldRail').onclick = exitHandheld; $('#exitHandheldTop').onclick = exitHandheld;
+  // The footer's hints are buttons too (touch and mouse); pressing one keeps focus where it was, so Select acts on it.
+  $$('.hh-hint').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
+  $('#hhSelectHint').onclick = () => { const f = document.activeElement; if (f && f !== document.body && !f.classList.contains('hh-hint')) f.click(); };
+  $('#hhBackHint').onclick = () => hhBack();
+  $('#hhMenuHint').onclick = (e) => hhMenu(e.currentTarget);
   $$('[data-hh-nav]').forEach((b) => (b.onclick = () => navigateHandheld(b.dataset.hhNav)));
   $('#hhBack').onclick = () => { if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') { state.hhSettingsPage = 'root'; renderHandheld(); return; } if (state.hhHistory.length) { state.hhPage = state.hhHistory.pop(); renderHandheld(); } else if (['detail', 'decision', 'plan'].includes(state.hhPage)) navigateHandheld('library', false); };
   $('#hhSearch').oninput = (e) => { state.hhSearch = e.target.value; renderHandheld(); };

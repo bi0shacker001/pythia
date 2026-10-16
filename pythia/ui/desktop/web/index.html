@@ -228,6 +228,7 @@ html[data-large-text="1"] .library-layout,html[data-large-text="1"] .library-lay
 html[data-large-text="1"] .game-list{max-height:420px}html[data-large-text="1"] .tab-pane{max-height:none}
 html[data-large-text="1"] .game-row h3,html[data-large-text="1"] .hh-game-row strong,html[data-large-text="1"] .hh-summary small{white-space:normal}
 html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
+.hh-hint{border:0;background:transparent;color:inherit;font:inherit;padding:0 10px 0 0;cursor:pointer}.hh-hint:hover{color:var(--text)}
 </style>
 </head>
 <body>
@@ -483,6 +484,7 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
     <button class="hh-nav" data-hh-nav="attention"><span class="ico">!</span><span>Attention</span></button>
     <button class="hh-nav" data-hh-nav="downloads"><span class="ico">⇩</span><span>Downloads</span></button>
     <button class="hh-nav" data-hh-nav="systems"><span class="ico">◫</span><span>Systems</span></button>
+    <button class="hh-nav" data-hh-nav="activity"><span class="ico">≋</span><span>Activity</span></button>
     <button class="hh-nav" data-hh-nav="settings"><span class="ico">⚙</span><span>Settings</span></button>
     <div class="hh-rail-spacer"></div>
     <button class="hh-nav desktop-switch" id="exitHandheldRail"><span class="ico">↗</span><span>Desktop</span></button>
@@ -495,7 +497,7 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
       <div class="hh-top-actions"><button class="hh-action primary" id="hhAdd">＋ Add</button><button class="hh-action hidden" data-console-toggle aria-label="Error console">⚠</button><button class="hh-action" id="exitHandheldTop"><span class="desktop-label">Desktop</span> ↗</button></div>
     </header>
     <main class="hh-content" id="hhContent" tabindex="-1"></main>
-    <footer class="hh-footer"><span>◉ Select</span><span>○ Back</span><span>☰ Menu</span><span class="right" id="hhFooterRight"></span></footer>
+    <footer class="hh-footer"><button class="hh-hint" id="hhSelectHint" tabindex="-1">◉ Select</button><button class="hh-hint" id="hhBackHint" tabindex="-1">○ Back</button><button class="hh-hint" id="hhMenuHint" tabindex="-1">☰ Menu</button><span class="right" id="hhFooterRight"></span></footer>
   </div>
 </section>
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>

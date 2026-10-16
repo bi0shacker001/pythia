@@ -179,7 +179,10 @@ class Backend(QObject):
         self._ui_log: list[dict] = []
         self._jobs: list[dict] = []
         self._detected: list[dict] = []
-        self._decisions: list[dict] = []
+        # Scan decisions waiting survive a restart (pythia.intake_store; UX review A16).
+        from pythia import intake_store
+
+        self._decisions: list[dict] = intake_store.load()
         self._error_console = error_console
         self._pad = None
         self._log_handler = _UiLogHandler(self)
@@ -458,8 +461,15 @@ class Backend(QObject):
         with self._lock:
             self._decisions = [d for d in self._decisions if d.get("path") != preview.get("path")]
             self._decisions.append(preview)
+            self._keep_decisions()
         self._emit_intake()
         self.decisionNeeded.emit(preview)
+
+    def _keep_decisions(self):
+        """Writes the waiting decisions to disk; called with self._lock held."""
+        from pythia import intake_store
+
+        intake_store.save(_jsonable(list(self._decisions)))
 
     # ---- decision resolution ---------------------------------------------------
     def _ask_live(self, preview: dict):
@@ -482,6 +492,7 @@ class Backend(QObject):
         with self._lock:
             pending = next((d for d in self._decisions if d.get("path") == path_str), {})
             self._decisions = [d for d in self._decisions if d.get("path") != path_str]
+            self._keep_decisions()
         self._emit_intake()
         if self._awaiting_live_decision:
             self._decision_result = decision

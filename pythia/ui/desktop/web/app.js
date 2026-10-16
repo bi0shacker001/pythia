@@ -195,7 +195,7 @@ function navigate(view, push = true) {
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
   $$('.nav-row[data-nav]').forEach((n) => n.classList.toggle('active', n.dataset.nav === view));
   $('#backButton').disabled = !state.history.length;
-  const titles = { library: 'Search games, engines, versions, paths…', downloads: 'Search intake queue…', reconcile: 'Search possible duplicates…', systems: 'Search systems…', launcher: 'Search launcher entries…', saves: 'Search save backups…', activity: 'Search jobs and events…', settings: 'Search settings…' };
+  const titles = { look: 'Search…', library: 'Search games, engines, versions, paths…', downloads: 'Search intake queue…', reconcile: 'Search possible duplicates…', systems: 'Search systems…', launcher: 'Search launcher entries…', saves: 'Search save backups…', activity: 'Search jobs and events…', settings: 'Search settings…' };
   $('#globalSearch').placeholder = titles[view] || 'Search…';
   // The library keeps its place (query, selection, scroll, collection) across navigation (UX review A11).
   state.search = view === 'library' ? state.libraryPlace.search : '';
@@ -205,7 +205,7 @@ function navigate(view, push = true) {
   if (view === 'library') restoreLibraryPlace();
 }
 function renderCurrent() {
-  ({ library: renderLibrary, downloads: renderDownloads, reconcile: renderReconcile, systems: renderSystems, launcher: renderLauncher, saves: renderSaves, activity: renderJobs, settings: renderSettings })[state.view]?.();
+  ({ look: () => renderLook(), library: renderLibrary, downloads: renderDownloads, reconcile: renderReconcile, systems: renderSystems, launcher: renderLauncher, saves: renderSaves, activity: renderJobs, settings: renderSettings })[state.view]?.();
 }
 function filteredGames() {
   const q = PythiaQuery.parse(state.search);
@@ -881,6 +881,67 @@ function renderPlugins() {
   $$('[data-plugin-details]').forEach((b) => (b.onclick = () => { const p = plugins.find((x) => x.id === b.dataset.pluginDetails); const a = model.accounts.find((x) => x.id === p.id); infoSheet({ title: p.name, details: [`Id: ${p.id}`, `Version: ${p.version}`, `Origin: ${p.origin}`, `Adds: ${p.kind}`, p.origin !== 'Built-in' ? 'Unofficial: it came from outside Pythia and runs with the same access as Pythia.' : 'Official: built into Pythia.', a ? `Account: ${a.connected ? 'connected' : 'not connected'} (${a.fields.map((f) => f.label).join(', ')})` : ''].filter(Boolean).join('\n') }); }));
 }
 
+// ---- Look, Review, Add (UX review A16) -------------------------------------------------------
+// One renderer for both shells: proposed games from a Look, each kept or not, new or linked to a game already
+// here, with its folders' kind and language and a store link; Add writes only what is kept.
+function lookEdit(p) {
+  if (!model.lookEdits) model.lookEdits = {};
+  if (!model.lookEdits[p.id]) model.lookEdits[p.id] = { keep: true, link_to: p.match ? p.match.game_id : null, store_link: '', folders: Object.fromEntries(p.folders.map((f) => [f.path, { kind: f.kind, language: f.language || '' }])) };
+  return model.lookEdits[p.id];
+}
+function choiceHtml(attrs, label, options, value) {
+  if (state.shell === 'handheld') return cycleRow({ label, options, value }).replace('<button ', `<button ${attrs} `);
+  return `<select class="field small-select" ${attrs} aria-label="${esc(label)}">${options.map((o) => `<option value="${esc(o.value)}" ${String(o.value) === String(value ?? '') ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+}
+const kindOptions = () => (model.vocab?.kinds || Object.keys(KIND_LABELS)).map((k) => ({ value: k, label: KIND_LABELS[k] || k }));
+const languageOptions = () => [{ value: '', label: 'No language' }, ...Object.entries(model.vocab?.languages || {}).sort((a, b) => a[1].localeCompare(b[1])).map(([v, l]) => ({ value: v, label: l }))];
+function lookCounts(p) {
+  const bits = [];
+  if (p.versions.length) bits.push(fmt.n(p.versions.length, 'version'));
+  if (p.parts.length) bits.push(fmt.n(p.parts.length, 'part'));
+  if (p.translations) bits.push(fmt.n(p.translations, 'translation'));
+  return bits.join(' · ') || fmt.n(p.folders.length, 'folder');
+}
+function renderLook(host = $('#lookHost'), summaryHost = $('#lookSummary')) {
+  if (!host) return;
+  const r = model.look || { status: 'none' };
+  if (summaryHost) summaryHost.textContent = r.status === 'ok' ? `${r.summary}. Nothing is added until you Add.` : '';
+  host.innerHTML = '';
+  if (r.status === 'none') { host.appendChild(stateBlock({ title: 'Nothing to review', body: 'Look through a folder to see the games in it before anything is added.', actions: [{ label: 'Look in a folder', primary: true, run: scanLibrary }] })); return; }
+  if (r.status === 'looking') { host.appendChild(stateBlock({ kind: 'loading', title: `Looking in ${fileName(r.root)}`, body: `${fmt.n(r.counts?.folders || 0, 'folder')} looked at, ${fmt.n(r.counts?.games || 0, 'game')} so far.` })); return; }
+  if (r.status === 'error') { host.appendChild(stateBlock({ kind: 'error', title: 'Could not look there', body: r.message || '' })); return; }
+  if (r.status === 'added') { host.appendChild(stateBlock({ glyph: '✓', title: r.summary || 'Added', body: (r.failures || []).map((f) => `${f.name}: ${f.message}`).join('\n') || 'They are in the library now.', actions: [{ label: 'Show the library', primary: true, run: () => (state.shell === 'handheld' ? navigateHandheld('library') : navigate('library')) }] })); return; }
+  const proposals = r.proposals || [];
+  const kept = proposals.filter((p) => lookEdit(p).keep).length;
+  const bar = el(`<div class="look-bar"><span>${fmt.n(kept, 'game')} of ${proposals.length} kept</span><span class="spacer"></span>${choiceHtml('data-bulk-kind', 'Set kind for the kept games', [{ value: '', label: 'Set kind…' }, ...kindOptions()], '')}${choiceHtml('data-bulk-language', 'Set language for the kept games', [{ value: '-', label: 'Set language…' }, ...languageOptions()], '-')}<button class="btn" type="button" data-look-discard>Discard</button><button class="btn primary" type="button" data-look-add ${kept ? '' : 'disabled'}>Add ${fmt.n(kept, 'game')}</button></div>`);
+  host.appendChild(bar);
+  for (const p of proposals) {
+    const e = lookEdit(p);
+    const matchOptions = [{ value: '', label: 'A new game' }, ...(p.match ? [{ value: p.match.game_id, label: `Link to ${p.match.name}` }] : [])];
+    const row = el(`<article class="look-row ${e.keep ? '' : 'left-out'}" data-look="${esc(p.id)}">
+      <div class="look-head"><label class="look-keep"><input type="checkbox" data-look-keep ${e.keep ? 'checked' : ''}> <strong>${esc(p.name)}</strong></label><span class="tag">${esc(kindName(p.engine) || ENGINE_KINDS[p.engine] || p.engine || 'Not identified')}</span><span class="tag">${esc(lookCounts(p))}</span><span class="spacer"></span>${choiceHtml('data-look-match', 'Add as', matchOptions, e.link_to || '')}</div>
+      ${p.match ? `<p class="look-reason">${esc(p.match.reason)}.</p>` : ''}
+      <div class="look-folders">${p.folders.map((f) => `<div class="look-folder" data-look-folder="${esc(f.path)}"><div class="look-folder-main"><span class="mono" aria-label="${esc(f.path)}">${esc(PythiaVersions.middleEllipsis(f.path, 80))}</span><small>${esc([f.part, f.version && `version ${f.version}`, ...(f.mods || [])].filter(Boolean).join(' · ') || 'No version number')}</small></div>${choiceHtml('data-folder-kind', 'Kind', kindOptions(), e.folders[f.path].kind)}${choiceHtml('data-folder-language', 'Language', languageOptions(), e.folders[f.path].language)}</div>`).join('')}</div>
+      <div class="look-link"><label>Store link <input class="field" data-look-link placeholder="https://f95zone.to/threads/…" value="${esc(e.store_link)}"></label></div>
+    </article>`);
+    host.appendChild(row);
+  }
+  for (const s of (r.skipped || []).concat(r.errors || [])) host.appendChild(el(`<p class="look-reason">${esc(fileName(s.path))}: ${esc(s.message)}</p>`));
+  const proposalOf = (node) => proposals.find((p) => p.id === node.closest('[data-look]').dataset.look);
+  $$('[data-look-keep]', host).forEach((cb) => (cb.onchange = () => { lookEdit(proposalOf(cb)).keep = cb.checked; renderLook(host, summaryHost); }));
+  $$('[data-look-match]', host).forEach((c) => c.addEventListener('change', () => { lookEdit(proposalOf(c)).link_to = c.value || null; }));
+  $$('[data-look-link]', host).forEach((i) => (i.oninput = () => { lookEdit(proposalOf(i)).store_link = i.value; }));
+  $$('[data-folder-kind], [data-folder-language]', host).forEach((c) => c.addEventListener('change', () => { const f = lookEdit(proposalOf(c)).folders[c.closest('[data-look-folder]').dataset.lookFolder]; if (c.matches('[data-folder-kind]')) f.kind = c.value; else f.language = c.value; }));
+  const bulk = (attr, key) => { const c = $(attr, host); c.addEventListener('change', () => { if (c.value === '' || c.value === '-') return; for (const p of proposals) { const ed = lookEdit(p); if (ed.keep) for (const path of Object.keys(ed.folders)) ed.folders[path][key] = c.value; } renderLook(host, summaryHost); }); };
+  bulk('[data-bulk-kind]', 'kind'); bulk('[data-bulk-language]', 'language');
+  $('[data-look-discard]', host).onclick = () => { pythia.discard_look(); model.lookEdits = {}; };
+  $('[data-look-add]', host).onclick = async () => {
+    const rows = proposals.map((p) => { const ed = lookEdit(p); return { id: p.id, name: p.name, keep: ed.keep, link_to: ed.link_to, store_link: ed.store_link, folders: p.folders.map((f) => ({ path: f.path, version: f.version, kind: ed.folders[f.path].kind, language: ed.folders[f.path].language })) }; });
+    const r2 = await act('add_from_look', [rows], null, { what: 'Adding' }); if (ok(r2)) { model.look = { status: 'adding' }; host.innerHTML = ''; host.appendChild(stateBlock({ kind: 'loading', title: 'Adding' })); }
+  };
+  if (state.shell === 'handheld') hhKeepDisabledReachable();
+}
+
 // ---- Actions shared by pages ------------------------------------------------------------
 const pickFolder = (title) => (done) => call('pick_folder', title).then((v) => done(typeof v === 'string' ? v : ''));
 // Example paths in this OS's shape (no C:\ on Linux), and the dialog's check before anything starts
@@ -917,9 +978,11 @@ async function findStoreGames() {
   if (ok(r)) { flash('Finding store games'); navigate('activity'); } else flash(r.status === 'unavailable' ? r.message : `Could not ask the stores: ${r.message}`, 'caution');
 }
 async function scanLibrary() {
-  const path = await prompt({ title: 'Scan a library folder', body: 'Every game folder inside is recorded. Scanning only reads: nothing is written into your game folders.', hint: pathHint('G:\\games', '~/Games'), kind: 'path', check: checkPath('folder'), save: 'Scan', pick: { label: 'Browse', run: pickFolder('Scan a library folder') } });
+  const path = await prompt({ title: 'Scan a library folder', body: 'Pythia looks through it and shows what it found. Nothing is added until you Add, and nothing is ever written into your game folders.', hint: pathHint('G:\\games', '~/Games'), kind: 'path', check: checkPath('folder'), save: 'Look', pick: { label: 'Browse', run: pickFolder('Scan a library folder') } });
   if (!path || !path.trim()) return;
-  pythia.start_scan(path.trim()); flash('Scan started'); navigate('activity');
+  // Look first, then Review, then Add (UX review A16): nothing is written until Add.
+  const r = await act('start_look', [path.trim()], null, { what: 'Looking' }); if (!ok(r)) return;
+  model.lookEdits = {}; if (state.shell === 'handheld') navigateHandheld('look'); else navigate('look');
 }
 async function importSource() {
   const connected = model.accounts.filter((a) => a.connected);
@@ -1008,7 +1071,7 @@ async function leaveHandheld({ body = 'The desktop layout needs a mouse or touch
 }
 const HH_RAIL_PAGES = ['home', 'library', 'attention', 'downloads', 'systems', 'activity', 'settings'];
 // A subpage's parent when it was reached without history (a deep link, a refresh).
-const HH_PARENTS = { detail: 'library', decision: 'attention', plan: 'attention', saves: 'home', launcher: 'home', duplicates: 'home' };
+const HH_PARENTS = { look: 'home', detail: 'library', decision: 'attention', plan: 'attention', saves: 'home', launcher: 'home', duplicates: 'home' };
 function navigateHandheld(page, push = true) { if (page === state.hhPage) { renderHandheld(); return; } if (HH_RAIL_PAGES.includes(page)) state.hhHistory = []; else if (push) state.hhHistory.push(state.hhPage); state.hhPage = page; state.hhSelected = null; if (page !== 'settings') state.hhSettingsPage = 'root'; renderHandheld(); }
 function handheldTitle() {
   if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') {
@@ -1017,7 +1080,7 @@ function handheldTitle() {
   }
   const attention = games.filter((g) => g.status !== 'ok').length; const running = model.jobs.filter((j) => j.state === 'running').length;
   const { detected, decisions, watcher } = model.intake;
-  return { home: ['Home', model.ready ? `${attention} need attention · ${fmt.n(running, 'job')} running` : 'Connecting'], library: ['Library', `${games.length} games`], attention: ['Needs attention', `${attention} items`], downloads: ['Downloads & intake', `${fmt.n(detected.length + decisions.length, 'item')} · ${watcher ? 'watching' : 'not watching'}`], systems: ['Systems', `${fmt.n(systems.length, 'system')}`], settings: ['Settings', 'Library, plugins, systems, and interface'], activity: ['Activity & jobs', `${fmt.n(running, 'job')} running`], saves: ['Save backups', 'Copies of saves kept on this computer'], launcher: ['Launcher entries', "What this computer's launchers list"], duplicates: ['Duplicates', 'Records that may be the same game'], detail: ['Game details', 'Versions, systems, and actions'], decision: ['Review', 'No changes applied'], plan: ['Available update', 'Review before applying'] }[state.hhPage] || ['Pythia', ''];
+  return { home: ['Home', model.ready ? `${attention} need attention · ${fmt.n(running, 'job')} running` : 'Connecting'], library: ['Library', `${games.length} games`], attention: ['Needs attention', `${attention} items`], downloads: ['Downloads & intake', `${fmt.n(detected.length + decisions.length, 'item')} · ${watcher ? 'watching' : 'not watching'}`], systems: ['Systems', `${fmt.n(systems.length, 'system')}`], settings: ['Settings', 'Library, plugins, systems, and interface'], look: ['Review what was found', model.look?.status === 'ok' ? model.look.summary : 'Nothing is added until you Add'], activity: ['Activity & jobs', `${fmt.n(running, 'job')} running`], saves: ['Save backups', 'Copies of saves kept on this computer'], launcher: ['Launcher entries', "What this computer's launchers list"], duplicates: ['Duplicates', 'Records that may be the same game'], detail: ['Game details', 'Versions, systems, and actions'], decision: ['Review', 'No changes applied'], plan: ['Available update', 'Review before applying'] }[state.hhPage] || ['Pythia', ''];
 }
 function renderHandheld() {
   const [title, sub] = handheldTitle(); $('#hhTitle').textContent = title; $('#hhSubtitle').textContent = sub;
@@ -1028,7 +1091,7 @@ function renderHandheld() {
   $('#hhFooterRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(running, 'job')} running` : 'Connecting';
   const q = state.hhSearch.toLowerCase();
   const page = state.hhPage;
-  if (page === 'home') renderHHHome(); else if (page === 'library') renderHHLibrary(q); else if (page === 'attention') renderHHAttention(q); else if (page === 'downloads') renderHHDownloads(); else if (page === 'systems') renderHHSystems(); else if (page === 'settings') renderHHSettings(); else if (page === 'detail') renderHHDetail(games.find((g) => g.id === state.hhSelected)); else if (page === 'decision') renderHHDecision(games.find((g) => g.id === state.hhSelected)); else if (page === 'plan') renderHHPlan(games.find((g) => g.id === state.hhSelected)); else if (page === 'activity') renderHHActivity(); else if (page === 'saves') renderHHSaves(); else if (page === 'launcher') renderHHLauncher(); else if (page === 'duplicates') renderHHDuplicates();
+  if (page === 'home') renderHHHome(); else if (page === 'library') renderHHLibrary(q); else if (page === 'attention') renderHHAttention(q); else if (page === 'downloads') renderHHDownloads(); else if (page === 'systems') renderHHSystems(); else if (page === 'settings') renderHHSettings(); else if (page === 'detail') renderHHDetail(games.find((g) => g.id === state.hhSelected)); else if (page === 'decision') renderHHDecision(games.find((g) => g.id === state.hhSelected)); else if (page === 'plan') renderHHPlan(games.find((g) => g.id === state.hhSelected)); else if (page === 'activity') renderHHActivity(); else if (page === 'saves') renderHHSaves(); else if (page === 'launcher') renderHHLauncher(); else if (page === 'duplicates') renderHHDuplicates(); else if (page === 'look') { const h = $('#hhContent'); h.innerHTML = '<div class="hh-stack"><p id="hhLookSummary"></p><div id="hhLookHost"></div></div>'; renderLook($('#hhLookHost'), $('#hhLookSummary')); }
   bindHandheldActions();
   hhKeepDisabledReachable();
   hhKeepFocus();
@@ -1512,6 +1575,8 @@ function connect() {
     pythia.gamesChanged.connect(refreshGames);
     // Controllers come from the backend only (SPEC 2.7); the page does not read the Gamepad API.
     pythia.padAction.connect(hhPadAction);
+    pythia.lookChanged.connect((r) => { model.look = r; if (state.view === 'look') renderLook(); if (state.shell === 'handheld' && state.hhPage === 'look') renderHandheld(); });
+    call('get_look').then((r) => { if (ok(r) || r.status) model.look = r; });
     call('get_folder_vocabulary').then((r) => { if (ok(r)) { model.vocab = r; renderCurrent(); } });
     call('describe_store_links').then((r) => { if (ok(r)) model.stores = r; });
     startShell();

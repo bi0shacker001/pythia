@@ -164,6 +164,7 @@ class Backend(QObject):
     modesChanged = Signal()  # manager mode turned on or off (pythia.modes)
     pairingFinished = Signal("QVariant")  # {"status": "ok", "paired": name} or an error result
     asyncResult = Signal("QVariant")  # a slow slot's answer: {"request": id, ...its result}
+    lookChanged = Signal("QVariant")  # a Look's live counts, its proposals, or that it was added (pythia.look)
     padAction = Signal(str)  # a controller press, named (pythia.pad), only while Pythia has the focus
 
     def __init__(self, error_console: bool = False):
@@ -185,6 +186,7 @@ class Backend(QObject):
         self._decisions: list[dict] = intake_store.load()
         self._error_console = error_console
         self._pad = None
+        self._look: dict | None = None
         self._log_handler = _UiLogHandler(self)
         logger.addHandler(self._log_handler)
         self.refresh_games()
@@ -391,6 +393,82 @@ class Backend(QObject):
         path_str = _normalize_path(path_str)
         job = self._job_start("scan", f"Scan {path_str}", "Finds every game folder inside")
         threading.Thread(target=self._scan_worker, args=(path_str, job), daemon=True).start()
+
+    # ---- Look, Review, Add (pythia.look; UX review A16) ------------------------
+    @Slot(str, result="QVariant")
+    @_guarded
+    def start_look(self, path_str: str):
+        """Looks through a folder for games without writing anything; its
+        proposals arrive as lookChanged, with live counts while it walks."""
+        path_str = _normalize_path(path_str)
+        job = self._job_start("scan", f"Look in {Path(path_str).name or path_str}", "Nothing is added until you Add")
+        with self._lock:
+            self._look = {"status": "looking", "root": path_str, "counts": {"folders": 0, "games": 0}, "job": job}
+        self.lookChanged.emit(_jsonable(self._look))
+        threading.Thread(target=self._look_worker, args=(path_str, job), daemon=True).start()
+        return {"status": "ok", "job": job}
+
+    def _look_worker(self, path_str: str, job: str):
+        from pythia import look
+
+        def progress(counts):
+            with self._lock:
+                if self._look and self._look.get("job") == job:
+                    self._look["counts"] = counts
+            self.lookChanged.emit(_jsonable({"status": "looking", "root": path_str, "counts": counts, "job": job}))
+
+        try:
+            result = look.look(path_str, progress=progress)
+        except OSError as exc:
+            self._job_finish(job, f"Could not look in {path_str}: {exc}", ok=False)
+            with self._lock:
+                self._look = None
+            self.lookChanged.emit({"status": "error", "message": str(exc)})
+            return
+        result["job"] = job
+        with self._lock:
+            self._look = result
+        self._job_finish(job, result["summary"] + ". Review them, then Add.")
+        self.lookChanged.emit(_jsonable(result))
+
+    @Slot(result="QVariant")
+    @_guarded
+    def get_look(self):
+        """The current Look: looking (with counts), its proposals, or none."""
+        with self._lock:
+            return _jsonable(self._look or {"status": "none"})
+
+    @Slot("QVariant", result="QVariant")
+    @_guarded
+    def add_from_look(self, rows):
+        """Adds the games Review kept, as reviewed (pythia.look.add)."""
+        rows = [dict(r) for r in rows or []]
+        kept = [r for r in rows if r.get("keep", True)]
+        title = f"Add {len(kept)} game{'s' if len(kept) != 1 else ''}"
+        job = self._job_start("onboard", title, "From the reviewed Look")
+        threading.Thread(target=self._add_worker, args=(rows, job), daemon=True).start()
+        return {"status": "ok", "job": job}
+
+    def _add_worker(self, rows, job):
+        from pythia import look
+
+        result = look.add(rows)
+        for f in result["failures"]:
+            self._job_log(job, f"not added: {f['name']} {f['path']}: {f['message']}")
+        self.refresh_games()
+        with self._lock:
+            self._look = None
+        text = f"Added {result['games']} game{'s' if result['games'] != 1 else ''} ({result['folders']} folders)"
+        if result["failures"]:
+            text += f", {len(result['failures'])} not added"
+        self._job_finish(job, text, ok=not result["failures"] or bool(result["games"]))
+        self.lookChanged.emit(_jsonable({**result, "status": "added", "summary": text}))
+
+    @Slot()
+    def discard_look(self):
+        with self._lock:
+            self._look = None
+        self.lookChanged.emit({"status": "none"})
 
     @Slot(result="QVariant")
     @_guarded

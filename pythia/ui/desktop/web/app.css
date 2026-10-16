@@ -251,3 +251,18 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
 /* UX review A15: store links, each with whether Pythia checks it for updates */
 .store-link{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin-right:8px}
 .store-link small,.store-none{color:var(--text-secondary)}
+/* UX review A16: Review what a Look found, before anything is added */
+.look-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-0)}
+.look-bar .spacer{flex:1}
+.look-row{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-0);padding:12px;margin-bottom:10px}
+.look-row.left-out{opacity:.6}
+.look-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.look-head .spacer{flex:1}
+.look-keep{display:inline-flex;align-items:center;gap:8px;font-size:1rem}
+.look-reason{margin:6px 0 0;color:var(--text-secondary);font-size:0.8125rem}
+.look-folders{display:grid;gap:6px;margin-top:10px}
+.look-folder{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1)}
+.look-folder-main{display:grid;gap:2px;min-width:0}.look-folder-main .mono{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.look-folder-main small{color:var(--text-secondary)}
+.look-link{margin-top:10px}.look-link label{display:flex;align-items:center;gap:8px;color:var(--text-secondary);font-size:0.8125rem}.look-link .field{flex:1}
+.small-select{width:auto;min-height:32px}
+@media(max-width:820px){.look-folder{grid-template-columns:1fr}}

@@ -4,6 +4,14 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+# pythia._native needs Rust 1.85 or newer: a distribution whose own rustc is
+# older has it as the versioned rustc-1.85 and cargo-1.85 (Build-Depends),
+# whose plain names are in /usr/lib/rust-1.85/bin.
+RUST_BIN := $(firstword $(wildcard /usr/lib/rust-1.85/bin))
+ifneq ($(RUST_BIN),)
+export PATH := $(RUST_BIN):$(PATH)
+endif
+
 %:
 	dh $@ --buildsystem=meson
 

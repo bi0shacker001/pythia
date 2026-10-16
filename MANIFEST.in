@@ -3,6 +3,8 @@ recursive-include pythia/ui/desktop/web *
 recursive-include pythia/ui/bigpicture/qml *
 recursive-include share *
 include bin/pythia
+include native/Cargo.toml native/Cargo.lock native/build.rs native/rustfmt.toml
+recursive-include native/src *.rs
 include LICENSE
 include AUTHORS
 include MANIFEST.in

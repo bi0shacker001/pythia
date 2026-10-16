@@ -1,39 +1,38 @@
-"""Loading droidtop-agent's ``droidtop_agent`` extension module.
+"""Loading ``pythia._native``, Pythia's droidtop side (``native/``).
 
-It is an optional, compiled dependency: a wheel from droidtop-agent's
-releases (``pip install droidtop_agent-*.whl``). Its refusals raise
-``droidtop_agent.AgentError``, which is this package's ``AgentError``; without
-the module, ``submodule()`` raises an ``AgentError`` of this package's own
-saying why.
+It is built with Pythia (setuptools-rust, from droidtop-agent's crates) and
+holds Pythia's droidtop state in its own folder, ``DATA_DIR/droidtop``. Its
+refusals raise ``pythia._native.AgentError``, which is this package's
+``AgentError``. A Pythia run from a source tree that was never built has no
+such module: ``submodule()`` then raises an ``AgentError`` of this package's
+own saying how to build it.
 """
 
+import os
 from types import ModuleType
 
-RELEASES = "https://github.com/Droidtop/droidtop-agent/releases"
+from pythia import settings
 
-try:  # an optional, compiled dependency
-    import droidtop_agent as _module  # type: ignore[import-not-found]
+BUILD_HINT = "build it with `pip install -e .` (it needs a Rust toolchain, 1.85 or newer)"
+FOLDER = os.path.join(settings.DATA_DIR, "droidtop")
+
+try:  # built with Pythia; missing only in a source tree that was never built
+    from pythia import _native as _module  # type: ignore[attr-defined]
 
     _missing: str | None = None
-except ImportError as ex:  # pragma: no cover - depends on the install
+except ImportError as ex:  # pragma: no cover - depends on the build
     _module = None
-    _missing = (
-        f"droidtop's agent module is not installed ({ex}). Install the droidtop_agent wheel for this "
-        f"system from {RELEASES}"
-    )
-
-# A wheel from before the agent's crates had their own submodules has one JSON
-# call and no AgentError: Pythia needs a newer one.
-if _module is not None and not hasattr(_module, "AgentError"):  # pragma: no cover - depends on the install
-    _missing = f"the installed droidtop_agent module is too old for Pythia. Install the newest wheel from {RELEASES}"
-    _module = None
+    _missing = f"Pythia's droidtop module is not built ({ex}); {BUILD_HINT}"
 
 if _module is not None:
     AgentError = _module.AgentError
 else:
 
     class AgentError(Exception):  # type: ignore[no-redef]
-        """A call the agent refused, in words a screen can show."""
+        """A droidtop call that was refused, in words a screen can show."""
+
+
+_folder_named = False
 
 
 def available() -> bool:
@@ -45,7 +44,12 @@ def why_unavailable() -> str | None:
 
 
 def submodule(name: str) -> ModuleType:
-    """``droidtop_agent.<name>``, or AgentError saying why it is missing."""
+    """``pythia._native.<name>`` over Pythia's droidtop folder, or AgentError
+    saying why the module is missing."""
+    global _folder_named
     if _module is None:
-        raise AgentError(_missing or "droidtop's agent module is not installed")
+        raise AgentError(_missing or "Pythia's droidtop module is not built")
+    if not _folder_named:
+        _module.use_folder(path=FOLDER)
+        _folder_named = True
     return getattr(_module, name)

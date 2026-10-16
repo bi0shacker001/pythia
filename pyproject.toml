@@ -1,5 +1,7 @@
 [build-system]
-requires = ["setuptools>=77"]
+# setuptools-rust builds pythia._native (native/), Pythia's droidtop side, with
+# cargo; building Pythia needs a Rust toolchain (1.85 or newer).
+requires = ["setuptools>=77", "setuptools-rust>=1.9"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -63,6 +65,13 @@ include = ["pythia", "pythia.*"]
 # The Qt UIs' pages and QML, loaded from beside their modules.
 "pythia.ui.desktop" = ["web/*"]
 "pythia.ui.bigpicture" = ["qml/*"]
+
+[[tool.setuptools-rust.ext-modules]]
+# Pythia's droidtop side (native/), one build for every Python from 3.10 on.
+target = "pythia._native"
+path = "native/Cargo.toml"
+binding = "PyO3"
+py-limited-api = "cp310"
 
 [tool.setuptools.data-files]
 # pythia.util.datapath and the game-launch wrapper are looked up under the prefix.

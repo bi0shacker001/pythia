@@ -43,3 +43,10 @@ CLAUDE.md
 *.ui~
 
 /dist/
+
+# cargo's output for native/
+/native/target
+/pythia/_native*.so
+/pythia/_native*.pyd
+/native/vendor
+/native/.cargo

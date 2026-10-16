@@ -1217,16 +1217,16 @@ class Backend(QObject):
         QApplication.instance().quit()
 
     # ---- handhelds: this computer as the droidtop agent (pythia.droidtop) --------
-    # droidtop-agent's crates, loaded in this process: the pairings and the
-    # library are the agent's own files, shared with droidtop-agent. Without
-    # the agent module every slot here answers "unavailable" with the reason.
+    # Pythia's own droidtop module (pythia._native, on droidtop-agent's crates).
+    # In a source tree that was never built there is none: every slot here
+    # answers "unavailable" with how to build it.
     def _agent_unavailable(self, slot: str) -> dict:
         from pythia.droidtop import why_unavailable
 
         return self._unavailable(
             slot,
-            why_unavailable() or "droidtop's agent module is not installed.",
-            title="The droidtop agent module is not installed",
+            why_unavailable() or "Pythia's droidtop module is not built.",
+            title="Pythia's droidtop module is not built",
         )
 
     @Slot(result="QVariant")

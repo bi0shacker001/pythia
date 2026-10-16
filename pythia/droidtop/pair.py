@@ -1,4 +1,4 @@
-"""Pairing a handheld from this computer (``droidtop_agent.pair``), the way
+"""Pairing a handheld from this computer (``pythia._native.pair``), the way
 droidtop-agent's window does it. Refusals raise AgentError."""
 
 from pythia.droidtop.native import submodule

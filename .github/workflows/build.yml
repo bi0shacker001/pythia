@@ -2,7 +2,9 @@ on: [push, pull_request]
 
 # Builds Pythia every way it ships (the Python wheel and sdist, a meson
 # install, the Debian package) and runs what each one installed, on Linux
-# and, for the wheel, on Windows. Static Analysis (static.yml) checks the
+# and, for the wheel, on Windows. Each build includes pythia._native (native/),
+# built with cargo: the runners' Rust for the wheels, Ubuntu's rustc-1.85 for
+# the Debian package, as Launchpad builds it. Static Analysis (static.yml) checks the
 # code; this checks that it builds and starts.
 name: Build
 
@@ -16,7 +18,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential meson gettext desktop-file-utils appstream-util \
-            debhelper dh-python dh-apparmor appstream dpkg-dev python3-all
+            debhelper dh-python dh-apparmor appstream dpkg-dev python3-all cargo-1.85 rustc-1.85
       - name: Meson build, its tests (desktop files, metainfo) and install
         run: |
           meson setup builddir
@@ -31,6 +33,7 @@ jobs:
         run: |
           sudo apt-get install -y ./dist/pythia_*.deb
           /usr/games/pythia --version
+          cd "$RUNNER_TEMP" && /usr/bin/python3 -c "import pythia._native as n; print('pythia._native', n.__version__)"
           HOME="$RUNNER_TEMP/home" /usr/games/pythia --list-games
       - uses: actions/upload-artifact@v4
         with:
@@ -58,6 +61,7 @@ jobs:
           python -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl
           "$RUNNER_TEMP/venv/bin/pythia" --version
+          cd "$RUNNER_TEMP" && "$RUNNER_TEMP/venv/bin/python" -c "import pythia._native as n; print('pythia._native', n.__version__)"
           HOME="$RUNNER_TEMP/home" "$RUNNER_TEMP/venv/bin/pythia" --list-games
       - uses: actions/upload-artifact@v4
         with:
@@ -81,6 +85,10 @@ jobs:
           & "$env:RUNNER_TEMP\venv\Scripts\pip.exe" install (Get-ChildItem dist\*.whl).FullName
           & "$env:RUNNER_TEMP\venv\Scripts\pythia.exe" --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Push-Location $env:RUNNER_TEMP
+          & "$env:RUNNER_TEMP\venv\Scripts\python.exe" -c "import pythia._native as n; print('pythia._native', n.__version__)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
           $env:APPDATA = "$env:RUNNER_TEMP\appdata"
           $env:LOCALAPPDATA = "$env:RUNNER_TEMP\localappdata"
           & "$env:RUNNER_TEMP\venv\Scripts\pythia.exe" --list-games

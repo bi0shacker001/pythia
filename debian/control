@@ -7,6 +7,8 @@ Build-Depends: debhelper-compat (= 12),
                dh-apparmor,
                dh-sequence-python3,
                meson,
+               cargo (>= 1.85) | cargo-1.85,
+               rustc (>= 1.85) | rustc-1.85,
 Rules-Requires-Root: no
 Standards-Version: 4.5.0
 Homepage: https://github.com/bi0shacker001/pythia
@@ -14,8 +16,9 @@ Vcs-Browser: https://github.com/bi0shacker001/pythia
 Vcs-Git: https://github.com/bi0shacker001/pythia.git
 
 Package: pythia
-Architecture: all
+Architecture: any
 Depends: ${misc:Depends},
+         ${shlibs:Depends},
          ${python3:Depends},
          python3-yaml,
          python3-lxml,

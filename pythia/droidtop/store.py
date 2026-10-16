@@ -1,4 +1,4 @@
-"""This computer's droidtop agent state (``droidtop_agent.store``): its
+"""This computer's droidtop agent state (``pythia._native.store``): its
 identity, the paired handhelds and the library every paired device shares.
 Each call is quick; refusals raise AgentError."""
 

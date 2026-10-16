@@ -1,4 +1,4 @@
-"""The copies of games' saves kept on this computer (``droidtop_agent.saves``):
+"""The copies of games' saves kept on this computer (``pythia._native.saves``):
 when both a handheld and this computer changed a game's saves, the newest
 copy wins and the other is kept here, so nothing is lost."""
 

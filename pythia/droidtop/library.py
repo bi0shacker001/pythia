@@ -92,7 +92,7 @@ def scanned_games(entries: list[dict], system_uuid: str) -> list[dict]:
 
 
 def export(rescan: bool = True) -> dict:
-    """Hands this system's tracked games to the agent (``droidtop_agent.scan``),
+    """Hands this system's tracked games to the agent (``pythia._native.scan``),
     in place of the ones handed before. The agent keeps them and joins them
     into every scan, whichever program serves, so closing Pythia does not
     take them off the handhelds. Returns the agent's count of games and

@@ -20,6 +20,12 @@ Pythia manually, it requires the following components:
     * python3-distro
     * python3-evdev (optional, for controller detection)
 
+Building Pythia (``pip install .``, meson or the Debian package) also builds
+its droidtop side, ``pythia._native`` (``native/``), so it needs a Rust
+toolchain, 1.85 or newer, with cargo. On Ubuntu 24.04 that is the
+``rustc-1.85`` and ``cargo-1.85`` packages. Cargo fetches droidtop-agent's
+crates from GitHub, pinned by commit in ``native/Cargo.toml``.
+
 These dependencies are only for running the Pythia client. To install and run
 games themselves we recommend you install the following packages:
 

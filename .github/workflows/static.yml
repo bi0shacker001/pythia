@@ -2,6 +2,26 @@ on: [push, pull_request]
 
 name: Static Analysis
 jobs:
+  native:
+    name: Native module (native/)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v4
+      - name: Format, lint and test with the runner's Rust
+        run: |
+          cargo --version
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: Builds with Rust 1.85, the oldest it supports (Ubuntu's rustc-1.85)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cargo-1.85 rustc-1.85
+          PATH="/usr/lib/rust-1.85/bin:$PATH" cargo check --locked
+
   syntax-compat:
     name: Syntax Compatibility (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest

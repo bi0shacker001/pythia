@@ -56,6 +56,16 @@ sed -i"" \
     -re"1s/${PYTHIA_VERSION}/${PYTHIA_DEBIAN_VERSION}${PPA_VERSION}/" \
     "${CODEBASE_ROOT}/debian/changelog"
 
+# Launchpad builds without a network, so the crates pythia._native (native/)
+# builds from go into the source package, with the cargo config that points
+# cargo at them.
+mkdir -p "${CODEBASE_ROOT}/native/.cargo"
+cargo vendor --locked --versioned-dirs \
+    --manifest-path "${CODEBASE_ROOT}/native/Cargo.toml" \
+    "${CODEBASE_ROOT}/native/vendor" \
+    > "${CODEBASE_ROOT}/native/.cargo/config.toml"
+sed -i"" -e"s|${CODEBASE_ROOT}/native/vendor|vendor|" "${CODEBASE_ROOT}/native/.cargo/config.toml"
+
 # Builds and signs the debian package files.
 # PPA_GPG_KEY_ID and PPA_GPG_PASSPHRASE environment variables must be defined
 # by this point.

@@ -415,8 +415,8 @@ function renderSystems() {
   rows.innerHTML = cross.map((g) => `<tr><td class="primary-cell"><strong>${esc(g.name)}</strong><small>${esc(g.engine)}</small></td>${systems.map((s) => { const e = g.entries.find((x) => x.system_uuid === s.id); if (!e) return '<td>—</td>'; const v = (e.versions || []).map((x) => (x.version && x.version !== e.canonical_name ? x.version : null)).filter(Boolean); const inst = (e.versions || []).some((x) => (x.variants || []).some((y) => y.path)); return `<td>${inst ? `<span class="state-pill ok">${esc(v.join(', ') || 'installed')}</span>` : '<span class="state-pill info">known</span>'}</td>`; }).join('')}</tr>`).join('');
 }
 // ---- Handhelds: this computer as the droidtop agent (backend: pythia.droidtop) -----------
-// The pairings are droidtop-agent's own files, shared with droidtop-agent; without the
-// agent module every slot answers "unavailable" and the panel says so.
+// Pythia's own droidtop module (pythia._native) holds the pairings; in a source tree where it
+// was never built every slot answers "unavailable" and the panel says so.
 let pairPoll = null;
 function stopPairPoll() { if (pairPoll) { clearInterval(pairPoll); pairPoll = null; } }
 function renderHandhelds() {

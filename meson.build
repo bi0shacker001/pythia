@@ -1,7 +1,7 @@
 project(
   'pythia',
   license: 'GPL-3.0-or-later',
-  meson_version: '>=0.46.0',
+  meson_version: '>=0.56.0',
 )
 
 # Find Python installation
@@ -41,7 +41,23 @@ install_data(
 install_subdir(
   'pythia',
   install_dir: pylibdir,
+  # A module built in the tree (pip install -e .) is not this build's.
+  exclude_files: ['_native.abi3.so', '_native.pyd'],
 )
+
+# Pythia's droidtop side, pythia._native (native/), built with cargo.
+cargo = find_program('cargo', required: get_option('native'))
+if cargo.found()
+  custom_target(
+    'pythia-native',
+    output: '_native.abi3.so',
+    command: [python, files('utils/build_native.py'), meson.current_source_dir(), '@OUTPUT@'],
+    build_by_default: true,
+    build_always_stale: true,
+    install: true,
+    install_dir: pythiadir,
+  )
+endif
 
 install_subdir(
   'share/icons',

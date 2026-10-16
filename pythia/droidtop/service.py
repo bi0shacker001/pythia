@@ -1,10 +1,9 @@
-"""Serving paired handhelds while Pythia runs (``droidtop_agent.service``):
+"""Serving paired handhelds while Pythia runs (``pythia._native.service``):
 the same service as ``droidtop-agent run``, on the agent's own threads."""
 
 import threading
-import time
 
-from pythia.droidtop.native import RELEASES, AgentError, available, submodule, why_unavailable
+from pythia.droidtop.native import AgentError, available, submodule, why_unavailable
 from pythia.util.log import logger
 
 _serving_lock = threading.Lock()
@@ -28,7 +27,7 @@ def serving() -> dict:
 
 
 def start_in_background() -> None:
-    """Serves in the background if the agent module is installed: what a
+    """Serves in the background if Pythia's droidtop module is built: what a
     front end calls once at start. Never raises; logs why it does not serve."""
     if not available():
         logger.info("Not serving droidtop handhelds: %s", why_unavailable())
@@ -53,21 +52,6 @@ def events(since: int = 0, wait: float = 0.0) -> list[dict]:
     first: ``seq``, ``ms``, ``level`` ("info", "warn"), ``kind`` ("launch",
     "arrived", "session", "library", "saves"...), ``message`` and what it is
     about (``peer``, ``device``, ``title``, ``key``...). With ``wait`` it waits
-    that many seconds for an event when there is none yet; a module from
-    before it could wait sleeps that long instead, so a caller loops the same
-    way with either. A module from before the service had events raises
-    AgentError saying so."""
-    module = submodule("service")
-    if not hasattr(module, "events"):
-        raise AgentError(
-            f"this droidtop_agent module cannot report what the agent does; install a newer wheel from {RELEASES}"
-        )
-    if wait <= 0:
-        return module.events(since=since)
-    try:
-        return module.events(since=since, wait=wait)
-    except TypeError:
-        new = module.events(since=since)
-        if not new:
-            time.sleep(wait)
-        return new
+    that many seconds for an event when there is none yet, without holding
+    the interpreter."""
+    return submodule("service").events(since=since, wait=wait)

@@ -73,6 +73,13 @@ class NativeTest(TestCase):
                 store.unpair("ab")
         fake.store.unpair.assert_called_once_with("ab")
 
+    def test_pythias_folder_is_named_before_the_first_call(self):
+        fake = mock.Mock()
+        with mock.patch.object(native, "_module", fake), mock.patch.object(native, "_folder_named", False):
+            store.identity()
+            store.devices()
+        fake.use_folder.assert_called_once_with(path=native.FOLDER)
+
     def test_without_the_module_it_says_why(self):
         with mock.patch.object(native, "_module", None), mock.patch.object(native, "_missing", "not installed"):
             self.assertFalse(native.available())
@@ -187,7 +194,7 @@ class AgentEventsTest(TestCase):
         fake.service.events.return_value = [{"seq": 3, "kind": "launch", "message": "x"}]
         with mock.patch.object(native, "_module", fake):
             self.assertEqual(service.events(2)[0]["kind"], "launch")
-        fake.service.events.assert_called_once_with(since=2)
+        fake.service.events.assert_called_once_with(since=2, wait=0.0)
 
     def test_waiting_for_the_next_event(self):
         fake = mock.Mock()
@@ -195,23 +202,6 @@ class AgentEventsTest(TestCase):
         with mock.patch.object(native, "_module", fake):
             self.assertEqual(service.events(5, wait=30), [])
         fake.service.events.assert_called_once_with(since=5, wait=30)
-
-    def test_a_module_that_cannot_wait_sleeps_instead(self):
-        def events(since=0):
-            return []
-
-        fake = mock.Mock()
-        fake.service.events = events
-        with mock.patch.object(native, "_module", fake), mock.patch.object(service.time, "sleep") as sleep:
-            self.assertEqual(service.events(0, wait=7), [])
-        sleep.assert_called_once_with(7)
-
-    def test_an_agent_module_without_events_says_so(self):
-        fake = mock.Mock()
-        fake.service = mock.Mock(spec=["serve", "serving"])
-        with mock.patch.object(native, "_module", fake):
-            with self.assertRaisesRegex(native.AgentError, "newer wheel"):
-                service.events()
 
 
 class LauncherFoldersTest(TestCase):

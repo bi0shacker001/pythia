@@ -65,3 +65,37 @@ class OnboardTest(TestCase):
             variant["kind"], variant["kind_set_by_person"] = "mod", True
             onboarding._merge_version(saved[0], game, "1.2", [], "es", [], {"kind": "renpy"}, kind="translation")
             self.assertEqual(saved[0]["versions"][0]["variants"][0]["kind"], "mod")
+
+
+class PartsTest(TestCase):
+    """Part folders are parts of one game, not versions (UX review A16; droidtop SPEC 7m segments)."""
+
+    def test_part_folders_are_parts_of_the_title_above(self):
+        for path, part, version in (
+            ("/library/Multi-part/UX Test Serial/Part1", "Part1", ""),
+            ("/library/Fetish Locator/Week 2", "Week 2", ""),
+            ("/library/Game/Chapter 3 v1.1", "Chapter 3", "1.1"),
+            ("/library/BeingADik/Chap3+/12.0-scrappy", "Chap3+", "12.0"),
+        ):
+            name, got_version, d = onboarding._derive_folder(Path(path))
+            self.assertEqual((d["part"], got_version), (part, version), path)
+            self.assertEqual(d["mods"] if part != "Chap3+" else [], [], path)
+        self.assertEqual(onboarding._derive_folder(Path("/library/UX Test Novel v1.0"))[2]["part"], None)
+
+    def test_onboarding_records_the_part_on_the_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            part = Path(tmp) / "UX Test Serial" / "Part1"
+            (part / "game").mkdir(parents=True)
+            (part / "renpy").mkdir()
+            (part / "game" / "script.rpy").write_text("label start:\n")
+            saved = []
+            with (
+                mock.patch.object(onboarding, "get_system_uuid", return_value="me"),
+                mock.patch.object(onboarding.datadir, "list_all_entries", return_value=[]),
+                mock.patch.object(onboarding.games_db, "save_entry_and_sync_cache", side_effect=saved.append),
+            ):
+                self.assertEqual(onboarding.onboard(part)["status"], "ok")
+            entry = saved[0]
+            self.assertEqual(entry["canonical_name"], "UX Test Serial")
+            self.assertEqual(entry["versions"][0]["version"], None)
+            self.assertEqual(entry["versions"][0]["variants"][0]["part"], "Part1")

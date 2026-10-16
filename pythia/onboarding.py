@@ -101,6 +101,19 @@ def _extract_version_only(leaf: str):
     return version, classify_folder_tokens(rest)
 
 
+def _split_part(leaf: str):
+    """A part folder's part ("Part1", "Week 2", "Chap3+"), the version after it when
+    there is a dotted one ("Chapter 3 v1.1" -> 1.1), and what else its name says."""
+    m = re.match(r"^(.*?\d+\+?)(.*)$", leaf)
+    if not m:
+        return leaf.strip(), "", classify_folder_tokens("")
+    part, rest = m.group(1).strip(" -_"), m.group(2)
+    if re.search(r"\d+[._]\d", rest):
+        version, details = _extract_version_only(re.sub(r"^[vV](?=\d)", "", rest.strip(" -_")))
+        return part, version, details
+    return part, "", classify_folder_tokens(rest)
+
+
 def _derive_name_version_mods_language(path: Path):
     """_derive_folder's name, version, mods and language."""
     name, version, details = _derive_folder(path)
@@ -128,15 +141,24 @@ def _derive_folder(path: Path):
     if _is_generic_part_leaf(folder_name):
         ancestor_name = _find_meaningful_ancestor_name(path)
         if ancestor_name is not None:
-            version, details = _extract_version_only(folder_name)
+            # A part folder (Part1, Week 2) is a part of the title above it; a bare
+            # version folder (12.0-scrappy) is a version, of the part above it when
+            # that is a part folder (droidtop SPEC 7m, segments; UX review A16).
+            if _GENERIC_PART_PREFIX_RE.match(folder_name):
+                part, version, details = _split_part(folder_name)
+            else:
+                version, details = _extract_version_only(folder_name)
+                parent = path.parent.name
+                part = parent if _GENERIC_PART_PREFIX_RE.match(parent) else None
+            details["part"] = part
             return ancestor_name, version, details
 
     m = _NAME_VERSION_RE.search(folder_name)
     if not m:
-        return folder_name, "", {"mods": [], "language": None, "kind": "game", "flags": []}
+        return folder_name, "", {"mods": [], "language": None, "kind": "game", "flags": [], "part": None}
     name = m.group(1).strip(" -_") or folder_name
     version = (m.group(2) or m.group(3)).replace("_", ".")
-    return name, version, classify_folder_tokens(m.group(4))
+    return name, version, {**classify_folder_tokens(m.group(4)), "part": None}
 
 
 def _own_entries():
@@ -347,6 +369,7 @@ def preview(path: Path | str):
         "language": language,
         "kind": details["kind"],
         "flags": details["flags"],
+        "part": details.get("part"),
         "candidates": candidates,
     }
 
@@ -473,6 +496,7 @@ def onboard(path: Path | str, decision: dict | None = None):
         source,
         kind=pv.get("kind", "game"),
         flags=pv.get("flags", []),
+        part=pv.get("part"),
     )
 
     if is_new_entry and foreign_seed is not None:
@@ -703,6 +727,7 @@ def _merge_version(
     source: dict,
     kind: str = "game",
     flags: list | None = None,
+    part: str | None = None,
 ):
     """Find-or-create the `versions[]` group for `version`, then find-by-path within
     that group's `variants[]` (update in place) or append a new variant. `source`
@@ -729,6 +754,8 @@ def _merge_version(
             if not variant.get("kind_set_by_person"):
                 variant["kind"] = kind
             variant["flags"] = list(flags or [])
+            if part:
+                variant["part"] = part
             variant["platforms"] = platforms
             variant["source"] = source
             variant["detected_at"] = now
@@ -741,6 +768,7 @@ def _merge_version(
             "language": language,
             "kind": kind,
             "flags": list(flags or []),
+            **({"part": part} if part else {}),
             "path": path_str,
             "platforms": platforms,
             "source": source,

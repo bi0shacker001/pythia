@@ -176,11 +176,16 @@
   // 4 s, takes no action, and is appended to Recent (the bell) unless private.
   const recent = [];
   const recentListeners = new Set();
-  function flash(text, tone = 'info', { private: priv = false } = {}) {
+  // tone 'critical' (a failure) stays until dismissed, shows its whole text, and may carry one action
+  // (`action: { label, run }`, "Show" for a failed job). Toasts never take focus.
+  function flash(text, tone = 'info', { private: priv = false, action = null } = {}) {
     const host = $('#flashes');
-    const node = el(`<div class="flash ${tone}" role="status" aria-live="polite"><span class="text">${esc(text)}</span></div>`);
+    const sticky = tone === 'critical';
+    const node = el(`<div class="flash ${tone}${sticky ? ' sticky' : ''}" role="${sticky ? 'alert' : 'status'}" aria-live="${sticky ? 'assertive' : 'polite'}"><span class="text">${esc(text)}</span>${action ? `<button type="button" class="flash-action" tabindex="-1">${esc(action.label)}</button>` : ''}${sticky ? '<button type="button" class="flash-close" tabindex="-1" aria-label="Dismiss">×</button>' : ''}</div>`);
     host.appendChild(node);
-    setTimeout(() => node.remove(), 4000);
+    if (action) $('.flash-action', node).addEventListener('click', () => { node.remove(); action.run(); });
+    if (sticky) $('.flash-close', node).addEventListener('click', () => node.remove());
+    else setTimeout(() => node.remove(), 4000);
     if (!priv) {
       recent.unshift({ text, tone, at: new Date() });
       if (recent.length > 50) recent.pop();

@@ -85,6 +85,10 @@ html[data-motion="off"] .skeleton { animation: none; }
 .flash { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 7px; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-strong); box-shadow: var(--shadow); animation: slide var(--motion-fast) var(--motion-ease); font-size: 0.8125rem; }
 .flash.caution { border-left: 4px solid var(--caution-ink); }
 .flash.danger { border-left: 4px solid var(--danger-ink); }
+.flash.critical { border-left: 4px solid var(--danger-ink); background: var(--danger-plate); color: var(--on-danger); }
+.flash.sticky .text { display: block; overflow: visible; -webkit-line-clamp: unset; }
+.flash-action, .flash-close { border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 5px; padding: 3px 9px; cursor: pointer; font: inherit; }
+.flash-close { border: 0; font-size: 1.1em; padding: 0 4px; }
 .flash .text { flex: 1; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 @keyframes slide { from { transform: translateY(8px); opacity: 0; } }
 .recent-popover { position: fixed; z-index: 180; top: calc(var(--menu) + var(--top) - 2px); right: 60px; width: min(380px, calc(100vw - 32px)); max-height: 60vh; overflow: auto; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); box-shadow: var(--shadow); }
@@ -130,3 +134,5 @@ body.console-open.console-bottom .shell, body.console-open.console-bottom .works
 body.handheld-active .console-panel { font-size: 0.875rem; }
 body.handheld-active .console-panel.dock-right { top: 0; width: min(50vw, 600px); }
 @media (max-width: 820px) { .console-panel.dock-right { top: auto; left: 0; right: 0; bottom: 0; width: auto; height: min(45vh, 360px); border-width: 1px 0 0; } }
+.status-button { border: 0; background: transparent; padding: 0; cursor: pointer; color: inherit; font: inherit; }
+.status-quiet { color: var(--text-secondary); }

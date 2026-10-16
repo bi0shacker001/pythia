@@ -39,16 +39,17 @@
   --border:#39364d;--border-strong:#4a4661;
   --text-primary:#eeeaf5;--text-secondary:#b4afc6;--text-tertiary:#8b86a0;
   --accent:#d9a441;--accent-hover:#ebba63;--accent-soft:#39301d;--on-accent:#251b08;
-  --positive:#63bd91;--positive-soft:#192c24;--warning:#d9a441;--warning-soft:#342a18;
+  --positive:#63bd91;--positive-soft:#192c24;--warning:#ee8b4a;--warning-soft:#36231a;
   --critical-token:#df6976;--critical-soft-token:#351d25;--informational:#78a9dc;--informational-soft:#182a3c;
   --selection:#332c20;--focus:#f4c56e;--focus-inner:#12111a;--overlay:rgba(5,4,9,.76);
   --shadow:0 18px 48px rgba(0,0,0,.34);
   /* Notice tones. Info follows the accent unless it would collide with caution
      (here it does: amber accent vs amber caution), so info uses neutral ink and
-     the circle-i glyph tells it apart. Caution and danger hues are locked;
-     only their lightness moves per theme to keep contrast. */
+     the circle-i glyph tells it apart. Caution (orange here, ochre in Parchment)
+     and danger are hues of their own, never the accent's (Droidtop/tracker#538,
+     UX review A1); only their lightness moves per theme to keep contrast. */
   --info-ink:#eeeaf5;--info-plate:#262433;--on-info:#d7d2e4;
-  --caution-ink:#ffc56b;--caution-plate:#342a18;--on-caution:#f1e3c6;
+  --caution-ink:#ffa066;--caution-plate:#36231a;--on-caution:#f6dccb;
   --danger-ink:#ff8a95;--danger-plate:#3a1f26;--on-danger:#f6d6da;
   --danger-fill:#c8323f;--on-danger-fill:#ffffff;
 }
@@ -59,7 +60,7 @@ html[data-theme="parchment"]{
   --border:#d5ccb8;--border-strong:#bdb19a;
   --text-primary:#28241f;--text-secondary:#5c5448;--text-tertiary:#7d7363;
   --accent:#a8672a;--accent-hover:#bd7a36;--accent-soft:#f0dfc2;--on-accent:#fff9ed;
-  --positive:#2f8f5e;--positive-soft:#e2f2e7;--warning:#a8672a;--warning-soft:#f4e5cc;
+  --positive:#2f8f5e;--positive-soft:#e2f2e7;--warning:#8a6a00;--warning-soft:#f3ebc8;
   --critical-token:#b8433f;--critical-soft-token:#f7e2df;--informational:#356f9c;--informational-soft:#e0edf6;
   --selection:#eee1c8;--focus:#8f561e;--focus-inner:#ffffff;--overlay:rgba(49,42,32,.42);
   --shadow:0 18px 48px rgba(73,55,31,.16);

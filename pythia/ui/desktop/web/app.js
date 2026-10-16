@@ -1104,11 +1104,27 @@ function renderChrome() {
   const nSystems = new Set(games.flatMap((g) => g.systemIds)).size || 1;
   $('#statusRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(nSystems, 'system')}` : '';
   $('#statusSyncLabel').textContent = !pythia ? 'Not connected' : nSystems > 1 ? `Synced across ${nSystems} systems` : 'This system only';
+  // The top bar never claims success (UX review A1): it says when Pythia is not connected or jobs failed,
+  // and otherwise only when the library was last read, without a check mark.
   const ind = $('#syncIndicator');
+  const failed = model.jobs.filter((j) => j.state === 'failed');
   if (!pythia) ind.innerHTML = `${visibleStatus('Not connected', 'critical')}`;
-  else ind.innerHTML = `${routineStatus('Library read')}<span id="syncLabel">${model.gamesAt ? esc(fmt.ago(model.gamesAt)) : '…'}</span>`;
+  else if (failed.length) { ind.innerHTML = `<button class="status-button" type="button">${visibleStatus(`${fmt.n(failed.length, 'job')} failed`, 'critical')}</button>`; $('button', ind).onclick = () => navigate('activity'); }
+  else ind.innerHTML = `<span id="syncLabel" class="status-quiet">${model.gamesAt ? `Read ${esc(fmt.ago(model.gamesAt))}` : 'Reading the library…'}</span>`;
 }
-setInterval(() => { const l = $('#syncLabel'); if (l && model.gamesAt) l.textContent = fmt.ago(model.gamesAt); }, 15000);
+setInterval(() => { const l = $('#syncLabel'); if (l && model.gamesAt) l.textContent = `Read ${fmt.ago(model.gamesAt)}`; }, 15000);
+// A job that has just failed raises a critical toast that stays until dismissed, with Show opening the job.
+function announceFailedJobs(before, after) {
+  const was = new Map((before || []).map((j) => [j.id, j.state]));
+  after.filter((j) => j.state === 'failed' && was.get(j.id) !== 'failed').forEach((j) => {
+    flash(`${j.title} failed: ${j.summary || j.detail || 'no reason given'}`, 'critical', { action: { label: 'Show', run: () => showJob(j.id) } });
+  });
+}
+function showJob(id) {
+  navigate('activity');
+  const j = model.jobs.find((x) => x.id === id); if (!j) return;
+  infoSheet({ title: j.title, details: [`${j.detail}`, `Started ${fmt.dateTime(j.started_at)}`, j.summary || '', '', ...(j.log || [])].join('\n') });
+}
 
 // ---- Backend bridge: connect, signals, initial loads ------------------------------------------
 function refreshGames() {
@@ -1138,10 +1154,11 @@ function connect() {
     pythia.pairingFinished.connect((r) => flash(r.status === 'ok' ? `Paired with ${r.paired}` : `Not paired: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'));
     pythia.logLine.connect(() => { if (state.view === 'activity') renderJobs(); });
     pythia.uiLog.connect((e) => { model.events.push(e); if (model.events.length > 500) model.events.shift(); if (state.view === 'activity') renderJobs(); });
-    pythia.jobsChanged.connect((jobs) => { model.jobs = jobs || []; renderChrome(); if (state.view === 'activity' || state.view === 'downloads') renderCurrent(); if (state.shell === 'handheld' && state.hhPage === 'home') renderHandheld(); });
+    pythia.jobsChanged.connect((jobs) => { announceFailedJobs(model.jobs, jobs || []); model.jobs = jobs || []; renderChrome(); if (state.view === 'activity' || state.view === 'downloads') renderCurrent(); if (state.shell === 'handheld' && state.hhPage === 'home') renderHandheld(); });
     pythia.intakeChanged.connect((i) => { model.intake = { detected: i.detected || [], decisions: i.decisions || [], watcher: i.watcher || null }; games = model.raw.map(adaptGame); renderChrome(); if (['downloads', 'reconcile', 'library'].includes(state.view)) renderCurrent(); if (state.shell === 'handheld') renderHandheld(); });
     pythia.decisionNeeded.connect((d) => flash(`${d.name || fileName(d.path)} needs a decision`, 'caution'));
-    pythia.onboardComplete.connect((r) => flash(r.status === 'ok' ? `Added ${r.name || ''}`.trim() : `Not added: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'));
+    // A failure is the failed job's own critical toast (announceFailedJobs); only success is acknowledged here.
+    pythia.onboardComplete.connect((r) => { if (r.status === 'ok') flash(`Added ${r.name || ''}`.trim()); });
     pythia.scanComplete.connect((results) => { const okN = (results || []).filter((r) => r.status === 'ok').length; flash(`Scan finished: ${fmt.n(okN, 'game')} found`); pythia.refresh_merge_candidates(); });
     pythia.downloadDetected.connect((path) => flash(`New file: ${fileName(path)}`));
     pythia.mergeCandidatesReady.connect((c) => { model.merges = c || []; renderChrome(); if (state.view === 'reconcile') renderReconcile(); });

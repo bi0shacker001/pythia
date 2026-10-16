@@ -29,6 +29,7 @@ import datetime
 import functools
 import json
 import logging
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -47,10 +48,12 @@ _SECRET_ARG_SLOTS = {"set_account_credential": {2}}
 
 
 def _normalize_path(path_str: str) -> str:
-    """QML folder dialogs hand back file:// URLs, not plain paths -- accept either."""
+    """QML folder dialogs hand back file:// URLs, not plain paths -- accept either.
+    A leading ~ is the home folder, as in the dialogs' example paths
+    (pythia.path_check checks the same path)."""
     if path_str.startswith("file:"):
         return QUrl(path_str).toLocalFile()
-    return path_str
+    return os.path.expanduser(path_str) if path_str.startswith("~") else path_str
 
 
 def _jsonable(obj):
@@ -1065,6 +1068,16 @@ class Backend(QObject):
 
         path, _filter = QFileDialog.getOpenFileName(None, title or "Choose a file")
         return path or ""
+
+    @Slot(str, str, result="QVariant")
+    @_guarded
+    def check_path(self, path_str: str, want: str):
+        """Whether a dialog's path will do before anything starts
+        (pythia.path_check; want is game, folder, writable or program).
+        ``reason`` is empty when it will."""
+        from pythia import path_check
+
+        return {"status": "ok", "reason": path_check.check(_normalize_path(path_str), want)}
 
     @Slot(str, result="QVariant")
     @_guarded

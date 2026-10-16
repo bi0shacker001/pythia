@@ -76,6 +76,9 @@ html[data-motion="off"] .skeleton { animation: none; }
 .dialog .buttons.wide .btn { flex: 1; min-height: 46px; }
 .dialog.prompt .buttons .btn { min-height: 36px; min-width: 88px; }
 .dialog .field-wrap { margin-top: 12px; }
+.dialog .field-reason { margin-top: 6px; min-height: 1.2em; font-size: 0.8125rem; color: var(--critical); overflow-wrap: anywhere; }
+.dialog .field-reason:empty { min-height: 0; margin-top: 0; }
+.dialog .btn.primary:disabled { background: var(--surface-2); border-color: var(--line); color: var(--text-secondary); }
 .dialog .btn.danger-fill { background: var(--danger-fill); border-color: var(--danger-fill); color: var(--on-danger-fill); font-weight: 700; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translateY(6px) scale(.98); } }

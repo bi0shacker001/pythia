@@ -128,7 +128,9 @@
   // prompt: Steam's rename dialog. A title line, the field, small Cancel and Save on the right.
   // Enter saves (Ctrl+Enter when multiline), Esc cancels and restores the old value.
   // kind: plain | path | url | number | select (options: [{value, label}]). Returns the text, or null when cancelled.
-  function prompt({ title, value = '', hint = '', kind = 'plain', multiline = false, save = 'Save', pick, options = [], body = '' }) {
+  // check: async (value) => reason; the save button stays disabled while it gives a reason, which is
+  // shown under the field (paths: backend check_path).
+  function prompt({ title, value = '', hint = '', kind = 'plain', multiline = false, save = 'Save', pick, options = [], body = '', check = null }) {
     return new Promise((resolve) => {
       let inputHtml;
       if (multiline) inputHtml = `<textarea class="notes-area" id="prompt-field" style="min-height:140px">${esc(value)}</textarea>`;
@@ -137,17 +139,42 @@
       openDialog({
         cls: 'prompt',
         html: `<h2>${esc(title)}</h2>${body ? `<div class="body" style="margin-top:6px">${esc(body)}</div>` : ''}
-          <div class="field-wrap"><label for="prompt-field" class="visually-hidden">${esc(title)}</label>${inputHtml}</div>
+          <div class="field-wrap"><label for="prompt-field" class="visually-hidden">${esc(title)}</label>${inputHtml}${check ? '<div class="field-reason" id="prompt-reason" role="status" aria-live="polite"></div>' : ''}</div>
           <div class="buttons">${pick ? `<button class="btn" type="button" data-pick style="margin-right:auto">${esc(pick.label)}</button>` : ''}<button class="btn" type="button" data-cancel>Cancel</button><button class="btn primary" type="button" data-proceed>${esc(save)}</button></div>`,
         onOpen: (card, close) => {
           const field = $('#prompt-field', card);
+          const proceed = $('[data-proceed]', card);
+          const reasonBox = $('#prompt-reason', card);
+          // Each check answers for the value it was asked about; only the latest answer counts.
+          let asked = 0;
+          let timer = null;
+          const recheck = () => {
+            if (!check) return;
+            proceed.disabled = true;
+            clearTimeout(timer);
+            timer = setTimeout(async () => {
+              const mine = ++asked;
+              const value = field.value;
+              let reason;
+              try { reason = await check(value); } catch (e) { reason = `Could not check the path: ${e.message || e}`; }
+              if (mine !== asked) return;
+              // An empty field keeps the button disabled without scolding before anything is typed.
+              reasonBox.textContent = value.trim() ? reason || '' : '';
+              field.setAttribute('aria-invalid', reason && value.trim() ? 'true' : 'false');
+              if (reason && value.trim()) field.setAttribute('aria-describedby', 'prompt-reason'); else field.removeAttribute('aria-describedby');
+              proceed.disabled = !!reason;
+            }, 200);
+          };
+          const submit = () => { if (!proceed.disabled) close(field.value); };
           field.focus(); if (!multiline && field.select) field.select();
           field.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && (!multiline || e.ctrlKey)) { e.preventDefault(); close(field.value); }
+            if (e.key === 'Enter' && (!multiline || e.ctrlKey)) { e.preventDefault(); submit(); }
           });
+          field.addEventListener('input', recheck);
           $('[data-cancel]', card).onclick = () => close(null);
-          $('[data-proceed]', card).onclick = () => close(field.value);
-          if (pick) $('[data-pick]', card).onclick = () => pick.run((v) => { if (v) field.value = v; field.focus(); });
+          proceed.onclick = submit;
+          if (pick) $('[data-pick]', card).onclick = () => pick.run((v) => { if (v) { field.value = v; recheck(); } field.focus(); });
+          recheck();
         },
         onClose: (r) => resolve(typeof r === 'string' ? r : null),
       });

@@ -207,7 +207,7 @@ async function bulkAction(a) {
   if (a === 'updates') { if (await confirm({ title: 'Check for updates?', body: 'Pythia asks F95zone about every game with an F95zone id. Other stores have no update check yet.', proceed: 'Check' })) { pythia.check_updates(); flash('Checking for updates'); navigate('activity'); } }
   if (a === 'reconcile') navigate('reconcile');
   if (a === 'backup') navigate('saves');
-  if (a === 'export') { const dir = await prompt({ title: 'Export a library report', body: 'One JSON file with this computer\u2019s records.', hint: 'C:\\Users\\you\\Documents', kind: 'path', save: 'Export', pick: { label: 'Browse', run: pickFolder('Folder for the report') } }); if (dir) { const r = await act('export_library_report', [dir.trim()], null, { what: 'Export' }); if (ok(r)) flash(`Report written: ${fileName(r.path)}`); } }
+  if (a === 'export') { const dir = await prompt({ title: 'Export a library report', body: 'One JSON file with this computer\u2019s records.', hint: pathHint('C:\\Users\\you\\Documents', '~/Documents'), kind: 'path', check: checkPath('writable'), save: 'Export', pick: { label: 'Browse', run: pickFolder('Folder for the report') } }); if (dir) { const r = await act('export_library_report', [dir.trim()], null, { what: 'Export' }); if (ok(r)) flash(`Report written: ${fileName(r.path)}`); } }
   if (a === 'remove') {
     const yes = await confirmDanger({ title: `Remove ${fmt.n(ids.length, 'game')} from the library?`, body: 'Their records leave the library. Files on disk stay where they are.', recommendation: 'We recommend Cancel unless the entries are wrong.', items: names.slice(0, 8).concat(names.length > 8 ? [`and ${names.length - 8} more`] : []), proceed: 'Remove' });
     if (yes) { for (const id of ids) await call('forget_game', id); state.bulk.clear(); state.selectionMode = false; updateBulkToolbar(); flash(`Removed ${fmt.n(ids.length, 'game')}`); }
@@ -688,8 +688,13 @@ function renderPlugins() {
 
 // ---- Actions shared by pages ------------------------------------------------------------
 const pickFolder = (title) => (done) => call('pick_folder', title).then((v) => done(typeof v === 'string' ? v : ''));
+// Example paths in this OS's shape (no C:\ on Linux), and the dialog's check before anything starts
+// (backend check_path: game, folder, writable or program).
+const onWindows = () => /^win/i.test((model.app && model.app.os) || navigator.platform || '');
+const pathHint = (win, other) => (onWindows() ? win : other);
+const checkPath = (want) => async (value) => { const r = await call('check_path', value, want); if (!ok(r)) throw new Error(r.message || 'no answer'); return r.reason; };
 async function addFolder() {
-  const path = await prompt({ title: 'Add a game folder', body: 'Pythia records the folder as it is; nothing is moved.', hint: 'G:\\games\\Example', kind: 'path', save: 'Add', pick: { label: 'Browse', run: pickFolder('Add a game folder') } });
+  const path = await prompt({ title: 'Add a game folder', body: 'Pythia records the folder as it is; nothing is moved.', hint: pathHint('G:\\games\\Example', '~/Games/Example'), kind: 'path', check: checkPath('game'), save: 'Add', pick: { label: 'Browse', run: pickFolder('Add a game folder') } });
   if (!path || !path.trim()) return;
   pythia.start_onboard(path.trim()); flash('Adding folder'); navigate('activity');
 }
@@ -699,7 +704,7 @@ async function findStoreGames() {
   if (ok(r)) { flash('Finding store games'); navigate('activity'); } else flash(r.status === 'unavailable' ? r.message : `Could not ask the stores: ${r.message}`, 'caution');
 }
 async function scanLibrary() {
-  const path = await prompt({ title: 'Scan a library folder', body: 'Every game folder inside is recorded. Scanning only reads: nothing is written into your game folders.', hint: 'G:\\games', kind: 'path', save: 'Scan', pick: { label: 'Browse', run: pickFolder('Scan a library folder') } });
+  const path = await prompt({ title: 'Scan a library folder', body: 'Every game folder inside is recorded. Scanning only reads: nothing is written into your game folders.', hint: pathHint('G:\\games', '~/Games'), kind: 'path', check: checkPath('folder'), save: 'Scan', pick: { label: 'Browse', run: pickFolder('Scan a library folder') } });
   if (!path || !path.trim()) return;
   pythia.start_scan(path.trim()); flash('Scan started'); navigate('activity');
 }
@@ -710,14 +715,14 @@ async function importSource() {
   if (id) { pythia.sync_account(id); flash('Importing'); navigate('activity'); }
 }
 async function watchFolder() {
-  const folder = await prompt({ title: 'Watch a download folder', hint: 'C:\\Users\\you\\Downloads', kind: 'path', save: 'Next', pick: { label: 'Browse', run: pickFolder('Folder to watch') } });
+  const folder = await prompt({ title: 'Watch a download folder', hint: pathHint('C:\\Users\\you\\Downloads', '~/Downloads'), kind: 'path', check: checkPath('folder'), save: 'Next', pick: { label: 'Browse', run: pickFolder('Folder to watch') } });
   if (!folder || !folder.trim()) return;
-  const program = await prompt({ title: 'Program to run while watching', body: 'Leave empty to only watch the folder.', hint: 'C:\\Tools\\F95Checker.exe', kind: 'path', save: 'Watch', pick: { label: 'Browse', run: (done) => call('pick_file', 'Program to run').then((v) => done(typeof v === 'string' ? v : '')) } });
+  const program = await prompt({ title: 'Program to run while watching', body: 'Leave empty to only watch the folder.', hint: pathHint('C:\\Tools\\F95Checker.exe', '~/Applications/F95Checker'), kind: 'path', check: checkPath('program'), save: 'Watch', pick: { label: 'Browse', run: (done) => call('pick_file', 'Program to run').then((v) => done(typeof v === 'string' ? v : '')) } });
   if (program === null) return;
   pythia.start_watch(program.trim(), folder.trim()); flash('Watching'); navigate('downloads');
 }
 async function exportDiagnostics() {
-  const dir = await prompt({ title: 'Export diagnostics', body: 'The log file plus app, system and plugin facts. No credentials.', hint: 'C:\\Users\\you\\Desktop', kind: 'path', save: 'Export', pick: { label: 'Browse', run: pickFolder('Folder for the diagnostics') } });
+  const dir = await prompt({ title: 'Export diagnostics', body: 'The log file plus app, system and plugin facts. No credentials.', hint: pathHint('C:\\Users\\you\\Desktop', '~/Desktop'), kind: 'path', check: checkPath('writable'), save: 'Export', pick: { label: 'Browse', run: pickFolder('Folder for the diagnostics') } });
   if (!dir) return;
   const r = await act('export_diagnostics', [dir.trim()], null, { what: 'Export' });
   if (ok(r)) flash(`Diagnostics written: ${fileName(r.report)}`);

@@ -27,8 +27,13 @@ the droidtop coordinator for this lane. Later sections follow them.
    recognise it later. An install's identity is its entry in Pythia's own
    data. Markers an earlier Pythia wrote are read and left alone.
 5. **Pairing.** Pairing is mutual TLS through droidtop-agent's crates, the
-   same as droidtop-agent's own pairing. A computer can also pair with
-   another computer.
+   same as droidtop-agent's own pairing (Droidtop/tracker#556): each device
+   has a self-signed certificate over its key, pairing pins the other's
+   certificate fingerprint, and every session is mutual TLS 1.3 with those
+   certificates. A computer can also pair with another computer. (Open:
+   droidtop-agent's crates today refuse computer-to-computer pairing,
+   DESIGN.md section 3, "Kinds of device"; the owner's word and the crates
+   disagree, and the crates are not changed until that is settled.)
 6. **One entry per game across stores.** A game owned on several stores is
    one library entry with several store ids (Droidtop/tracker#133, droidtop
    SPEC 7m), not one entry per store.
@@ -205,8 +210,8 @@ The Devices page (today "Systems & sync") lists every device this computer
 knows. Each device has:
 
 - **A name**, which the person can change on this computer.
-- **A type**: a computer (another Pythia, or droidtop-agent) or a
-  droidtop handheld.
+- **A type**: a computer (another Pythia, or droidtop-agent; see the open
+  point in 1.5) or a droidtop handheld.
 - **Last sync**: when the two last exchanged saves or the library, or
   "Never".
 - **Pending changes**: what is waiting to go either way, counted (saves,
@@ -214,7 +219,8 @@ knows. Each device has:
 - **Conflicts**: saves that differ on both sides since the last sync.
   Each conflict is also in Review's Sync conflicts (A18).
 - **The device ID**, read-only, under Info. It is the device's PeerId (its
-  public key, droidtop-agent docs/DESIGN.md section 3).
+  public key, droidtop-agent docs/DESIGN.md section 3), with its pinned
+  certificate fingerprint.
 
 What syncs with a device is shown on that device's own page, generated
 from the sync model. It says that game files never sync (UX review AG6).
@@ -228,9 +234,9 @@ same change.
 
 Pairing uses droidtop-agent's crates, so Pythia and droidtop-agent pair the
 same way and share one identity and one trust list per computer
-(droidtop-agent docs/DESIGN.md section 3). The "mutual TLS" of 1.5 is, in
-those crates, mutual authentication with pinned keys over the Noise
-channel (DESIGN.md section 4); no other channel is added. What follows adds a way to find
+(droidtop-agent docs/DESIGN.md section 3). Every session is mutual TLS 1.3, each
+side presenting its device certificate, and pairing is what pins the
+other's certificate fingerprint (1.5; DESIGN.md sections 3 and 4). What follows adds a way to find
 each other and a code to compare; the typed-code exchange that exists today
 stays as the fallback.
 
@@ -264,9 +270,11 @@ code (numeric comparison, as Bluetooth and ZRTP do):
    both random values, reduced to 000000 to 999999. Both screens show it in
    large type.
 5. The person confirms on both devices that the codes match. Each side
-   then sends its name and its identity's signature over the transcript
-   (label, side, both PeerIds, both random values, the name), and pins the
-   other's PeerId.
+   then describes itself, `{name, kind, cert}` (`cert` its certificate's
+   fingerprint, as in the typed exchange), with its identity's signature
+   over the transcript (label, side, both PeerIds, both random values, the
+   description's exact text). Each checks that the fingerprint is the one
+   of the key that signed, and pins it.
 
 The label is `droidtop-agent pair-confirm v1`. The commitment means neither
 side can choose its value after seeing the other's, so a device in the
@@ -278,7 +286,7 @@ allowed per opening of the pairing screen.
 
 The existing exchange stays, both ways, as the fallback: windowcast's
 SPAKE2 exchange (`windowcast_pairing::exchange`, label `droidtop-agent pair
-v2`). Either the handheld shows a code and the person types it into
+v3`, which pins certificate fingerprints the same way). Either the handheld shows a code and the person types it into
 Pythia (Pair a handheld), or Pythia shows a code and its addresses and the
 person types them into droidtop (Show a code; droidtop's "Use a code from
 the computer"). Three wrong codes end the attempt.

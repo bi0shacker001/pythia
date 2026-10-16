@@ -40,8 +40,8 @@ class PadReaderTest(TestCase):
     def reader(self, queued, focused):
         sent = []
         fake = FakeNative(queued)
-        reader = pad.PadReader(sent.append, focused=lambda: focused)
-        with mock.patch.object(native, "submodule", return_value=fake), mock.patch("PySide6.QtCore.QTimer"):
+        reader = pad.PadReader(sent.append, focused=lambda: focused, make_timer=mock.Mock)
+        with mock.patch.object(native, "submodule", return_value=fake):
             self.assertTrue(reader.start())
         return reader, fake, sent
 

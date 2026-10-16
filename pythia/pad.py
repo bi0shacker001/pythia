@@ -44,13 +44,25 @@ def pythia_has_focus() -> bool:
     return QGuiApplication.applicationState() == Qt.ApplicationState.ApplicationActive
 
 
+def qt_timer() -> Any:
+    from PySide6.QtCore import QTimer
+
+    return QTimer()
+
+
 class PadReader:
     """Starts the native reader and drains it on a Qt timer, calling ``send``
     with each action while Pythia has the focus."""
 
-    def __init__(self, send: Callable[[str], None], focused: Callable[[], bool] = pythia_has_focus):
+    def __init__(
+        self,
+        send: Callable[[str], None],
+        focused: Callable[[], bool] = pythia_has_focus,
+        make_timer: Callable[[], Any] = qt_timer,
+    ):
         self._send = send
         self._focused = focused
+        self._make_timer = make_timer
         self._timer: Any = None
         self._module: Any = None
         self.problem: str | None = None
@@ -66,9 +78,7 @@ class PadReader:
             logger.warning(self.problem)
             return False
         self._module = module
-        from PySide6.QtCore import QTimer
-
-        self._timer = QTimer()
+        self._timer = self._make_timer()
         self._timer.setInterval(POLL_MS)
         self._timer.timeout.connect(self.drain)
         self._timer.start()

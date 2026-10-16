@@ -348,10 +348,24 @@ def get_games_where(**conditions: Any) -> list[DbGameDict]:
     against the merged games+primary-variant view (or per-variant rows, for
     variant-scoped fields -- see get_games())."""
     filters: dict[str, Any] = {}
+    excludes: dict[str, Any] = {}
+    below: dict[str, Any] = {}
     for field, value in conditions.items():
-        base_field = field.split("__")[0]
-        filters[field] = value
-    return get_games(filters=filters)
+        base_field, _, op = field.partition("__")
+        if op == "isnull":
+            (filters if value else excludes)[base_field] = None
+        elif op == "not":
+            excludes[base_field] = value
+        elif op in ("", "in"):
+            filters[base_field] = value
+        elif op == "lessthan":
+            below[base_field] = value
+        else:
+            raise ValueError(f"unknown condition {field}")
+    games = get_games(filters=filters, excludes=excludes)
+    for field, limit in below.items():
+        games = [g for g in games if g.get(field) is not None and g[field] < limit]
+    return games
 
 
 def get_games_by_ids(game_ids) -> list[DbGameDict]:

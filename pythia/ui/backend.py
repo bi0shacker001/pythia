@@ -630,6 +630,69 @@ class Backend(QObject):
                 return {"status": "ok", "current": version or None}
         return {"status": "error", "message": "This computer has no record of that game."}
 
+    # ---- a folder's kind and language (UX review A14) --------------------------
+    @Slot(result="QVariant")
+    @_guarded
+    def get_folder_vocabulary(self):
+        """The kinds a folder can be and the languages Pythia names, for the
+        Versions section's choices and its folder names."""
+        return {"status": "ok", "kinds": list(datadir.KINDS), "languages": dict(datadir.LANGUAGE_NAMES)}
+
+    def _edit_variant(self, game_id: str, path: str, change) -> dict:
+        uuid = get_system_uuid()
+        for entry in datadir.list_all_entries():
+            if entry.get("system_uuid") != uuid or entry.get("game_id") != game_id:
+                continue
+            for group in entry.get("versions") or []:
+                for variant in group.get("variants") or []:
+                    if variant.get("path") == path:
+                        message = change(entry, group, variant)
+                        if message:
+                            return {"status": "error", "message": message}
+                        games_db.save_entry_and_sync_cache(entry)
+                        self.refresh_games()
+                        return {"status": "ok"}
+            return {"status": "error", "message": "That folder is not one of this game's folders here."}
+        return {"status": "error", "message": "This computer has no record of that game."}
+
+    @Slot(str, str, str, str, result="QVariant")
+    @_guarded
+    def set_variant_details(self, game_id: str, path: str, kind: str, language: str):
+        """A folder's kind (game, mod, patch or translation) and language, as the
+        person sets them; a rescan keeps them."""
+
+        def change(entry, group, variant):
+            if kind not in datadir.KINDS:
+                return f"Kind is one of {', '.join(datadir.KINDS)}."
+            if language and language not in datadir.LANGUAGE_NAMES and language != "mtl":
+                return f"Pythia does not know the language {language!r}."
+            variant["kind"] = kind
+            variant["kind_set_by_person"] = True
+            variant["language"] = language or None
+            datadir.add_timeline_event(entry, "folder_described", f"{path}: {kind}, {language or 'no language'}")
+            return None
+
+        return self._edit_variant(game_id, path, change)
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    def link_variant_to_version(self, game_id: str, path: str, base_version: str):
+        """Links a translation, patch or mod folder to the version it applies to
+        (one action); an empty ``base_version`` unlinks it."""
+
+        def change(entry, group, variant):
+            labels = [g.get("version") or "" for g in entry.get("versions") or []]
+            if base_version and base_version not in labels:
+                return f"{base_version} is not one of this game's versions here."
+            if base_version:
+                variant["base_version"] = base_version
+            else:
+                variant.pop("base_version", None)
+            datadir.add_timeline_event(entry, "folder_linked", f"{path} -> {base_version or 'unlinked'}")
+            return None
+
+        return self._edit_variant(game_id, path, change)
+
     # 2026-08-04, Lutris-base port: the old direct-launch variant flag (set_variant_
     # direct) isn't ported -- Lutris's own "linux" runner already covers "just run
     # this executable directly, no compatibility layer needed" (see

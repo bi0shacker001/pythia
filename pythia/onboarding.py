@@ -26,7 +26,7 @@ from pathlib import Path
 from pythia import datadir
 from pythia.core import instance_marker
 from pythia.database import games as games_db
-from pythia.datadir import classify_variant_tokens
+from pythia.datadir import classify_folder_tokens
 from pythia.identity import get_system_uuid, new_game_id
 
 NAME_SIMILARITY_THRESHOLD = 0.6
@@ -95,15 +95,19 @@ def _extract_version_only(leaf: str):
     stripped = _GENERIC_PART_PREFIX_RE.sub("", leaf, count=1)
     m = re.search(r"(\d+(?:[._]\d+)*[a-zA-Z]*)", stripped)
     if not m:
-        mods, language = classify_variant_tokens(stripped)
-        return stripped.strip() or leaf, mods, language
+        return stripped.strip() or leaf, classify_folder_tokens(stripped)
     version = m.group(1).replace("_", ".")
     rest = stripped[: m.start()] + " " + stripped[m.end() :]
-    mods, language = classify_variant_tokens(rest)
-    return version, mods, language
+    return version, classify_folder_tokens(rest)
 
 
 def _derive_name_version_mods_language(path: Path):
+    """_derive_folder's name, version, mods and language."""
+    name, version, details = _derive_folder(path)
+    return name, version, details["mods"], details["language"]
+
+
+def _derive_folder(path: Path):
     """Minimal placeholder splitter -- good enough to seed a canonical name, a
     version-ish label, a `mods` guess, and a `language` guess from a raw folder name; a
     proper Sonarr/Radarr-style naming filter system replaces this later. Best-effort --
@@ -124,16 +128,15 @@ def _derive_name_version_mods_language(path: Path):
     if _is_generic_part_leaf(folder_name):
         ancestor_name = _find_meaningful_ancestor_name(path)
         if ancestor_name is not None:
-            version, mods, language = _extract_version_only(folder_name)
-            return ancestor_name, version, mods, language
+            version, details = _extract_version_only(folder_name)
+            return ancestor_name, version, details
 
     m = _NAME_VERSION_RE.search(folder_name)
     if not m:
-        return folder_name, "", [], None
+        return folder_name, "", {"mods": [], "language": None, "kind": "game", "flags": []}
     name = m.group(1).strip(" -_") or folder_name
     version = (m.group(2) or m.group(3)).replace("_", ".")
-    mods, language = classify_variant_tokens(m.group(4))
-    return name, version, mods, language
+    return name, version, classify_folder_tokens(m.group(4))
 
 
 def _own_entries():
@@ -323,7 +326,8 @@ def preview(path: Path | str):
         if other.get("kind") != detection.get("kind") and other.get("kind") in datadir.PLATFORM_ID_KINDS
     ]
 
-    derived_name, derived_version, mods, language = _derive_name_version_mods_language(path)
+    derived_name, derived_version, details = _derive_folder(path)
+    mods, language = details["mods"], details["language"]
     name = detection.get("name") or derived_name
     # No version token anywhere means no version: None, never the folder name
     # (2026-10-14 real-data finding: 102 of 162 scanned games carried their own
@@ -341,6 +345,8 @@ def preview(path: Path | str):
         "version_label": version_label,
         "mods": mods,
         "language": language,
+        "kind": details["kind"],
+        "flags": details["flags"],
         "candidates": candidates,
     }
 
@@ -457,7 +463,17 @@ def onboard(path: Path | str, decision: dict | None = None):
     )
     # Nothing is written into the game's folder: its identity is this entry
     # (game_uuid, and the variant's path) in Pythia's own data.
-    _merge_version(entry, path, version_label, mods, language, detection.get("platforms", []), source)
+    _merge_version(
+        entry,
+        path,
+        version_label,
+        mods,
+        language,
+        detection.get("platforms", []),
+        source,
+        kind=pv.get("kind", "game"),
+        flags=pv.get("flags", []),
+    )
 
     if is_new_entry and foreign_seed is not None:
         datadir.add_timeline_event(
@@ -677,7 +693,17 @@ def _update_platform_ids_and_ownership(entry: dict, detection: dict):
         ownership.append({"platform": kind})
 
 
-def _merge_version(entry: dict, path: Path, version: str, mods: list, language, platforms: list, source: dict):
+def _merge_version(
+    entry: dict,
+    path: Path,
+    version: str,
+    mods: list,
+    language,
+    platforms: list,
+    source: dict,
+    kind: str = "game",
+    flags: list | None = None,
+):
     """Find-or-create the `versions[]` group for `version`, then find-by-path within
     that group's `variants[]` (update in place) or append a new variant. `source`
     (what this specific on-disk install actually is -- see PLATFORM_ID_KINDS'
@@ -699,6 +725,10 @@ def _merge_version(entry: dict, path: Path, version: str, mods: list, language, 
         if variant.get("path") == path_str:
             variant["mods"] = mods
             variant["language"] = language
+            # A kind the person set (set_variant_details) is theirs; a rescan only proposes.
+            if not variant.get("kind_set_by_person"):
+                variant["kind"] = kind
+            variant["flags"] = list(flags or [])
             variant["platforms"] = platforms
             variant["source"] = source
             variant["detected_at"] = now
@@ -709,6 +739,8 @@ def _merge_version(entry: dict, path: Path, version: str, mods: list, language, 
             "id": new_game_id()[:12],
             "mods": mods,
             "language": language,
+            "kind": kind,
+            "flags": list(flags or []),
             "path": path_str,
             "platforms": platforms,
             "source": source,

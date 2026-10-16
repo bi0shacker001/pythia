@@ -2,6 +2,7 @@
 the same service as ``droidtop-agent run``, on the agent's own threads."""
 
 import threading
+import time
 
 from pythia.droidtop.native import RELEASES, AgentError, available, submodule, why_unavailable
 from pythia.util.log import logger
@@ -47,14 +48,26 @@ def start_in_background() -> None:
     threading.Thread(target=run, name="droidtop-agent", daemon=True).start()
 
 
-def events(since: int = 0) -> list[dict]:
+def events(since: int = 0, wait: float = 0.0) -> list[dict]:
     """What the service did after event ``since`` (0: the last 500), oldest
     first: ``seq``, ``ms``, ``level`` ("info", "warn"), ``kind`` ("launch",
-    "arrived", "session", "library"...) and ``message``. An agent module from
-    before the service had events raises AgentError saying so."""
+    "arrived", "session", "library", "saves"...), ``message`` and what it is
+    about (``peer``, ``device``, ``title``, ``key``...). With ``wait`` it waits
+    that many seconds for an event when there is none yet; a module from
+    before it could wait sleeps that long instead, so a caller loops the same
+    way with either. A module from before the service had events raises
+    AgentError saying so."""
     module = submodule("service")
     if not hasattr(module, "events"):
         raise AgentError(
             f"this droidtop_agent module cannot report what the agent does; install a newer wheel from {RELEASES}"
         )
-    return module.events(since=since)
+    if wait <= 0:
+        return module.events(since=since)
+    try:
+        return module.events(since=since, wait=wait)
+    except TypeError:
+        new = module.events(since=since)
+        if not new:
+            time.sleep(wait)
+        return new

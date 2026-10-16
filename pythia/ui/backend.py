@@ -30,7 +30,6 @@ import functools
 import json
 import logging
 import threading
-import time
 from pathlib import Path
 from typing import Any
 
@@ -94,10 +93,11 @@ def _guarded(fn):
     return wrapper
 
 
-# How often the agent's events are read while this process serves, and the
-# kinds after which the handheld panels redraw (a sync, an arrival, a launch).
-_AGENT_EVENTS_EVERY_S = 2
-_HANDHELD_EVENT_KINDS = {"session", "library", "arrived", "launch"}
+# How long one read of the agent's events waits for the next one, and the
+# kinds after which the handheld panels redraw (a sync, an arrival, a launch,
+# a save copy).
+_AGENT_EVENTS_WAIT_S = 30
+_HANDHELD_EVENT_KINDS = {"session", "library", "arrived", "launch", "saves"}
 
 
 def _off_the_main_thread(fn):
@@ -226,11 +226,8 @@ class Backend(QObject):
 
             seen = 0
             while True:
-                time.sleep(_AGENT_EVENTS_EVERY_S)
                 try:
-                    if service.serving().get("state") != "serving":
-                        continue
-                    new = service.events(seen)
+                    new = service.events(seen, wait=_AGENT_EVENTS_WAIT_S)
                 except AgentError as ex:
                     self._record("warn", "agent", f"What the droidtop agent does is not shown here: {ex}")
                     return

@@ -189,6 +189,23 @@ class AgentEventsTest(TestCase):
             self.assertEqual(service.events(2)[0]["kind"], "launch")
         fake.service.events.assert_called_once_with(since=2)
 
+    def test_waiting_for_the_next_event(self):
+        fake = mock.Mock()
+        fake.service.events.return_value = []
+        with mock.patch.object(native, "_module", fake):
+            self.assertEqual(service.events(5, wait=30), [])
+        fake.service.events.assert_called_once_with(since=5, wait=30)
+
+    def test_a_module_that_cannot_wait_sleeps_instead(self):
+        def events(since=0):
+            return []
+
+        fake = mock.Mock()
+        fake.service.events = events
+        with mock.patch.object(native, "_module", fake), mock.patch.object(service.time, "sleep") as sleep:
+            self.assertEqual(service.events(0, wait=7), [])
+        sleep.assert_called_once_with(7)
+
     def test_an_agent_module_without_events_says_so(self):
         fake = mock.Mock()
         fake.service = mock.Mock(spec=["serve", "serving"])

@@ -546,9 +546,10 @@ function renderDownloads() {
     const ds = Array.isArray(list) ? list : [];
     if (!ds.length) { host.appendChild(stateBlock({ title: 'No downloader plugins', body: 'A downloader plugin adds a card here.' })); return; }
     ds.forEach((d) => {
-      const watching = watcher && d.enabled;
+      // Only the downloader that started the watch is watching (Droidtop/tracker#538 retest D4).
+      const watching = !!watcher && d.enabled && watcher.plugin === d.id;
       const card = el(`<div class="card"><div class="card-head"><div class="card-icon">${esc(d.display_name.slice(0, 2).toUpperCase())}</div><div><strong>${esc(d.display_name)}</strong><small>${esc(d.headless ? 'Can fetch without a window' : 'Opens its own window; Pythia watches the folder')}</small></div></div><div class="card-body"><p>${esc(watching ? `Watching ${watcher.folder}${watcher.program ? ` while ${fileName(watcher.program)} runs` : ''}.` : d.enabled ? 'Not watching a folder right now.' : 'Turned off in Settings > Downloaders.')}</p></div><div class="card-foot">${watching ? routineStatus('Watching') : d.enabled ? visibleStatus('Idle', 'neutral', '–') : visibleStatus('Turned off', 'neutral', '–')}<span class="spacer"></span><button class="btn small" data-watch>${watching ? 'Stop' : 'Watch a folder'}</button></div></div>`);
-      $('[data-watch]', card).onclick = () => (watching ? stopWatching() : watchFolder());
+      $('[data-watch]', card).onclick = () => (watching ? stopWatching() : watchFolder(d.id));
       host.appendChild(card);
     });
   }, { what: 'Downloaders' });
@@ -886,7 +887,7 @@ function renderCapabilityList(host, category) {
       const row = el(`<div class="account-row"><div class="card-icon">${esc(p.display_name.slice(0, 2).toUpperCase())}</div><div><strong>${esc(p.display_name)}</strong>${sub || s.error ? `<small>${esc(s.error || sub)}</small>` : ''}</div><div class="row-status">${status}<button class="toggle" aria-label="Enable ${esc(p.display_name)}"><span></span></button>${extra}</div></div>`);
       bindSwitch($('.toggle', row), p.enabled, (on) => act('set_plugin_enabled', [p.id, on], on ? `${p.display_name} turned on` : `${p.display_name} turned off`, { what: 'Turning the plugin' }).then((res) => { if (ok(res)) { refreshPlugins().then(() => renderCapabilityList(host, category)); } }), `Enable ${p.display_name}`);
       $('[data-account]', row)?.addEventListener('click', () => accountDialog(p.id));
-      $('[data-watch-config]', row)?.addEventListener('click', () => (s.watching ? stopWatching() : watchFolder()));
+      $('[data-watch-config]', row)?.addEventListener('click', () => (s.watching ? stopWatching() : watchFolder(p.id)));
       h.appendChild(row);
     });
   }, { what: `${CATEGORY_NAMES[category]} plugins` });
@@ -1021,12 +1022,13 @@ async function importSource() {
   const id = await prompt({ title: 'Import from source', kind: 'select', options: connected.map((a) => ({ value: a.id, label: a.display_name })), value: connected[0].id, save: 'Import' });
   if (id) { pythia.sync_account(id); flash('Importing'); navigate('activity'); }
 }
-async function watchFolder() {
+async function watchFolder(pluginId = '') {
   const folder = await prompt({ title: 'Watch a download folder', hint: pathHint('C:\\Users\\you\\Downloads', '~/Downloads'), kind: 'path', check: checkPath('folder'), save: 'Next', pick: { label: 'Browse', run: pickFolder('Folder to watch') } });
   if (!folder || !folder.trim()) return;
   const program = await prompt({ title: 'Program to run while watching', body: 'Leave empty to only watch the folder.', hint: pathHint('C:\\Tools\\F95Checker.exe', '~/Applications/F95Checker'), kind: 'path', check: checkPath('program'), save: 'Watch', pick: { label: 'Browse', run: (done) => call('pick_file', 'Program to run').then((v) => done(typeof v === 'string' ? v : '')) } });
   if (program === null) return;
-  pythia.start_watch(program.trim(), folder.trim()); flash('Watching'); navigate('downloads');
+  if (pluginId) pythia.start_watch_for(pluginId, program.trim(), folder.trim()); else pythia.start_watch(program.trim(), folder.trim());
+  flash('Watching'); navigate('downloads');
 }
 async function exportDiagnostics() {
   const dir = await prompt({ title: 'Export diagnostics', body: 'The log file plus app, system and plugin facts. No credentials.', hint: pathHint('C:\\Users\\you\\Desktop', '~/Desktop'), kind: 'path', check: checkPath('writable'), save: 'Export', pick: { label: 'Browse', run: pickFolder('Folder for the diagnostics') } });

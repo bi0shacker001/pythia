@@ -649,6 +649,26 @@ class TestResumeProgressCreation(TestCase):
         # Progress file should be cleaned up on success
         assert not os.path.exists(dest + ".progress")
 
+    def test_chunks_queued_before_a_stop_are_still_written_and_recorded(self):
+        """Another range failing sets stop_request; what was already downloaded is
+        still written, so its range is recorded for the resume (Droidtop/tracker#538)."""
+        dest = str(self.tmp_path / "stopped.bin")
+        with open(dest, "wb") as f:
+            f.truncate(2000)
+        dl = GOGDownloader("https://cdn.gog.com/file.bin", dest, num_workers=2)
+        dl._progress = DownloadProgress(dest)
+        dl._progress.create("https://cdn.gog.com/file.bin", 2000, [(0, 999), (1000, 1999)])
+        dl.stop_request = threading.Event()
+        dl.stop_request.set()
+        dl._write_queue.put((0, b"A" * 1000, 0, 999))
+        dl._write_queue.put(None)
+        dl._writer_loop()
+        with open(dest, "rb") as f:
+            self.assertEqual(f.read(1000), b"A" * 1000)
+        progress = DownloadProgress(dest)
+        self.assertTrue(progress.load())
+        self.assertEqual(progress.completed_ranges, [(0, 999)])
+
     def test_progress_file_records_completed_ranges(self):
         """Ranges that finish should be persisted in the progress file."""
         dest = str(self.tmp_path / "track.bin")

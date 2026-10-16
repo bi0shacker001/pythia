@@ -142,6 +142,16 @@ class _UiLogHandler(logging.Handler):
         self._backend._keep(entry)
 
 
+def downloader_watching(watcher: dict | None, plugin_id: str) -> str | None:
+    """The folder `plugin_id` is watching: the watch's folder when that
+    downloader started it, else None. A watch started for no downloader, or
+    for another, is not this one's (Droidtop/tracker#538 retest D4: every
+    downloader said Watching)."""
+    if not watcher or watcher.get("plugin") != plugin_id:
+        return None
+    return watcher.get("folder")
+
+
 class Backend(QObject):
     logLine = Signal(str)
     # Dict and list payloads are declared as QVariant, not a bare Python object:
@@ -390,6 +400,9 @@ class Backend(QObject):
     # ---- scan a library (automatic; ambiguous results reviewed afterward) -----
     @Slot(str)
     def start_scan(self, path_str: str):
+        """Scans a folder and records what it finds: the big-picture UI's
+        scan (bigpicture/qml/HomeScreen.qml). The web UI looks first
+        (start_look) and adds what the person keeps."""
         path_str = _normalize_path(path_str)
         job = self._job_start("scan", f"Scan {path_str}", "Finds every game folder inside")
         threading.Thread(target=self._scan_worker, args=(path_str, job), daemon=True).start()
@@ -411,10 +424,17 @@ class Backend(QObject):
     def _look_worker(self, path_str: str, job: str):
         from pythia import look
 
+        # Only the newest Look is the page's: one started after this one
+        # replaces it, and this one's progress and result are then dropped
+        # rather than overwriting the newer one's (Droidtop/tracker#538 retest).
+        def current() -> bool:
+            return self._look is not None and self._look.get("job") == job
+
         def progress(counts):
             with self._lock:
-                if self._look and self._look.get("job") == job:
-                    self._look["counts"] = counts
+                if self._look is None or not current():
+                    return
+                self._look["counts"] = counts
             self.lookChanged.emit(_jsonable({"status": "looking", "root": path_str, "counts": counts, "job": job}))
 
         try:
@@ -422,12 +442,19 @@ class Backend(QObject):
         except OSError as exc:
             self._job_finish(job, f"Could not look in {path_str}: {exc}", ok=False)
             with self._lock:
+                if not current():
+                    return
                 self._look = None
             self.lookChanged.emit({"status": "error", "message": str(exc)})
             return
         result["job"] = job
         with self._lock:
-            self._look = result
+            replaced = not current()
+            if not replaced:
+                self._look = result
+        if replaced:
+            self._job_finish(job, "Replaced by a newer Look; nothing was added")
+            return
         self._job_finish(job, result["summary"] + ". Review them, then Add.")
         self.lookChanged.emit(_jsonable(result))
 
@@ -595,8 +622,14 @@ class Backend(QObject):
         self.onboardComplete.emit(_jsonable(result))
 
     # ---- download watching -----------------------------------------------------
+    @Slot(str, str, str)
+    def start_watch_for(self, plugin_id: str, command_str: str, watch_dir_str: str):
+        """start_watch for one downloader plugin: only that plugin's card and
+        row say Watching (Droidtop/tracker#538 retest D4)."""
+        self.start_watch(command_str, watch_dir_str, plugin_id)
+
     @Slot(str, str)
-    def start_watch(self, command_str: str, watch_dir_str: str):
+    def start_watch(self, command_str: str, watch_dir_str: str, plugin_id: str = ""):
         """Launch `command_str` (a single executable path -- no argument splitting
         yet) and watch `watch_dir_str` for new files, emitting downloadDetected for
         each. See downloads.launch_and_watch; this doesn't move or import anything
@@ -612,7 +645,13 @@ class Backend(QObject):
         self.stop_watch()
         self._watch_stop_event = threading.Event()
         job = self._job_start("watch", f"Watching {watch_dir_str}", f"Running {command_str}" if command_str else "")
-        self._watcher = {"program": command_str, "folder": watch_dir_str, "started_at": _now(), "job": job}
+        self._watcher = {
+            "program": command_str,
+            "folder": watch_dir_str,
+            "plugin": plugin_id or None,
+            "started_at": _now(),
+            "job": job,
+        }
         self._emit_intake()
         threading.Thread(
             target=self._watch_worker, args=(command_str, watch_dir_str, self._watch_stop_event, job), daemon=True
@@ -1006,7 +1045,10 @@ class Backend(QObject):
                     caps = p.capabilities(ctx)
                     item["state"] = {"installed": caps.get("installed"), "tool_version": caps.get("version")}
                 elif category == "downloader":
-                    item["state"] = {"watching": (self._watcher or {}).get("folder"), "platforms": list(p.platforms)}
+                    item["state"] = {
+                        "watching": downloader_watching(self._watcher, p.id),
+                        "platforms": list(p.platforms),
+                    }
             except NotImplementedError:
                 item["state"] = {"unknown": "This plugin does not report its state."}
             except Exception as exc:  # noqa: BLE001 -- one plugin's failure is that row's state

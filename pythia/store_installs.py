@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from pythia import datadir, onboarding
-from pythia.droidtop.native import submodule
+from pythia.droidtop.native import plain_path, submodule
 from pythia.identity import get_system_uuid
 from pythia.util.log import logger
 
@@ -45,7 +45,7 @@ def find() -> list[dict]:
     for item in scan.get("games") or []:
         game = item.get("game") or {}
         install = game.get("install") or {}
-        folder = item.get("base") or install.get("path")
+        folder = plain_path(item.get("base") or install.get("path"))
         if not install.get("installed") or not folder or not Path(folder).is_dir():
             continue
         found.append(

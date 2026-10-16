@@ -463,3 +463,36 @@ class ProfileFoldersTest(TestCase):
                 found = _native.agent.folders()
         self.assertEqual(Path(found["config"]), Path(roaming) / "droidtop-agent")
         self.assertEqual(Path(found["data"]), Path(local) / "droidtop-agent")
+
+
+class PlainPathTest(TestCase):
+    """Windows paths from the native side without the \\\\?\\ prefix (Droidtop/tracker#538 retest S1, S2)."""
+
+    def test_the_extended_length_prefix_is_dropped(self):
+        self.assertEqual(native.plain_path("\\\\?\\G:\\games\\Tiny"), "G:\\games\\Tiny")
+        self.assertEqual(native.plain_path("\\\\?\\UNC\\nas\\games"), "\\\\nas\\games")
+        self.assertEqual(native.plain_path("/home/me/games"), "/home/me/games")
+        self.assertIsNone(native.plain_path(None))
+
+    def test_save_copies_and_launcher_folders_are_plain(self):
+        from pythia import store_installs
+        from pythia.droidtop import saves
+
+        fake = mock.Mock()
+        fake.saves.copies.return_value = [
+            {"key": "k", "dir": "\\\\?\\G:\\keep\\k", "copies": [{"path": "\\\\?\\G:\\keep\\k\\1"}]}
+        ]
+        fake.scan.scan_with.return_value = {
+            "games": [
+                {
+                    "base": "\\\\?\\" + tempfile.gettempdir(),
+                    "game": {"key": "steam:1", "title": "T", "install": {"installed": True}},
+                }
+            ]
+        }
+        with mock.patch.object(native, "_module", fake):
+            kept = saves.copies()
+            found = store_installs.find()
+        self.assertEqual(kept[0]["dir"], "G:\\keep\\k")
+        self.assertEqual(kept[0]["copies"][0]["path"], "G:\\keep\\k\\1")
+        self.assertEqual(found[0]["folder"], tempfile.gettempdir())

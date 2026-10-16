@@ -2,14 +2,19 @@
 when both a handheld and this computer changed a game's saves, the newest
 copy wins and the other is kept here, so nothing is lost."""
 
-from pythia.droidtop.native import submodule
+from pythia.droidtop.native import plain_path, submodule
 
 
 def copies() -> list[dict]:
     """Every game's kept copies: ``key``, ``title``, ``dir`` and ``copies``,
     each with ``device``, ``stamp`` (UTC, ``20261008T224500Z``), ``files``,
-    ``path``, ``newest`` and ``reviewed``."""
-    return submodule("saves").copies()
+    ``path``, ``newest`` and ``reviewed``. Paths are plain (plain_path)."""
+    games = submodule("saves").copies()
+    for game in games:
+        game["dir"] = plain_path(game.get("dir"))
+        for copy in game.get("copies") or []:
+            copy["path"] = plain_path(copy.get("path"))
+    return games
 
 
 def lookup(key: str, title: str = "", fetch: bool = False) -> dict:

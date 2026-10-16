@@ -30,10 +30,10 @@ the droidtop coordinator for this lane. Later sections follow them.
    same as droidtop-agent's own pairing (Droidtop/tracker#556): each device
    has a self-signed certificate over its key, pairing pins the other's
    certificate fingerprint, and every session is mutual TLS 1.3 with those
-   certificates. A computer pairs with handhelds, not with
-   another computer (droidtop SPEC 7o: each device pairs with any number
-   of the other kind; droidtop-agent DESIGN.md section 3 refuses a
-   computer).
+   certificates. A computer can also pair with another computer. (Open:
+   droidtop-agent's crates today refuse computer-to-computer pairing,
+   DESIGN.md section 3, "Kinds of device"; the owner's word and the crates
+   disagree, and the crates are not changed until that is settled.)
 6. **One entry per game across stores.** A game owned on several stores is
    one library entry with several store ids (Droidtop/tracker#133, droidtop
    SPEC 7m), not one entry per store.
@@ -210,8 +210,8 @@ The Devices page (today "Systems & sync") lists every device this computer
 knows. Each device has:
 
 - **A name**, which the person can change on this computer.
-- **A type**: a droidtop handheld. (A computer pairs only with handhelds,
-  1.5.)
+- **A type**: a computer (another Pythia, or droidtop-agent; see the open
+  point in 1.5) or a droidtop handheld.
 - **Last sync**: when the two last exchanged saves or the library, or
   "Never".
 - **Pending changes**: what is waiting to go either way, counted (saves,

@@ -344,6 +344,34 @@ class TakeoverTest(TestCase):
         fake.agent.turn_off.assert_not_called()
         fake.service.serve.assert_not_called()
 
+    def test_with_sync_on_the_agents_state_comes_in_before_anything_is_served(self):
+        """Owner, 2026-10-16: "pythia imports the droidtop agent context when it takes the agent role, too, so
+        data shouldn't be lost"."""
+        fake = self.agent(running=[{"pid": 7, "name": "droidtop-agent"}], starts=True)
+        fake.service.serving.return_value = {"state": "off"}
+        order = []
+        fake.agent.turn_off.side_effect = lambda **kw: order.append("turn_off") or {
+            "entries": ["desktop"],
+            "still_running": [],
+        }
+        fake.agent.sync.side_effect = lambda **kw: order.append("sync") or {"imported": ["devices.json"]}
+        threads = []
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(service, "available", return_value=True),
+            mock.patch.object(takeover, "serves", return_value=True),
+            mock.patch.object(launch, "register", side_effect=lambda: order.append("register")),
+            mock.patch.object(service, "serve", side_effect=lambda: order.append("serve")),
+            mock.patch.object(store, "identity", return_value={"name": "PC"}),
+            mock.patch.object(
+                service.threading, "Thread", side_effect=lambda target, **kw: threads.append(target) or mock.Mock()
+            ),
+        ):
+            service.start_in_background()
+            threads[0]()
+        self.assertEqual(order, ["turn_off", "sync", "register", "serve"])
+        fake.agent.sync.assert_called_once_with(write_back=True)
+
 
 class HandheldLaunchTest(TestCase):
     """launch.launch_for_handheld: the agent's launcher for keys that are not Steam's."""

@@ -58,7 +58,7 @@ the droidtop coordinator for this lane. Later sections follow them.
      droidtop-agent's folder, because it is the agent. Otherwise the
      switch starts off. That first answer is kept as the setting.
    - While it is off Pythia does not listen on the network for handhelds,
-     look for or answer them, announce this computer, or touch
+     look for or answer them, announce this computer, or write
      droidtop-agent's folder or its start at sign-in.
    - Turning it on says first, in plain words, what follows: the ports,
      the announcement to a public discovery server, and that
@@ -73,6 +73,24 @@ the droidtop coordinator for this lane. Later sections follow them.
      written outside.
    - Pairing a handheld from Pythia's Devices page is the person's own
      action, so it listens for that pairing only, while the page shows it.
+
+8. **Taking the agent role loses nothing the agent had.** Owner,
+   2026-10-16: "pythia imports the droidtop agent context when it takes
+   the agent role, too, so data shouldn't be lost". Before Pythia serves,
+   it takes in droidtop-agent's state, reading the agent's folder and
+   writing only its own:
+   - The identity and device certificate, and the trusted devices: shared
+     in windowcast's host folder. An older agent's own identity
+     (identity.key, trusted-devices) is taken before Pythia's state is
+     opened, so it becomes this computer's rather than a new one.
+   - The paired devices, settings (with the plugin adapters' approvals),
+     saves choices, manager games, launcher marks and plugin adapter
+     offers. The first time, every one the agent has comes in whatever
+     its age, and the paired devices are merged with any Pythia has.
+     After that the newer copy wins.
+   - The library: both change logs merged, so nothing is lost.
+   - Save copies and the plugin adapters: any file Pythia lacks is
+     copied; none is replaced or deleted.
 
 ## 2. The pad model (handheld shell)
 

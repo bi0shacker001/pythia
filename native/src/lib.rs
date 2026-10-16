@@ -105,6 +105,10 @@ pub(crate) fn agent() -> Result<Arc<Agent>, String> {
     }
     let folder = FOLDER.lock().unwrap().clone().ok_or("Pythia has not named its droidtop folder yet (use_folder)")?;
     let dirs = pythia_dirs(folder).map_err(|e| format!("Pythia's droidtop folder could not be made: {e}"))?;
+    if let Some((agent_config, _)) = agent::agent_folders() {
+        agent::adopt_legacy_identity(&agent_config, &dirs.config, &dirs.computer)
+            .map_err(|e| format!("droidtop-agent's identity could not be taken in: {e}"))?;
+    }
     let opened = Arc::new(Agent::open_in(dirs).map_err(|e| format!("Pythia's droidtop state could not be opened: {e}"))?);
     Ok(AGENT.get_or_init(|| opened).clone())
 }

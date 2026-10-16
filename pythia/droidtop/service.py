@@ -42,7 +42,7 @@ def start_in_background() -> None:
             if not takeover.serves():
                 logger.info(
                     "Sync with droidtop is off: Pythia does not listen for handhelds, announce this computer "
-                    "or touch droidtop-agent's folder"
+                    "or write droidtop-agent's folder"
                 )
                 return
             taken = takeover.take_over()

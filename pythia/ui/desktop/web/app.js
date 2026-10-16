@@ -600,21 +600,36 @@ function renderReconcile() {
     };
   }
   const panel = $('#mergePanel'); panel.innerHTML = '';
-  $('#mergeCount').textContent = model.merges === null ? '' : fmt.n(open.length, 'pair');
+  const groups = mergeClusters();
+  $('#mergeCount').textContent = model.merges === null ? '' : fmt.n(groups.length, 'possible duplicate');
   if (model.merges === null) panel.appendChild(stateBlock({ kind: 'loading' }));
   else if (model.merges && model.merges.status) panel.appendChild(fromResult(model.merges, { what: 'The duplicate search', retry: () => { model.merges = null; renderReconcile(); pythia.refresh_merge_candidates(); } }));
-  else if (!open.length) panel.appendChild(stateBlock({ glyph: '✓', title: 'No possible duplicates', body: merges.length ? `${fmt.n(merges.length, 'pair')} marked as not the same.` : 'Two records with the same or a similar name would show here.' }));
+  else if (!groups.length) panel.appendChild(stateBlock({ glyph: '✓', title: 'No possible duplicates', body: merges.length ? 'Those found are marked as not the same.' : 'Records with the same or a similar name would show here.' }));
   else {
     const q = state.view === 'reconcile' ? state.search.toLowerCase() : '';
-    open.filter((c) => !q || `${c.a.name} ${c.b.name} ${c.a.path} ${c.b.path}`.toLowerCase().includes(q)).forEach((c) => {
-      const side = (x, other) => `<div class="variant-row" style="grid-template-columns:46px 1fr auto"><div class="cover-mini art-${ART_CLASSES[strHash(x.game_id) % ART_CLASSES.length]}">${esc(initials(x.name || '?'))}</div><div><div class="variant-name"><strong>${esc(x.name)}</strong> · ${esc(kindName(x.engine_kind) || 'Not identified')} · ${fmt.n(x.version_count || 0, 'version')}</div><div class="variant-path">${esc(x.path || 'Not installed here')}</div></div><button class="btn small" data-keep="${esc(x.game_id)}" data-fold="${esc(other.game_id)}">Keep this one</button></div>`;
-      const card = el(`<div class="version-group"><div class="version-head"><strong>${esc(c.reason === 'parts' ? 'Parts of one game' : 'Similar names')}</strong><small>${c.reason === 'parts' ? 'Both folders sit under one parent folder' : `${Math.round((c.score || 0) * 100)}% alike`}</small><span class="spacer"></span><button class="btn small ghost" data-not-same>Not the same</button></div>${side(c.a, c.b)}${side(c.b, c.a)}</div>`);
-      $$('[data-keep]', card).forEach((b) => (b.onclick = () => mergeInto(c, b.dataset.keep, b.dataset.fold)));
-      $('[data-not-same]', card).onclick = () => { const s = dismissedSet(); s.add(pairKey(c)); try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...s])); } catch (e) { /* ignore */ } flash('Kept apart'); renderReconcile(); renderChrome(); };
-      panel.appendChild(card);
-    });
+    groups.filter((c) => !q || c.members.some((m) => `${m.name} ${m.path}`.toLowerCase().includes(q))).forEach((c) => panel.appendChild(clusterCard(c)));
   }
 }
+// One card per cluster of possible duplicates (UX review A16; reconcile.js): why they look like one game, the
+// record the others fold into (chosen by default, changeable), what moves, and the suggested action.
+const SUGGEST_LABELS = { versions: 'Combine as versions', source: 'Same game, another source' };
+function clusterCard(c, { handheld = false } = {}) {
+  const choice = (m) => `<label class="cluster-member"><input type="radio" name="keep-${esc(c.id)}" value="${esc(m.game_id)}" ${m.game_id === c.target ? 'checked' : ''}><span><strong>${esc(m.name)}</strong> · ${esc((m.versions || []).join(', ') || 'no version')} · ${esc([...(m.sources || []).map((k) => kindName(k) || k), ...(m.stores || []).map((k) => storeName(k))].join(', ') || 'Not identified')}<br><small class="mono">${esc(PythiaVersions.middleEllipsis(m.path || 'Not installed here', 72))}</small></span></label>`;
+  const card = el(`<section class="${handheld ? 'hh-panel' : 'version-group'} cluster" data-cluster="${esc(c.id)}"><div class="${handheld ? 'hh-panel-head' : 'version-head'}"><strong>${esc(c.name)}</strong><small>${fmt.n(c.members.length, 'record')}</small></div><div class="${handheld ? 'hh-panel-body' : ''}"><p class="look-reason">${esc(c.reason)}</p><div class="cluster-members" role="radiogroup" aria-label="The record to keep">${c.members.map(choice).join('')}</div><p class="look-reason" data-moves>${esc(c.moves)}</p><div class="choice-row"><button class="${handheld ? 'hh-action primary' : 'btn primary'}" type="button" data-combine>${esc(SUGGEST_LABELS[c.suggest])}</button><button class="${handheld ? 'hh-action' : 'btn ghost'}" type="button" data-apart>Not the same</button></div></div></section>`);
+  const keepId = () => ($(`input[name="keep-${CSS.escape(c.id)}"]:checked`, card) || {}).value || c.target;
+  $$('input[type=radio]', card).forEach((r) => (r.onchange = () => { const keep = c.members.find((m) => m.game_id === keepId()); const others = c.members.filter((m) => m !== keep); $('[data-moves]', card).textContent = `${others.map((m) => ((m.versions || []).length ? `${m.name} ${m.versions.join(', ')}` : m.name)).join('; ')} ${others.length === 1 ? 'moves' : 'move'} into ${keep.name}.`; }));
+  $('[data-combine]', card).onclick = async () => {
+    const keep = c.members.find((m) => m.game_id === keepId()); const others = c.members.filter((m) => m !== keep);
+    if (await confirmDanger({ title: `${SUGGEST_LABELS[c.suggest]}?`, body: `${$('[data-moves]', card).textContent} Their versions, store ids and ownership move over; the other records are removed. Files stay where they are.`, recommendation: 'We recommend Cancel unless they are the same game.', items: others.map((m) => m.path || m.name), proceed: SUGGEST_LABELS[c.suggest] })) { pythia.merge_cluster(keep.game_id, others.map((m) => m.game_id)); flash('Combining'); }
+  };
+  $('[data-apart]', card).onclick = () => {
+    const set = dismissedSet(); for (let i = 0; i < c.members.length; i++) for (let j = i + 1; j < c.members.length; j++) set.add([c.members[i].game_id, c.members[j].game_id].sort().join('+'));
+    try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...set])); } catch (e) { /* storage may be unavailable */ }
+    flash('Kept apart'); renderCurrent(); renderChrome(); if (state.shell === 'handheld') renderHandheld();
+  };
+  return card;
+}
+const mergeClusters = () => PythiaReconcile.clusters(Array.isArray(model.merges) ? model.merges : [], dismissed);
 const DISMISS_KEY = 'pythia-review-dismissed';
 const dismissedSet = () => { try { return new Set(JSON.parse(localStorage.getItem(DISMISS_KEY) || '[]')); } catch (e) { return new Set(); } };
 const pairKey = (c) => [c.a.game_id, c.b.game_id].sort().join('+');
@@ -1263,11 +1278,9 @@ function renderHHDuplicates() {
   const host = $('#hhContent');
   if (model.merges === null || model.merges === undefined) { host.replaceChildren(stateBlock({ kind: 'loading' })); pythia.refresh_merge_candidates(); return; }
   if (model.merges.status) { host.replaceChildren(fromResult(model.merges, { what: 'The duplicate search', retry: () => { model.merges = null; renderHHDuplicates(); } })); return; }
-  const open = (Array.isArray(model.merges) ? model.merges : []).filter((c) => !dismissed(c));
-  if (!open.length) { host.replaceChildren(stateBlock({ glyph: '✓', title: 'No possible duplicates', body: 'Two records with the same or a similar name would show here.' })); return; }
-  host.innerHTML = `<div class="hh-stack">${open.map((c, i) => `<section class="hh-panel"><div class="hh-panel-head"><h2>${esc(c.a.name)} · ${esc(c.b.name)}</h2><span class="spacer"></span><small>${c.reason === 'parts' ? 'Parts of one game' : `${Math.round((c.score || 0) * 100)}% alike`}</small></div><div class="hh-panel-body hh-summary-list">${hhRow({ art: 'A', title: c.a.name, sub: c.a.path || '' })}${hhRow({ art: 'B', title: c.b.name, sub: c.b.path || '' })}<div class="hh-toolbar"><button class="hh-action" data-hh-keep="${i}:a">Keep A</button><button class="hh-action" data-hh-keep="${i}:b">Keep B</button><button class="hh-action" data-hh-apart="${i}">Not the same</button></div></div></section>`).join('')}</div>`;
-  $$('[data-hh-keep]', host).forEach((b) => (b.onclick = () => { const [i, side] = b.dataset.hhKeep.split(':'); const c = open[Number(i)]; const keep = side === 'a' ? c.a : c.b; const fold = side === 'a' ? c.b : c.a; mergeInto(c, keep.game_id, fold.game_id); }));
-  $$('[data-hh-apart]', host).forEach((b) => (b.onclick = () => { const c = open[Number(b.dataset.hhApart)]; const set = dismissedSet(); set.add(pairKey(c)); try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...set])); } catch (e) { /* storage may be unavailable */ } flash('Kept apart'); renderHHDuplicates(); }));
+  const groups = mergeClusters();
+  if (!groups.length) { host.replaceChildren(stateBlock({ glyph: '✓', title: 'No possible duplicates', body: 'Records with the same or a similar name would show here.' })); return; }
+  const stack = el('<div class="hh-stack"></div>'); groups.forEach((c) => stack.appendChild(clusterCard(c, { handheld: true }))); host.replaceChildren(stack);
 }
 function bindHandheldActions() {
   const host = $('#handheldShell');
@@ -1518,7 +1531,7 @@ function renderChrome() {
   const attention = games.filter((g) => g.status !== 'ok').length;
   const running = model.jobs.filter((j) => j.state === 'running').length;
   const { detected, decisions } = model.intake;
-  const merges = Array.isArray(model.merges) ? model.merges.filter((c) => !dismissed(c)).length : 0;
+  const merges = Array.isArray(model.merges) ? mergeClusters().length : 0;
   const set = (id, n) => { const x = $(id); if (x) x.textContent = n ? String(n) : ''; };
   set('#allCount', games.length); set('#attentionCount', attention); set('#downloadsCount', detected.length + decisions.length); set('#reconcileCount', decisions.length + merges); set('#activityCount', running);
   const jc = $('#jobsCount'); jc.textContent = running ? String(running) : ''; jc.classList.toggle('hidden', !running);

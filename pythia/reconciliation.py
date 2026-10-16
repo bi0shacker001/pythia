@@ -57,6 +57,13 @@ def _summarize(entry: dict) -> dict:
         "engine_kind": (first_variant.get("source") or {}).get("kind") if first_variant else None,
         "version_count": len(versions),
         "platforms": first_variant.get("platforms", []) if first_variant else [],
+        # What a cluster's reason and "what moves" are made of (UX review A16).
+        "versions": [group.get("version") for group in versions if group.get("version")],
+        "folders": sum(len(group.get("variants", [])) for group in versions),
+        "sources": sorted(
+            {(v.get("source") or {}).get("kind") for g in versions for v in g.get("variants", [])} - {None}
+        ),
+        "stores": sorted({p.get("platform") for p in entry.get("platform_ids", []) if p.get("platform")}),
     }
 
 

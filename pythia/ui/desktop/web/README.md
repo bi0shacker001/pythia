@@ -24,6 +24,7 @@ from the same model and the same backend.
 | `console.js` | the error console (`window.ErrorConsole`) |
 | `query.js` | the library query (`window.PythiaQuery`): words that must all match, ignoring case, accents and punctuation, across every version, folder, mod, language and kind; filters `source:`, `engine:`, `kind:`, `installed`, `has:update`, `has:nolink` (UX review A11). Tested under node: `tests/web/*.test.mjs` |
 | `versions.js` | ordering a game's versions (`window.PythiaVersions`): droidtop's `Versions.compareLoose`, which labels are version numbers, and the middle-ellipsis for folder paths (UX review A13). Tested under node |
+| `reconcile.js` | possible duplicates as clusters (`window.PythiaReconcile`): the pairs the backend finds joined into clusters, each with its reason in words, the suggestion (Combine as versions, or Same game, another source), the record to keep and what moves (UX review A16). Tested under node |
 | `app.js` | the model (`adaptGame`), the backend bridge, the pages of both shells, the menu bar |
 
 ## The data path (one for every page)
@@ -53,7 +54,7 @@ which the Activity page's event log and the error console both read.
 |---|---|
 | Library, game inspector | `games` + `gamesChanged`; `open_path`, `start_onboard` (rescan, add another folder), `rename_game`, `forget_game`, `save_notes`, `find_manager_for_game` / `open_in_manager`; Engine & Compatibility: `get_platform_status` (the engine plugin's own report) and `enable_platform` (confirmed first); `set_engine_kind`, `apply_update` answer unavailable |
 | Downloads & intake | `get_intake` + `intakeChanged` (files the watcher saw, scan decisions, the watcher), `start_watch`/`stop_watch` + `downloadDetected`, `forget_detected`; `get_downloader_plugins` for the cards |
-| Reconciliation | decisions from `decisionNeeded`/`get_intake`, resolved with `resolveDecision` after a confirm; possible duplicates from `refresh_merge_candidates` + `mergeCandidatesReady` (`reason` "parts" marks part folders of one game), folded with `merge_games` through the danger dialog; "Not the same" is remembered in the page's own storage |
+| Reconciliation | decisions from `decisionNeeded`/`get_intake`, resolved with `resolveDecision` after a confirm; possible duplicates from `refresh_merge_candidates` + `mergeCandidatesReady` (`reason` "parts" marks part folders of one game), shown as clusters (reconcile.js) and folded with `merge_cluster` through the danger dialog; "Not the same" is remembered in the page's own storage |
 | Systems & sync | the `system_uuid`s in the synced folder, `get_system_info`, `get_app_info`, `rebuild_index`; cross-system table from the entries; "Add system" asks `get_transfer_settings` (unavailable) |
 | Launcher entries | `get_launcher_entries` (what each launcher on this computer lists, against the library: tracked, drifted or untracked), `record_launcher_entry` |
 | Save backups | `get_save_backups`: the copies of saves the droidtop agent kept when a sync with a handheld would have overwritten saves that differ; "Put back…" is `restore_save_copy` after a confirm (the saves there now are kept first); "Back up now" is `back_up_saves_now` |

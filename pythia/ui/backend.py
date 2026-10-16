@@ -676,6 +676,27 @@ class Backend(QObject):
         self._job_finish(job, "Folded" if ok else result.get("message", ""), ok)
         self.mergeComplete.emit(_jsonable(result))
 
+    @Slot(str, "QVariant")
+    def merge_cluster(self, surviving_id: str, retired_ids):
+        """Folds every record of a Reconciliation cluster into one, one after
+        another in one job (UX review A16: "Combine as versions")."""
+        retired = [str(r) for r in retired_ids or [] if str(r) != surviving_id]
+        job = self._job_start("merge", f"Combine {len(retired) + 1} records", f"into {surviving_id}")
+        threading.Thread(target=self._merge_cluster_worker, args=(surviving_id, retired, job), daemon=True).start()
+
+    def _merge_cluster_worker(self, surviving_id, retired, job):
+        failed = []
+        for retired_id in retired:
+            result = reconciliation.merge(surviving_id, retired_id)
+            if result.get("status") != "ok":
+                failed.append(result.get("message", retired_id))
+                self._job_log(job, f"not folded {retired_id}: {result.get('message')}")
+        self.refresh_games()
+        done = len(retired) - len(failed)
+        text = f"Combined {done + 1} records into one" + (f", {len(failed)} not" if failed else "")
+        self._job_finish(job, text, not failed)
+        self.mergeComplete.emit({"status": "ok" if not failed else "error", "message": "; ".join(failed)})
+
     # ---- notes ------------------------------------------------------------------
     @Slot(str, str, result="QVariant")
     @_guarded

@@ -917,6 +917,40 @@ class Backend(QObject):
 
         set_setting("ui_mode", mode)
 
+    # ---- Start in (pythia.start_shell; UX review A8) --------------------------
+    @Slot(result="QVariant")
+    @_guarded
+    def get_start(self):
+        """``start_in`` (auto, desktop, handheld or last), ``shell`` (the one to
+        start in now) and ``device`` (whether this is a handheld, and its
+        maker and model)."""
+        from pythia import start_shell
+
+        device = start_shell.detect()
+        return {
+            "status": "ok",
+            "start_in": start_shell.start_in(),
+            "shell": start_shell.initial_shell(device),
+            "device": device,
+        }
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def set_start_in(self, value: str):
+        from pythia import start_shell
+
+        start_shell.set_start_in(value)
+        return {"status": "ok", "start_in": value}
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def remember_shell(self, shell: str):
+        """A confirmed, deliberate switch of shell (A4), what "Remember last" starts in."""
+        from pythia import start_shell
+
+        start_shell.remember(shell)
+        return {"status": "ok"}
+
     # ---- launcher hand-off --------------------------------------------------
     @Slot(str, result="QVariant")
     @_guarded

@@ -632,7 +632,7 @@ function openSettingsPane(name) { state.settingsPane = name; const btn = $$('[da
 function renderSettingsPane(name) {
   const info = model.info || {}; const app = model.app || {};
   if (name === 'general') renderModes($('#modesState'));
-  if (name === 'general') { $('#appDataPath').textContent = info.app_data_folder || ''; call('get_ui_mode').then((m) => { $('#uiModeSelect').value = typeof m === 'string' ? m : ''; }); }
+  if (name === 'general') { $('#appDataPath').textContent = info.app_data_folder || '';  }
   if (name === 'library') { loadInto($('#libraryFolders'), 'get_library_folders', [], (r, host) => { (r.folders || []).forEach((f) => host.appendChild(el(`<div class="account-row"><div class="card-icon">F</div><div><strong>${esc(f.path)}</strong></div></div>`))); if (!(r.folders || []).length) host.appendChild(stateBlock({ title: 'No folders tracked' })); }, { what: 'Tracked folders', actions: [{ label: 'Scan a folder', primary: true, run: scanLibrary }] }); loadInto($('#scanSettings'), 'get_scan_settings', [], () => {}, { what: 'Scan settings' }); }
   if (['sources', 'downloaders', 'metadata', 'managers', 'engines', 'mods', 'patchers'].includes(name)) {
     const cat = { sources: 'library', downloaders: 'downloader', metadata: 'metadata', managers: 'manager', engines: 'engine', mods: 'mod', patchers: 'patcher' }[name];
@@ -774,18 +774,27 @@ async function action(a) {
 }
 
 // ---- Handheld shell -----------------------------------------------------------------------
-function resolveInitialShell() {
-  const explicit = new URLSearchParams(location.search).get('ui');
-  if (explicit === 'handheld' || explicit === 'desktop') return explicit;
-  const pref = localStorage.getItem('pythia-startup-shell') || 'auto';
-  if (pref === 'desktop' || pref === 'handheld') return pref;
-  if (pref === 'last') return localStorage.getItem('pythia-last-shell') || 'desktop';
-  const coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
-  const compact = window.innerWidth <= 900 || (coarse && window.innerWidth <= 1400) || (window.innerHeight <= 650 && window.innerWidth <= 1200);
-  return compact ? 'handheld' : 'desktop';
+// Start in (UX review A8): Pythia keeps it (backend get_start), not the page's storage. ?ui= wins for a run;
+// a choice an earlier page kept in its own storage moves to Pythia once.
+function explicitShell() { const ui = new URLSearchParams(location.search).get('ui'); return ui === 'handheld' || ui === 'desktop' ? ui : null; }
+async function startShell() {
+  let moved = null;
+  try {
+    const old = localStorage.getItem('pythia-startup-shell'); const last = localStorage.getItem('pythia-last-shell');
+    if (old) { moved = old; localStorage.removeItem('pythia-startup-shell'); }
+    if (last) { localStorage.removeItem('pythia-last-shell'); await call('remember_shell', last); }
+  } catch (e) { /* storage may be unavailable */ }
+  if (moved && moved !== 'auto') await call('set_start_in', moved);
+  const r = await call('get_start'); if (!ok(r)) return;
+  model.start = r; renderStartIn();
+  if (!explicitShell() && r.shell === 'handheld' && state.shell !== 'handheld') enterHandheld('home');
 }
+const START_IN_OPTIONS = [{ value: 'auto', label: 'Auto-detect' }, { value: 'desktop', label: 'Desktop' }, { value: 'handheld', label: 'Handheld' }, { value: 'last', label: 'Remember last' }];
+function startInNote() { const d = model.start?.device; return d ? `Auto-detect: ${d.device || 'this computer'} ${d.handheld ? 'is a handheld, so Handheld' : 'is not a known handheld, so Desktop'}.` : ''; }
+function renderStartIn() { const sel = $('#startupShellSelect'); if (sel && model.start) sel.value = model.start.start_in; const note = $('#startInNote'); if (note) note.textContent = startInNote(); }
+async function setStartIn(value) { const r = await act('set_start_in', [value], 'Saved', { what: 'Start in' }); if (ok(r)) { model.start = { ...model.start, start_in: value }; renderStartIn(); } }
 // The remembered shell (Settings > Interface > Remember last shell) changes only on a deliberate switch (UX review A4).
-function rememberShell(shell) { try { localStorage.setItem('pythia-last-shell', shell); } catch (e) { /* storage may be unavailable */ } }
+function rememberShell(shell) { call('remember_shell', shell); }
 // The handheld shell's size from the window's short side (UX review A6): 800 px is 1, 1080 px about
 // 1.35, at most 1.6. Text size multiplies on top (tokens.css). The desktop stays at 1.
 function applyHandheldScale() {
@@ -911,8 +920,8 @@ function renderHHSettings() {
     host.innerHTML = `<div class="hh-stack">${back}<div class="hh-setting"><strong>Metadata folder</strong><small class="mono" style="word-break:break-all">${esc(model.info?.sync_folder || '')}</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div><div class="hh-setting"><strong>This system's ID</strong><small class="mono">${esc(model.info?.system_uuid || '')}</small></div><div class="hh-setting"><strong>Warn on metadata conflicts</strong><button class="toggle" data-option="warn_conflicts" aria-label="Warn on metadata conflicts"><span></span></button></div><div id="hhTransfer"></div></div>`;
     loadInto($('#hhTransfer', host), 'get_transfer_settings', [], () => {}, { what: 'Game transfer' });
   } else if (page === 'interface') {
-    const startup = localStorage.getItem('pythia-startup-shell') || 'auto';
-    host.innerHTML = `<div class="hh-stack">${back}<div class="hh-settings"><div class="hh-setting"><strong>Startup shell</strong>${cycleRow({ id: 'hhStartupShell', label: 'Startup shell', options: [{ value: 'auto', label: 'Auto-detect at startup' }, { value: 'desktop', label: 'Always Desktop' }, { value: 'handheld', label: 'Always Handheld' }, { value: 'last', label: 'Remember last shell' }], value: startup })}</div><div class="hh-setting"><strong>Handheld library view</strong>${cycleRow({ id: 'hhLibraryDefault', label: 'Handheld library view', options: [{ value: 'list', label: 'List' }, { value: 'grid', label: 'Cover grid' }], value: state.hhLibraryMode })}</div><div class="hh-setting"><strong>Theme</strong>${cycleRow({ id: 'hhTheme', label: 'Theme', options: [{ value: 'ink', label: 'Ink & Amber' }, { value: 'parchment', label: 'Parchment' }, { value: 'cobalt', label: 'Slate & Cobalt' }], value: document.documentElement.dataset.theme || 'ink' })}</div><div class="hh-setting"><strong>Text size</strong>${cycleRow({ id: 'hhTextScale', label: 'Text size', options: [{ value: '1', label: 'Normal' }, { value: '1.15', label: 'Larger' }, { value: '1.3', label: 'Large' }, { value: '1.5', label: 'Largest' }], value: prefs.get('text-scale', '1') })}</div><div class="hh-setting"><strong>Reduce motion</strong><button class="toggle" id="hhMotion" aria-label="Reduce motion"><span></span></button></div><div class="hh-setting"><strong>Desktop interface</strong><button class="hh-action" id="hhSettingsDesktop" style="width:100%">Open Desktop</button></div></div></div>`;
+    const startup = model.start?.start_in || 'auto';
+    host.innerHTML = `<div class="hh-stack">${back}<div class="hh-settings"><div class="hh-setting"><strong>Start in</strong>${cycleRow({ id: 'hhStartupShell', label: 'Start in', options: START_IN_OPTIONS, value: startup })}<small>${esc(startInNote())}</small></div><div class="hh-setting"><strong>Handheld library view</strong>${cycleRow({ id: 'hhLibraryDefault', label: 'Handheld library view', options: [{ value: 'list', label: 'List' }, { value: 'grid', label: 'Cover grid' }], value: state.hhLibraryMode })}</div><div class="hh-setting"><strong>Theme</strong>${cycleRow({ id: 'hhTheme', label: 'Theme', options: [{ value: 'ink', label: 'Ink & Amber' }, { value: 'parchment', label: 'Parchment' }, { value: 'cobalt', label: 'Slate & Cobalt' }], value: document.documentElement.dataset.theme || 'ink' })}</div><div class="hh-setting"><strong>Text size</strong>${cycleRow({ id: 'hhTextScale', label: 'Text size', options: [{ value: '1', label: 'Normal' }, { value: '1.15', label: 'Larger' }, { value: '1.3', label: 'Large' }, { value: '1.5', label: 'Largest' }], value: prefs.get('text-scale', '1') })}</div><div class="hh-setting"><strong>Reduce motion</strong><button class="toggle" id="hhMotion" aria-label="Reduce motion"><span></span></button></div><div class="hh-setting"><strong>Desktop interface</strong><button class="hh-action" id="hhSettingsDesktop" style="width:100%">Open Desktop</button></div></div></div>`;
     bindSwitch($('#hhMotion'), prefs.get('motion', 'on') === 'off', (on) => { prefs.set('motion', on ? 'off' : 'on'); applyInterface(); }, 'Reduce motion');
   } else {
     host.innerHTML = `<div class="hh-stack">${back}<div class="hh-setting"><strong>Pythia</strong><small>${esc(model.app ? `${model.app.version} · ${model.app.platform} · schema v${model.app.schema_version}` : '')}</small></div><div class="hh-setting"><strong>Export diagnostics</strong><small>The log file plus app, system and plugin facts.</small><button class="hh-action" data-hh-action="export-diagnostics">Export…</button></div><div class="hh-setting"><strong>Rebuild cache.db</strong><button class="hh-action" data-hh-action="rebuild-cache">Rebuild</button></div><div class="hh-setting"><strong>Error console</strong><small>${esc(model.config?.error_console ? 'On for this run.' : 'Off. Start with --error-console or set error_console = True in pythia.conf.')}</small>${model.config?.error_console ? '<button class="hh-action" data-console-toggle>Open console</button>' : ''}</div><div class="hh-setting"><strong>Reset local identity</strong><small>Gives this computer a new ID.</small><button class="hh-action" data-hh-action="reset-identity">Review reset…</button></div></div>`;
@@ -1023,7 +1032,7 @@ function bindHandheldActions() {
   $$('[data-open-path]', host).forEach((b) => (b.onclick = () => openKnownPath(b.dataset.openPath)));
   $('[data-hh-plan-back]')?.addEventListener('click', () => { state.hhPage = 'decision'; renderHandheld(); });
   $('[data-hh-apply]')?.addEventListener('click', async () => { const g = games.find((x) => x.id === state.hhSelected); const r = await call('apply_update', g.id, g.updates[0]?.version || ''); infoSheet({ title: 'Apply update', details: ok(r) ? 'Started' : r.message }); });
-  $('#hhStartupShell')?.addEventListener('change', (e) => { localStorage.setItem('pythia-startup-shell', e.target.value); const desktop = $('#startupShellSelect'); if (desktop) desktop.value = e.target.value; });
+  $('#hhStartupShell')?.addEventListener('change', (e) => setStartIn(e.target.value));
   $('#hhLibraryDefault')?.addEventListener('change', (e) => { state.hhLibraryMode = e.target.value; localStorage.setItem('pythia-handheld-library', e.target.value); });
   $('#hhTheme')?.addEventListener('change', (e) => applyTheme(e.target.value));
   $('#hhTextScale')?.addEventListener('change', (e) => { prefs.set('text-scale', e.target.value); applyInterface(); });
@@ -1302,6 +1311,7 @@ function connect() {
     pythia.gamesChanged.connect(refreshGames);
     // Controllers come from the backend only (SPEC 2.7); the page does not read the Gamepad API.
     pythia.padAction.connect(hhPadAction);
+    startShell();
     call('start_pad').then((r) => { model.pad = r; if (ok(r) && !r.available) ErrorConsole.reportWeb('warn', r.reason || 'Controllers are not read', 'start_pad'); });
     pythia.modesChanged.connect(() => refreshModes().then(() => renderCurrent()));
     pythia.handheldsChanged.connect(() => { if (state.view === 'systems') renderHandhelds(); if (state.shell === 'handheld' && state.hhPage === 'systems') renderHandheld(); });
@@ -1381,7 +1391,6 @@ function setup() {
   $('#textScaleSelect').onchange = (e) => { prefs.set('text-scale', e.target.value); applyInterface(); };
   $('#densitySelect').onchange = (e) => { state.density = e.target.value; prefs.set('density', state.density); applyInterface(); };
   bindSwitch($('#motionToggle'), prefs.get('motion', 'on') === 'off', (on) => { prefs.set('motion', on ? 'off' : 'on'); applyInterface(); }, 'Reduce motion');
-  $('#uiModeSelect').onchange = (e) => { pythia.set_ui_mode(e.target.value); flash('Saved'); };
   $('#logLevelSelect').onchange = (e) => act('set_log_level', [e.target.value], 'Log level saved', { what: 'Log level' });
   document.addEventListener('click', (e) => { if (!e.target.closest('#themePopover') && !e.target.closest('#themeButton')) toggleThemePopover(false); if (!e.target.closest('#addPopover') && !e.target.closest('#addButton')) { $('#addPopover').classList.add('hidden'); $('#addButton').setAttribute('aria-expanded', 'false'); } if (!e.target.closest('.menu-item')) closeAllMenus(); });
   $('#recentButton').onclick = (e) => { e.stopPropagation(); const existing = $('.recent-popover'); if (existing) { existing.remove(); return; } const pop = el('<div class="recent-popover" role="dialog" aria-label="Recent"></div>'); if (!flash.recent.length) pop.appendChild(stateBlock({ title: 'Nothing recent', body: 'Acknowledgements show here for a while.' })); else flash.recent.forEach((r) => pop.appendChild(el(`<div class="line"><span>${esc(r.text)}</span><time>${esc(fmt.time(r.at))}</time></div>`))); document.body.appendChild(pop); const close = (ev) => { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('mousedown', close); } }; setTimeout(() => document.addEventListener('mousedown', close), 0); };
@@ -1399,8 +1408,8 @@ function setup() {
   $('#addButton').onclick = (e) => { e.stopPropagation(); const pop = $('#addPopover'); const show = pop.classList.contains('hidden'); pop.classList.toggle('hidden', !show); $('#addButton').setAttribute('aria-expanded', String(show)); toggleThemePopover(false); };
   $$('[data-add-choice]').forEach((b) => (b.onclick = () => { const kind = b.dataset.addChoice; $('#addPopover').classList.add('hidden'); $('#addButton').setAttribute('aria-expanded', 'false'); closeAllMenus(); if (kind === 'scan') scanLibrary(); else if (kind === 'stores') findStoreGames(); else if (kind === 'download') navigate('downloads'); else if (kind === 'folder') addFolder(); else importSource(); }));
   $('#refreshMerges').onclick = () => { model.merges = null; renderReconcile(); pythia.refresh_merge_candidates(); };
-  const startupPref = localStorage.getItem('pythia-startup-shell') || 'auto'; $('#startupShellSelect').value = startupPref; $('#desktopLibrarySelect').value = state.libraryMode; $('#handheldLibrarySelect').value = state.hhLibraryMode;
-  $('#startupShellSelect').onchange = (e) => localStorage.setItem('pythia-startup-shell', e.target.value);
+  renderStartIn(); $('#desktopLibrarySelect').value = state.libraryMode; $('#handheldLibrarySelect').value = state.hhLibraryMode;
+  $('#startupShellSelect').onchange = (e) => setStartIn(e.target.value);
   $('#desktopLibrarySelect').onchange = (e) => { state.libraryMode = e.target.value; localStorage.setItem('pythia-desktop-library', e.target.value); renderLibrary(); };
   $('#handheldLibrarySelect').onchange = (e) => { state.hhLibraryMode = e.target.value; localStorage.setItem('pythia-handheld-library', e.target.value); };
   $$('[data-menu]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); toggleMenu(b.dataset.menu); }));
@@ -1411,7 +1420,7 @@ function setup() {
   $$('[data-settings-nav]').forEach((b) => (b.onclick = () => { openSettingsPane(b.dataset.settingsNav); closeAllMenus(); }));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllMenus(); });
   renderChrome(); renderLibrary();
-  if (resolveInitialShell() === 'handheld') enterHandheld('home');
+  if (explicitShell() === 'handheld') enterHandheld('home');
   connect();
 }
 setup();

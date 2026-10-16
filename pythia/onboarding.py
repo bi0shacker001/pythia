@@ -451,8 +451,9 @@ def onboard(path: Path | str, decision: dict | None = None):
     is_new_variant_path = not any(
         variant.get("path") == str(path) for group in entry.get("versions", []) for variant in group.get("variants", [])
     )
+    # Nothing is written into the game's folder: its identity is this entry
+    # (game_uuid, and the variant's path) in Pythia's own data.
     _merge_version(entry, path, version_label, mods, language, detection.get("platforms", []), source)
-    instance_marker.write_marker(path, entry["game_uuid"], version_label, mods, language, this_uuid)
 
     if is_new_entry and foreign_seed is not None:
         datadir.add_timeline_event(

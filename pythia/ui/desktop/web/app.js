@@ -680,7 +680,7 @@ async function addFolder() {
   pythia.start_onboard(path.trim()); flash('Adding folder'); navigate('activity');
 }
 async function scanLibrary() {
-  const path = await prompt({ title: 'Scan a library folder', body: 'Every game folder inside is recorded. Scanning is read-only apart from a small marker file in each game folder.', hint: 'G:\\games', kind: 'path', save: 'Scan', pick: { label: 'Browse', run: pickFolder('Scan a library folder') } });
+  const path = await prompt({ title: 'Scan a library folder', body: 'Every game folder inside is recorded. Scanning only reads: nothing is written into your game folders.', hint: 'G:\\games', kind: 'path', save: 'Scan', pick: { label: 'Browse', run: pickFolder('Scan a library folder') } });
   if (!path || !path.trim()) return;
   pythia.start_scan(path.trim()); flash('Scan started'); navigate('activity');
 }

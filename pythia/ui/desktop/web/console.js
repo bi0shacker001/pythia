@@ -27,11 +27,20 @@
     updateBadge();
   }
 
-  // The page's own errors go to Pythia's log (and come back through uiLog);
-  // without a bridge they stay local so the console still shows them.
+  // The page's own errors always go to Pythia's log, console on or off (Droidtop/tracker#538:
+  // with the console off they were dropped), and come back through uiLog when it is on.
+  // Until the channel connects they wait here, and are shown locally too.
+  const waiting = [];
   function reportWeb(level, message, context) {
-    if (bridge && bridge.report_web_error) bridge.report_web_error(level, message, context || '', () => {});
-    else add({ ts: new Date().toISOString(), level, source: 'web', slot: null, message: context ? `${message} (${context})` : message });
+    if (bridge && bridge.report_web_error) { bridge.report_web_error(level, message, context || '', () => {}); return; }
+    waiting.push([level, message, context || '']);
+    add({ ts: new Date().toISOString(), level, source: 'web', slot: null, message: context ? `${message} (${context})` : message });
+  }
+  // attach(): called as soon as the channel connects, whether or not the console is on.
+  function attach(b) {
+    bridge = b;
+    if (!bridge || !bridge.report_web_error) return;
+    waiting.splice(0).forEach(([level, message, context]) => bridge.report_web_error(level, message, context, () => {}));
   }
 
   function captureWebErrors() {
@@ -118,7 +127,7 @@
   // enable(): called once the backend says the console is on. The existing entries
   // come from get_ui_log; everything after arrives through uiLog.
   function enable(b) {
-    bridge = b;
+    attach(b);
     store.enabled = true;
     $$('[data-console-toggle]').forEach((x) => x.classList.remove('hidden'));
     if (bridge) {
@@ -136,5 +145,5 @@
     document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'e') { e.preventDefault(); setOpen(!store.open); } });
   }
 
-  window.ErrorConsole = { init, enable, add, setOpen, reportWeb, get entries() { return store.entries; } };
+  window.ErrorConsole = { init, attach, enable, add, setOpen, reportWeb, get entries() { return store.entries; } };
 })();

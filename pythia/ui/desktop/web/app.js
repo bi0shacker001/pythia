@@ -1011,6 +1011,7 @@ function connect() {
   if (!(window.qt && qt.webChannelTransport)) { renderChrome(); renderNoBackend(); return; }
   new QWebChannel(qt.webChannelTransport, (channel) => {
     pythia = channel.objects.pythia;
+    ErrorConsole.attach(pythia); // the page's errors reach Pythia's log whether or not the console is on
     pythia.asyncResult.connect(asyncArrived);
     window.pythia = pythia;
     pythia.gamesChanged.connect(refreshGames);
@@ -1117,5 +1118,5 @@ setup();
 
 // A read-only view of the model for the screenshot driver and the console; never written to.
 window.pythiaDebug = () => ({ ready: model.ready, connected: !!pythia, games: games.length, attention: games.filter((g) => g.status !== 'ok').length, jobs: model.jobs.length, decisions: model.intake.decisions.length, merges: Array.isArray(model.merges) ? model.merges.length : model.merges, events: model.events.length, errorConsole: !!model.config?.error_console, view: state.view, shell: state.shell });
-window.pythiaUI = { navigate, enterHandheld, exitHandheld, navigateHandheld, openSettingsPane, openTab, state };
+window.pythiaUI = { navigate, enterHandheld, exitHandheld, navigateHandheld, openSettingsPane, openTab, state, call };
 })();

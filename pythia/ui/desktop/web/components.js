@@ -312,5 +312,5 @@
     e.preventDefault(); e.stopImmediatePropagation(); cycle(node, e.key === 'ArrowLeft' ? -1 : 1);
   }, true);
 
-  window.UI = { esc, el, $, $$, notice, confirm, confirmDanger, prompt, infoSheet, flash, stateBlock, fromResult, bindSwitch, menu, fmt, cycleRow };
+  window.UI = { esc, el, $, $$, notice, confirm, confirmDanger, prompt, infoSheet, flash, stateBlock, fromResult, bindSwitch, menu, fmt, cycleRow, cycleStep: cycle };
 })();

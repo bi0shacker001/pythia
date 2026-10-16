@@ -794,7 +794,7 @@ function applyHandheldScale() {
   document.documentElement.style.setProperty('--hh-scale', scale.toFixed(3));
 }
 window.addEventListener('resize', applyHandheldScale);
-function enterHandheld(page = 'home', { remember = false } = {}) { state.shell = 'handheld'; state.hhPage = page; state.hhHistory = []; if (remember) rememberShell('handheld'); applyHandheldScale(); document.body.classList.add('handheld-active'); $('#handheldShell').classList.remove('hidden'); renderHandheld(); setTimeout(() => $('.hh-nav.active')?.focus(), 0); }
+function enterHandheld(page = 'home', { remember = false } = {}) { state.shell = 'handheld'; state.hhPage = page; state.hhHistory = []; if (remember) rememberShell('handheld'); applyHandheldScale(); document.body.classList.add('handheld-active'); $('#handheldShell').classList.remove('hidden'); renderHandheld(); setTimeout(() => hhEnterZone('content') || hhEnterZone('rail'), 0); }
 function exitHandheld({ remember = false } = {}) { state.shell = 'desktop'; if (remember) rememberShell('desktop'); applyHandheldScale(); document.body.classList.remove('handheld-active'); $('#handheldShell').classList.add('hidden'); setTimeout(() => $('#enterHandheldButton')?.focus(), 0); }
 // Leaving the handheld shell is only ever deliberate (the rail's Desktop, the top bar's, Menu > Desktop,
 // or a page only the desktop has), and asks first with Cancel focused. Back never leaves it.
@@ -818,7 +818,8 @@ function handheldTitle() {
 }
 function renderHandheld() {
   const [title, sub] = handheldTitle(); $('#hhTitle').textContent = title; $('#hhSubtitle').textContent = sub;
-  $('#hhBack').disabled = state.hhPage === 'home';
+  const hhBackButton = $('#hhBack'); hhBackButton.disabled = false; hhBackButton.removeAttribute('aria-disabled'); hhBackButton.classList.remove('is-disabled');
+  hhBackButton.style.visibility = state.hhPage === 'home' ? 'hidden' : '';
   $$('[data-hh-nav]').forEach((b) => b.classList.toggle('active', b.dataset.hhNav === state.hhPage));
   const running = model.jobs.filter((j) => j.state === 'running').length;
   $('#hhFooterRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(running, 'job')} running` : 'Connecting';
@@ -826,6 +827,7 @@ function renderHandheld() {
   const page = state.hhPage;
   if (page === 'home') renderHHHome(); else if (page === 'library') renderHHLibrary(q); else if (page === 'attention') renderHHAttention(q); else if (page === 'downloads') renderHHDownloads(); else if (page === 'systems') renderHHSystems(); else if (page === 'settings') renderHHSettings(); else if (page === 'detail') renderHHDetail(games.find((g) => g.id === state.hhSelected)); else if (page === 'decision') renderHHDecision(games.find((g) => g.id === state.hhSelected)); else if (page === 'plan') renderHHPlan(games.find((g) => g.id === state.hhSelected)); else if (page === 'activity') renderHHActivity(); else if (page === 'saves') renderHHSaves(); else if (page === 'launcher') renderHHLauncher(); else if (page === 'duplicates') renderHHDuplicates();
   bindHandheldActions();
+  hhKeepDisabledReachable();
   hhKeepFocus();
 }
 function hhSummaryGame(g) { return `<button class="hh-summary" data-hh-game="${g.id}"><span class="art art-${g.art}">${esc(initials(g.name))}</span><span><strong>${esc(g.name)}</strong><small>${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)} · ${esc(g.systems.join(' / '))}</small></span>${gameStatus(g)}</button>`; }
@@ -894,8 +896,10 @@ function renderHHSettings() {
       if (!(r.plugins || []).length) h.appendChild(stateBlock({ title: `No ${CATEGORY_NAMES[cat].toLowerCase()} plugins` }));
     }, { what: `${CATEGORY_NAMES[cat]} plugins` });
   } else if (page === 'general') {
-    host.innerHTML = `<div class="hh-stack">${back}<div class="hh-settings" id="hhModes"></div><div class="hh-setting"><strong>Application data folder</strong><small class="mono" style="word-break:break-all">${esc(model.info?.app_data_folder || '')}</small><button class="hh-action" data-open-path="app_data_folder">Open folder</button></div></div>`;
+    host.innerHTML = `<div class="hh-stack">${back}<div class="hh-settings" id="hhModes"></div><div class="hh-setting" id="hhPads"></div><div class="hh-setting"><strong>Application data folder</strong><small class="mono" style="word-break:break-all">${esc(model.info?.app_data_folder || '')}</small><button class="hh-action" data-open-path="app_data_folder">Open folder</button></div></div>`;
     renderModes($('#hhModes', host));
+    // Controllers (SPEC 2.7): read by the backend, or why not.
+    call('start_pad').then((r) => { model.pad = r; const box = $('#hhPads', host); if (!box) return; const pads = (ok(r) && r.pads) || []; box.innerHTML = `<strong>Controllers</strong><small>${esc(!ok(r) ? r.message : !r.available ? r.reason : pads.length ? pads.map((p) => p.name).join(' · ') : 'None connected. Keyboard and mouse work too.')}</small>`; });
   } else if (page === 'library') {
     host.innerHTML = `<div class="hh-stack">${back}<div class="hh-capability-list" id="hhFolders"></div><button class="hh-action primary" data-hh-scan>Scan a folder</button></div>`;
     loadInto($('#hhFolders', host), 'get_library_folders', [], (r, h) => { if (!(r.folders || []).length) h.appendChild(stateBlock({ title: 'No folders tracked' })); }, { what: 'Tracked folders' });
@@ -921,7 +925,7 @@ function renderHHDetail(g) {
   const host = $('#hhContent');
   host.innerHTML = `<div class="hh-stack"><section class="hh-panel"><div class="hh-panel-body"><div class="hh-decision-head"><div class="hh-decision-art art-${g.art}">${esc(initials(g.name))}</div><div><h1 style="margin:0">${esc(g.name)}</h1><div class="meta">${esc(g.source)} · ${esc(g.engine)} · ${esc(versionText(g))}</div><div style="margin-top:10px">${gameStatus(g)}</div></div></div><div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px" id="hhDetailActions">${g.status !== 'ok' ? `<button class="hh-action" data-hh-decision="${g.id}">Review</button>` : ''}${g.path ? `<button class="hh-action" data-hh-rescan="${g.id}">Rescan</button>` : ''}<button class="hh-action" data-hh-nav-jump="systems">Systems</button>${g.path ? `<button class="hh-action" data-hh-open="${esc(g.path)}">Open folder</button>` : ''}</div></div></section><section class="hh-detail-section"><h2>Overview</h2><p style="margin:0;color:var(--text-secondary);line-height:1.5">${esc(g.note || '')}</p><div class="hh-plan" style="margin-top:10px"><div class="hh-plan-row"><b>Path</b><span class="mono">${esc(g.path || 'Not installed here')}</span></div><div class="hh-plan-row"><b>Platforms</b><span>${esc(g.platforms.map(platformName).join(' · ') || '—')}</span></div><div class="hh-plan-row"><b>Systems</b><span>${esc(g.systems.join(' · '))}</span></div>${g.added ? `<div class="hh-plan-row"><b>Added</b><span>${esc(fmt.date(g.added))}</span></div>` : ''}</div></section><section class="hh-detail-section"><h2>Versions</h2><div class="hh-summary-list">${g.versions.map((v) => `<div class="hh-summary" style="cursor:default"><span class="art art-${g.art}">${esc((v.version && v.version !== g.name ? v.version : '?').slice(0, 4))}</span><span><strong>${esc(v.version && v.version !== g.name ? v.version : 'No version number')}</strong><small>${(v.variants || []).length} installed variant(s)</small></span>${routineStatus('Installed')}</div>`).join('')}${g.updates.map((u) => `<button class="hh-summary" data-hh-plan="${g.id}"><span class="art" style="background:var(--warning-soft);color:var(--warning)">＋</span><span><strong>${esc(u.version || 'Newer version')}</strong><small>${esc(u.source || '')} · ${esc(platformName(u.platform))}</small></span>${visibleStatus('Available', 'pending', '↻')}</button>`).join('')}</div></section></div>`;
   if (!g.versions.length) $('.hh-summary-list', host).appendChild(stateBlock({ title: 'Nothing installed here' }));
-  call('find_manager_for_game', g.id).then((r) => { const managers = ok(r) ? r.managers || [] : []; if (!managers.length) return; const m = managers[0]; const b = el(`<button class="hh-action" ${m.available === false ? 'disabled' : ''}>Open in ${esc(m.manager_name)}${m.available === false ? ' · not installed' : ''}</button>`); b.onclick = () => openInManager(g, m); $('#hhDetailActions', host)?.appendChild(b); });
+  call('find_manager_for_game', g.id).then((r) => { const managers = ok(r) ? r.managers || [] : []; if (!managers.length) return; const m = managers[0]; const b = el(`<button class="hh-action" data-reason="${esc(m.manager_name)} is not installed on this computer." ${m.available === false ? 'disabled' : ''}>Open in ${esc(m.manager_name)}${m.available === false ? ' · not installed' : ''}</button>`); b.onclick = () => openInManager(g, m); $('#hhDetailActions', host)?.appendChild(b); hhKeepDisabledReachable(); });
 }
 function renderHHDecision(g) {
   if (!g) { navigateHandheld('attention', false); return; }
@@ -938,7 +942,7 @@ function renderHHDecision(g) {
 function renderHHPlan(g) {
   if (!g) { navigateHandheld('attention', false); return; }
   const u = g.updates[0];
-  $('#hhContent').innerHTML = `<section class="hh-decision"><div class="hh-state pending">Seen, not applied</div><h1 style="margin:5px 0 0;font:500 1.625rem var(--serif)">Available update · ${esc(g.name)}</h1><div class="hh-plan">${u ? `<div class="hh-plan-row"><b>Installed</b><span>${esc(versionText(g))}</span></div><div class="hh-plan-row"><b>Available</b><span>${esc(u.version || '?')} · ${esc(platformName(u.platform))}</span></div><div class="hh-plan-row"><b>Seen via</b><span>${esc(u.source || '?')}${u.detected_at ? ` on ${esc(fmt.date(u.detected_at))}` : ''}</span></div><div class="hh-plan-row"><b>Files</b><span>Pythia records updates; it does not download or apply them yet.</span></div>` : '<div class="hh-plan-row"><b>Update</b><span>No update is recorded for this game.</span></div>'}</div><div class="actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="hh-action" data-hh-plan-back>Back</button><button class="hh-action primary" data-hh-apply ${u ? '' : 'disabled'}>Apply update</button></div></section>`;
+  $('#hhContent').innerHTML = `<section class="hh-decision"><div class="hh-state pending">Seen, not applied</div><h1 style="margin:5px 0 0;font:500 1.625rem var(--serif)">Available update · ${esc(g.name)}</h1><div class="hh-plan">${u ? `<div class="hh-plan-row"><b>Installed</b><span>${esc(versionText(g))}</span></div><div class="hh-plan-row"><b>Available</b><span>${esc(u.version || '?')} · ${esc(platformName(u.platform))}</span></div><div class="hh-plan-row"><b>Seen via</b><span>${esc(u.source || '?')}${u.detected_at ? ` on ${esc(fmt.date(u.detected_at))}` : ''}</span></div><div class="hh-plan-row"><b>Files</b><span>Pythia records updates; it does not download or apply them yet.</span></div>` : '<div class="hh-plan-row"><b>Update</b><span>No update is recorded for this game.</span></div>'}</div><div class="actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="hh-action" data-hh-plan-back>Back</button><button class="hh-action primary" data-hh-apply data-reason="No newer version has been seen for this game." ${u ? '' : 'disabled'}>Apply update</button></div></section>`;
 }
 // ---- Handheld pages the desktop has (Droidtop/tracker#538): the same slots, drawn for the handheld -------------
 function hhList(rows) { return `<div class="hh-summary-list">${rows.join('')}</div>`; }
@@ -996,7 +1000,7 @@ function bindHandheldActions() {
   $$('[data-hh-decision]', host).forEach((b) => (b.onclick = () => { state.hhHistory.push(state.hhPage); state.hhSelected = b.dataset.hhDecision; state.hhPage = 'decision'; renderHandheld(); }));
   $$('[data-hh-plan]', host).forEach((b) => (b.onclick = () => { state.hhHistory.push(state.hhPage); state.hhSelected = b.dataset.hhPlan; state.hhPage = 'plan'; renderHandheld(); }));
   $$('[data-hh-library-mode]', host).forEach((b) => (b.onclick = () => { state.hhLibraryMode = b.dataset.hhLibraryMode; localStorage.setItem('pythia-handheld-library', state.hhLibraryMode); renderHandheld(); }));
-  $('#hhSourceFilter')?.addEventListener('change', (e) => { state.hhSource = e.target.value; renderHandheld(); $('#hhSourceFilter')?.focus(); });
+  $('#hhSourceFilter')?.addEventListener('change', (e) => { const onIt = document.activeElement === e.target; state.hhSource = e.target.value; renderHandheld(); if (onIt) $('#hhSourceFilter')?.focus(); });
   $$('[data-hh-settings-page]', host).forEach((b) => (b.onclick = () => { state.hhSettingsPage = b.dataset.hhSettingsPage; renderHandheld(); }));
   $$('[data-hh-choice]', host).forEach((b) => (b.onclick = async () => {
     const g = games.find((x) => x.id === state.hhSelected); const k = b.dataset.hhChoice;
@@ -1028,39 +1032,91 @@ function bindHandheldActions() {
 function rescanHH(g) { if (!g || !g.path) return; pythia.start_onboard(g.path); flash('Rescanning'); navigateHandheld('home', false); }
 // Handheld focus (Droidtop/tracker#538): the D-pad moves within one zone (the rail, the top bar, the page, or an open
 // dialog or menu) and crosses to the next zone only at its edge, so Down from the top bar enters the page, not the rail.
-function hhFocusables(root) { return root ? $$('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]', root).filter((x) => x.offsetParent !== null) : []; }
+// ---- The pad model (docs/SPEC.md, section 2; UX review A7) -----------------------------------
+// Zones: the rail, the strip (the top bar and the page's own toolbar), the content, and an open dialog or
+// menu. Focus moves within a zone and crosses only at its edge; each zone remembers its place on each page.
+const hhVisible = (x) => x.offsetParent !== null && getComputedStyle(x).visibility !== 'hidden';
+function hhFocusables(root) { return root ? $$('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]', root).filter(hhVisible) : []; }
 function hhNearest(items, from, direction) {
   const r = from.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   let best = null, bestScore = Infinity;
-  for (const x of items) { if (x === from) continue; const q = x.getBoundingClientRect(), xx = q.left + q.width / 2, y = q.top + q.height / 2, dx = xx - cx, dy = y - cy; const valid = direction === 'left' ? dx < 0 && Math.abs(dx) >= Math.abs(dy) * .35 : direction === 'right' ? dx > 0 && Math.abs(dx) >= Math.abs(dy) * .35 : direction === 'up' ? dy < 0 && Math.abs(dy) >= Math.abs(dx) * .35 : dy > 0 && Math.abs(dy) >= Math.abs(dx) * .35; if (!valid) continue; const primary = direction === 'left' || direction === 'right' ? Math.abs(dx) : Math.abs(dy), cross = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx), score = primary + cross * 2.2; if (score < bestScore) { best = x; bestScore = score; } }
+  for (const x of items) { if (x === from) continue; const q = x.getBoundingClientRect(), xx = q.left + q.width / 2, y = q.top + q.height / 2, dx = xx - cx, dy = y - cy; const sameRow = q.top < r.bottom - 2 && q.bottom > r.top + 2; const valid = direction === 'left' ? dx < 0 && sameRow : direction === 'right' ? dx > 0 && sameRow : direction === 'up' ? dy < 0 && Math.abs(dy) >= Math.abs(dx) * .35 : dy > 0 && Math.abs(dy) >= Math.abs(dx) * .35; if (!valid) continue; const primary = direction === 'left' || direction === 'right' ? Math.abs(dx) : Math.abs(dy), cross = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx), score = primary + cross * 2.2; if (score < bestScore) { best = x; bestScore = score; } }
   return best;
 }
 function hhFocus(node) { if (!node) return false; node.focus(); node.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true; }
-function hhFocusRail() { return hhFocus($('.hh-rail .hh-nav.active') || hhFocusables($('.hh-rail'))[0]); }
-function hhFocusPage() { return hhFocus(hhFocusables($('#hhContent'))[0]); }
+function hhZoneOf(node) {
+  if (!node || !node.closest) return null;
+  if (node.closest('.hh-rail')) return 'rail';
+  if (node.closest('.hh-topbar') || node.closest('#hhContent .hh-toolbar')) return 'strip';
+  if (node.closest('#hhContent')) return 'content';
+  return null;
+}
+function hhZoneItems(zone) {
+  if (zone === 'rail') return hhFocusables($('.hh-rail'));
+  if (zone === 'strip') return [...hhFocusables($('.hh-topbar')), ...hhFocusables($('#hhContent .hh-toolbar'))];
+  return hhFocusables($('#hhContent')).filter((x) => !x.closest('.hh-toolbar'));
+}
+// A place is the item, not its position: a game, a settings link, an id; else its index in the zone.
+const HH_PLACE_ATTRS = ['hhGame', 'hhDecision', 'hhPlan', 'hhSettingsPage', 'hhNav', 'hhNavJump', 'hhAction', 'hhLibraryMode', 'hhChoice'];
+const hhPlaces = {};
+const hhPlaceKey = () => `${state.hhPage}|${state.hhPage === 'settings' ? state.hhSettingsPage : ['detail', 'decision', 'plan'].includes(state.hhPage) ? state.hhSelected : ''}`;
+function hhLocator(node, items) {
+  if (node.id) return { id: node.id };
+  const attr = HH_PLACE_ATTRS.find((a) => node.dataset[a] !== undefined);
+  if (attr) return { attr, value: node.dataset[attr] };
+  return { index: items.indexOf(node) };
+}
+function hhFind(place, items) {
+  if (!place) return null;
+  if (place.id) return items.find((x) => x.id === place.id) || null;
+  if (place.attr) return items.find((x) => x.dataset[place.attr] === place.value) || null;
+  return items[place.index] || null;
+}
+function hhRemember(node) {
+  const zone = hhZoneOf(node); if (!zone) return;
+  hhPlaces[`${hhPlaceKey()}|${zone}`] = hhLocator(node, hhZoneItems(zone));
+  hhPlaces[`${hhPlaceKey()}|zone`] = zone;
+}
+function hhEnterZone(zone) {
+  const items = hhZoneItems(zone);
+  return hhFocus(hhFind(hhPlaces[`${hhPlaceKey()}|${zone}`], items) || (zone === 'rail' ? $('.hh-rail .hh-nav.active') : null) || items[0]);
+}
+function hhFocusRail() { return hhEnterZone('rail'); }
+function hhFocusPage() { return hhEnterZone('content'); }
 function moveHandheldFocus(direction) {
   const overlay = [...$$('.ctx-menu'), ...$$('.scrim')].pop();
   const current = document.activeElement;
   if (overlay) { const items = hhFocusables(overlay); if (!items.length) return; hhFocus(items.includes(current) ? hhNearest(items, current, direction) || current : items[0]); return; }
-  const rail = $('.hh-rail'), top = $('.hh-topbar'), page = $('#hhContent');
-  const zone = [rail, top, page].find((z) => z.contains(current));
-  if (!zone) { if (!hhFocusPage()) hhFocusRail(); return; }
-  const items = hhFocusables(zone);
+  const zone = hhZoneOf(current);
+  if (!zone) { hhEnterZone('content') || hhEnterZone('rail'); return; }
+  const items = hhZoneItems(zone);
   const next = items.includes(current) ? hhNearest(items, current, direction) : items[0];
   if (next) { hhFocus(next); return; }
-  if (zone === page && direction === 'left') hhFocusRail();
-  else if (zone === page && direction === 'up') hhFocus(hhFocusables(top)[0]);
-  else if (zone === top && direction === 'down') hhFocusPage() || hhFocusRail();
-  else if (zone === top && direction === 'left') hhFocusRail();
-  else if (zone === rail && direction === 'right') hhFocusPage() || hhFocus(hhFocusables(top)[0]);
+  if (direction === 'left' && zone !== 'rail') hhEnterZone('rail');
+  else if (zone === 'content' && direction === 'up') hhEnterZone('strip');
+  else if (zone === 'strip' && direction === 'down') hhEnterZone('content') || hhEnterZone('rail');
+  else if (zone === 'rail' && direction === 'right') hhEnterZone('content') || hhEnterZone('strip');
 }
-// After a page is drawn, focus lands on its first item unless it is still somewhere in the shell (the rail, the top bar).
+// After a page is drawn: focus stays where it is if that is still in the shell; else it returns to the
+// place this page last had (the row you left), else the first content item.
 function hhKeepFocus() {
   const current = document.activeElement;
-  const zones = [$('.hh-rail'), $('.hh-topbar'), $('#hhContent')];
-  if (current && current.isConnected && zones.some((z) => z.contains(current))) return;
-  if (!hhFocusPage()) hhFocusRail();
+  if (current && current.isConnected && hhZoneOf(current)) { hhHints(); return; }
+  const zone = hhPlaces[`${hhPlaceKey()}|zone`] || 'content';
+  hhEnterZone(zone) || hhEnterZone('content') || hhEnterZone('rail');
+  hhHints();
 }
+// A disabled control stays focusable in the handheld shell and says why, inline (SPEC 2.5): its reason is
+// data-reason or its title. A does nothing on it.
+function hhKeepDisabledReachable() {
+  $$('#handheldShell button[disabled]').forEach((b) => {
+    b.disabled = false; b.setAttribute('aria-disabled', 'true'); b.classList.add('is-disabled');
+    const reason = b.dataset.reason || b.title;
+    if (reason && !b.nextElementSibling?.classList.contains('disabled-reason')) b.insertAdjacentElement('afterend', el(`<small class="disabled-reason">${esc(reason)}</small>`));
+  });
+}
+document.addEventListener('click', (e) => { const b = e.target.closest?.('#handheldShell [aria-disabled="true"]'); if (b) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+document.addEventListener('focusin', (e) => { if (state.shell === 'handheld') { hhRemember(e.target); hhHints(); } });
 // The one Back (UX review A4): B, Escape, the footer's Back and the on-screen ‹. A settings subpage goes
 // to the settings root, a subpage to where it was opened from (or its parent), a rail page to Home, and
 // Home stays. It never leaves the shell.
@@ -1074,40 +1130,80 @@ function hhBack() {
   }
   state.hhHistory = []; state.hhPage = 'home'; state.hhSelected = null; state.hhSettingsPage = 'root'; renderHandheld();
 }
+// The page's strip, for LB and RB (SPEC 2.2): the library's source filter, the settings pages, a game page's sections.
+const HH_SETTINGS_PAGES = ['general', 'library', 'capabilities', 'plugins', 'sync', 'interface', 'advanced'];
+function hhStrip() {
+  if (state.hhPage === 'library' && $('#hhSourceFilter')) return { label: 'Source', step: (d) => UI.cycleStep($('#hhSourceFilter'), d) };
+  if (state.hhPage === 'settings' && state.hhSettingsPage !== 'root') return { label: 'Pages', step: (d) => { const i = HH_SETTINGS_PAGES.indexOf(state.hhSettingsPage); state.hhSettingsPage = HH_SETTINGS_PAGES[(i + d + HH_SETTINGS_PAGES.length) % HH_SETTINGS_PAGES.length]; renderHandheld(); } };
+  const sections = $$('#hhContent .hh-detail-section, #hhContent > .hh-stack > section');
+  if (state.hhPage === 'detail' && sections.length > 1) return { label: 'Sections', step: (d) => {
+    const top = $('#hhContent').getBoundingClientRect().top;
+    let at = sections.findIndex((s) => s.contains(document.activeElement));
+    if (at < 0) at = Math.max(0, sections.findIndex((s) => s.getBoundingClientRect().bottom > top + 8));
+    const next = sections[Math.min(sections.length - 1, Math.max(0, at + d))];
+    next.setAttribute('tabindex', '-1'); next.scrollIntoView({ block: 'start' }); (hhFocusables(next)[0] || next).focus();
+  } };
+  return null;
+}
+// X: the focused item's action menu, which holds Info (SPEC 2.2; the shared menu model is A11).
+function hhItemMenu(node) {
+  const id = node?.dataset?.hhGame; const g = id && games.find((x) => x.id === id); if (!g) return null;
+  return () => menu(node, [
+    { label: 'Open', run: () => node.click() },
+    ...(g.path ? [{ label: 'Rescan', run: () => rescanHH(g) }, { label: 'Open folder', run: () => openFolder(g.path) }] : []),
+    { label: 'Info', run: () => infoSheet({ title: g.name, details: [`Game ID: ${g.id}`, `Source: ${g.source}`, `Engine: ${g.engine}`, `Version: ${versionText(g)}`, `Folder: ${g.path || 'Not installed here'}`, `Systems: ${g.systems.join(', ')}`].join('\n') }) },
+  ], { returnTo: node });
+}
+// Start: the Pythia menu (SPEC 2.2).
 function hhMenu(anchor) {
-  const before = document.activeElement;
-  const returnTo = before && [$('.hh-rail'), $('.hh-topbar'), $('#hhContent')].some((z) => z.contains(before)) ? before : hhFocusables($('#hhContent'))[0];
+  const returnTo = document.activeElement;
   menu(anchor || $('#hhMenuHint'), [
-    { label: 'Search', run: () => $('#hhSearch').focus() },
-    { label: 'Add a game…', run: () => $('#hhAdd').click() },
     { label: 'Activity & jobs', run: () => navigateHandheld('activity') },
     { label: 'Save backups', run: () => navigateHandheld('saves') },
     { label: 'Launcher entries', run: () => navigateHandheld('launcher') },
     { label: 'Duplicates', run: () => navigateHandheld('duplicates') },
+    { label: 'Add a game…', run: () => $('#hhAdd').click() },
+    ...(model.config?.error_console ? [{ label: 'Error console', run: () => ErrorConsole.setOpen(true) }] : []),
     { rule: true },
     { label: 'Switch to the desktop layout', run: () => leaveHandheld() },
+    { label: 'Quit Pythia', run: async () => { if (await confirm({ title: 'Quit Pythia?', body: 'Running jobs stop.', proceed: 'Quit' })) pythia.quit_app(); } },
   ], { returnTo });
 }
-// Gamepads (the Web Gamepad API, standard mapping): D-pad or left stick moves, A selects, B goes back, Start opens the
-// Menu. Only while the handheld shell is shown; a held direction repeats.
-const pad = { held: {}, since: {}, last: {} };
-function hhPadPoll() {
-  requestAnimationFrame(hhPadPoll);
-  if (state.shell !== 'handheld' || !navigator.getGamepads) return;
-  const gp = [...navigator.getGamepads()].find((g) => g && g.connected); if (!gp) return;
-  const b = (i) => !!gp.buttons[i]?.pressed; const ax = (i) => gp.axes[i] || 0;
-  const now = performance.now();
-  const inputs = { up: b(12) || ax(1) < -0.5, down: b(13) || ax(1) > 0.5, left: b(14) || ax(0) < -0.5, right: b(15) || ax(0) > 0.5, a: b(0), b: b(1), start: b(9) };
-  for (const [name, down] of Object.entries(inputs)) {
-    if (!down) { pad.held[name] = false; continue; }
-    const first = !pad.held[name]; if (first) { pad.held[name] = true; pad.since[name] = now; pad.last[name] = now; }
-    const repeat = !first && ['up', 'down', 'left', 'right'].includes(name) && now - pad.since[name] > 400 && now - pad.last[name] > 120;
-    if (!first && !repeat) continue; pad.last[name] = now;
-    if (['up', 'down', 'left', 'right'].includes(name)) moveHandheldFocus(name);
-    else if (name === 'a') { const f = document.activeElement; if (f && f !== document.body) f.click(); }
-    else if (name === 'b') { const overlay = [...$$('.ctx-menu'), ...$$('.scrim')].pop(); if (overlay) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); else hhBack(); }
-    else if (name === 'start') hhMenu();
+// One press from the backend's controller reader (pythia/pad.py), only while Pythia has the focus. Directions
+// and B go through the keyboard's path, so a choice row, a dialog and Back behave the same for both.
+function hhPadAction(name) {
+  if (state.shell !== 'handheld') return;
+  const key = (k) => document.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+  const overlay = [...$$('.ctx-menu'), ...$$('.scrim')].pop();
+  const f = document.activeElement;
+  if (['up', 'down', 'left', 'right'].includes(name)) key(`Arrow${name[0].toUpperCase()}${name.slice(1)}`);
+  else if (name === 'a') { if (f && f !== document.body && !f.classList.contains('hh-hint')) f.click(); }
+  else if (name === 'b') key('Escape');
+  else if (overlay) return;
+  else if (name === 'x') hhItemMenu(f)?.();
+  else if (name === 'y') hhFocus($('#hhSearch'));
+  else if (name === 'l1' || name === 'r1') hhStrip()?.step(name === 'l1' ? -1 : 1);
+  else if (name === 'start') hhMenu();
+  else if (name === 'select' && state.hhPage === 'library') $(`[data-hh-library-mode="${state.hhLibraryMode === 'grid' ? 'list' : 'grid'}"]`)?.click();
+}
+// The footer names only what dispatches here (SPEC 2.3), with the Win 4's Xbox labels; each hint is also a button.
+function hhHints() {
+  const host = $('#hhHints'); if (!host) return;
+  const overlay = [...$$('.ctx-menu'), ...$$('.scrim')].pop();
+  const f = document.activeElement;
+  const canBack = overlay || state.hhPage !== 'home' || (state.hhPage === 'settings' && state.hhSettingsPage !== 'root');
+  const hints = [];
+  if (f && f !== document.body && f.getAttribute('aria-disabled') !== 'true' && (hhZoneOf(f) || overlay?.contains(f))) hints.push(['a', 'A', 'Select', 'hhSelectHint']);
+  if (canBack) hints.push(['b', 'B', overlay ? 'Close' : 'Back', 'hhBackHint']);
+  if (!overlay) {
+    if (hhItemMenu(f)) hints.push(['x', 'X', 'Actions']);
+    hints.push(['y', 'Y', 'Search']);
+    const strip = hhStrip(); if (strip) hints.push(['r1', 'LB RB', strip.label]);
+    if (state.hhPage === 'library') hints.push(['select', '⧉', state.hhLibraryMode === 'grid' ? 'List' : 'Grid']);
+    hints.push(['start', '☰', 'Menu', 'hhMenuHint']);
   }
+  host.innerHTML = hints.map(([action, glyph, label, id]) => `<button class="hh-hint" type="button" tabindex="-1" data-pad="${action}" ${id ? `id="${id}"` : ''}><span class="pad-glyph">${esc(glyph)}</span> ${esc(label)}</button>`).join('');
+  $$('[data-pad]', host).forEach((b) => (b.onclick = (e) => (b.dataset.pad === 'start' ? hhMenu(e.currentTarget) : hhPadAction(b.dataset.pad))));
 }
 
 // ---- Menu bar, theme, interface preferences ----------------------------------------------
@@ -1204,6 +1300,9 @@ function connect() {
     pythia.asyncResult.connect(asyncArrived);
     window.pythia = pythia;
     pythia.gamesChanged.connect(refreshGames);
+    // Controllers come from the backend only (SPEC 2.7); the page does not read the Gamepad API.
+    pythia.padAction.connect(hhPadAction);
+    call('start_pad').then((r) => { model.pad = r; if (ok(r) && !r.available) ErrorConsole.reportWeb('warn', r.reason || 'Controllers are not read', 'start_pad'); });
     pythia.modesChanged.connect(() => refreshModes().then(() => renderCurrent()));
     pythia.handheldsChanged.connect(() => { if (state.view === 'systems') renderHandhelds(); if (state.shell === 'handheld' && state.hhPage === 'systems') renderHandheld(); });
     pythia.pairingFinished.connect((r) => flash(r.status === 'ok' ? `Paired with ${r.paired}` : `Not paired: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'));
@@ -1247,7 +1346,6 @@ function renderNoBackend() {
 function setup() {
   applyTheme(prefs.get('theme', 'ink')); applyInterface();
   ErrorConsole.init();
-  requestAnimationFrame(hhPadPoll);
   updateBulkToolbar();
   $$('[data-nav]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.nav)));
   $$('[data-filter-nav]').forEach((b) => (b.onclick = () => { state.filterStatus = b.dataset.filterNav; navigate('library'); renderLibrary(); }));
@@ -1290,9 +1388,6 @@ function setup() {
   $('#enterHandheldButton').onclick = () => enterHandheld('home', { remember: true }); $('#exitHandheldRail').onclick = () => leaveHandheld(); $('#exitHandheldTop').onclick = () => leaveHandheld();
   // The footer's hints are buttons too (touch and mouse); pressing one keeps focus where it was, so Select acts on it.
   $$('.hh-hint').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
-  $('#hhSelectHint').onclick = () => { const f = document.activeElement; if (f && f !== document.body && !f.classList.contains('hh-hint')) f.click(); };
-  $('#hhBackHint').onclick = () => hhBack();
-  $('#hhMenuHint').onclick = (e) => hhMenu(e.currentTarget);
   $$('[data-hh-nav]').forEach((b) => (b.onclick = () => navigateHandheld(b.dataset.hhNav)));
   $('#hhBack').onclick = () => hhBack();
   $('#hhSearch').oninput = (e) => { state.hhSearch = e.target.value; renderHandheld(); };
@@ -1323,5 +1418,5 @@ setup();
 
 // A read-only view of the model for the screenshot driver and the console; never written to.
 window.pythiaDebug = () => ({ ready: model.ready, connected: !!pythia, games: games.length, attention: games.filter((g) => g.status !== 'ok').length, jobs: model.jobs.length, decisions: model.intake.decisions.length, merges: Array.isArray(model.merges) ? model.merges.length : model.merges, events: model.events.length, errorConsole: !!model.config?.error_console, view: state.view, shell: state.shell });
-window.pythiaUI = { navigate, enterHandheld, exitHandheld, leaveHandheld, hhBack, navigateHandheld, openSettingsPane, openTab, state, call };
+window.pythiaUI = { navigate, enterHandheld, exitHandheld, leaveHandheld, hhBack, hhKeepDisabledReachable, navigateHandheld, openSettingsPane, openTab, state, call };
 })();

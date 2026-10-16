@@ -31,6 +31,7 @@ use pyo3::prelude::*;
 use serde_json::{json, Value};
 
 mod agent;
+mod pad;
 mod pair;
 mod saves;
 mod scan;
@@ -148,5 +149,6 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "scan", scan::fill)?;
     submodule(m, "saves", saves::fill)?;
     submodule(m, "service", service::fill)?;
+    submodule(m, "pad", pad::fill)?;
     Ok(())
 }

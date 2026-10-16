@@ -164,6 +164,7 @@ class Backend(QObject):
     modesChanged = Signal()  # manager mode turned on or off (pythia.modes)
     pairingFinished = Signal("QVariant")  # {"status": "ok", "paired": name} or an error result
     asyncResult = Signal("QVariant")  # a slow slot's answer: {"request": id, ...its result}
+    padAction = Signal(str)  # a controller press, named (pythia.pad), only while Pythia has the focus
 
     def __init__(self, error_console: bool = False):
         super().__init__()
@@ -180,6 +181,7 @@ class Backend(QObject):
         self._detected: list[dict] = []
         self._decisions: list[dict] = []
         self._error_console = error_console
+        self._pad = None
         self._log_handler = _UiLogHandler(self)
         logger.addHandler(self._log_handler)
         self.refresh_games()
@@ -1068,6 +1070,24 @@ class Backend(QObject):
 
         path, _filter = QFileDialog.getOpenFileName(None, title or "Choose a file")
         return path or ""
+
+    @Slot(result="QVariant")
+    @_guarded
+    def start_pad(self):
+        """Starts reading game controllers (pythia.pad), once; each press then
+        arrives as padAction while one of Pythia's windows has the focus.
+        ``available`` is false, with ``reason``, when they cannot be read."""
+        from pythia.pad import PadReader
+
+        if self._pad is None:
+            self._pad = PadReader(self.padAction.emit)
+            self._pad.start()
+        return {
+            "status": "ok",
+            "available": self._pad.problem is None,
+            "reason": self._pad.problem,
+            "pads": self._pad.pads(),
+        }
 
     @Slot(str, str, result="QVariant")
     @_guarded

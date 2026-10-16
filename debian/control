@@ -9,6 +9,8 @@ Build-Depends: debhelper-compat (= 12),
                meson,
                cargo (>= 1.85) | cargo-1.85,
                rustc (>= 1.85) | rustc-1.85,
+               libudev-dev,
+               pkg-config,
 Rules-Requires-Root: no
 Standards-Version: 4.5.0
 Homepage: https://github.com/bi0shacker001/pythia

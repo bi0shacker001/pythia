@@ -220,6 +220,14 @@ body.handheld-active>.menu-bar,body.handheld-active>.topbar,body.handheld-active
 .handheld-active #handheldShell .toggle{width:4.5rem;height:48px;padding:0 4px;border-width:2px}
 .handheld-active #handheldShell .toggle span{width:2.25rem;height:2.25rem}
 .handheld-active #handheldShell .toggle.on span{transform:translateX(calc(4.5rem - 2.25rem - 12px))}
+/* UX review A7 (docs/SPEC.md 2.3-2.6): one thick focus ring in its own colour that wins over .active,
+   disabled controls that stay reachable and say why, hints as buttons, toasts clear of the hint row. */
+.handheld-active #handheldShell :focus,.handheld-active .scrim :focus,.handheld-active .ctx-menu :focus{outline:0.25rem solid var(--focus-ring);outline-offset:0.15rem}
+.handheld-active #handheldShell .hh-nav.active:focus{outline:0.25rem solid var(--focus-ring);outline-offset:0.15rem;color:var(--text-primary)}
+.handheld-active #handheldShell .is-disabled{opacity:.6;cursor:not-allowed}
+.handheld-active #handheldShell .disabled-reason{display:block;margin-top:4px;font-size:0.75rem;color:var(--text-secondary)}
+.hh-hints{display:flex;align-items:center;gap:4px}.pad-glyph{display:inline-grid;place-items:center;min-width:1.5em;padding:0 .3em;border:1px solid var(--border-strong);border-radius:99px;font-weight:700}
+.handheld-active .flashes{bottom:calc(48px + 1rem)}
 
 /* 2026-10-14: wired to the backend. Tokens live in tokens.css; notices, dialogs, flashes,
    state blocks, menus and the error console in components.css. */
@@ -503,13 +511,13 @@ html[data-large-text="1"] .settings-layout{grid-template-columns:1fr}
   </aside>
   <div class="hh-app">
     <header class="hh-topbar">
-      <button class="hh-back" id="hhBack" aria-label="Back" disabled>‹</button>
+      <button class="hh-back" id="hhBack" aria-label="Back">‹</button>
       <div class="hh-heading"><strong id="hhTitle">Home</strong><small id="hhSubtitle"></small></div>
       <input class="hh-search" id="hhSearch" aria-label="Search handheld view" placeholder="Search games and tasks">
       <div class="hh-top-actions"><button class="hh-action primary" id="hhAdd">＋ Add</button><button class="hh-action hidden" data-console-toggle aria-label="Error console">⚠</button><button class="hh-action" id="exitHandheldTop"><span class="desktop-label">Desktop</span> ↗</button></div>
     </header>
     <main class="hh-content" id="hhContent" tabindex="-1"></main>
-    <footer class="hh-footer"><button class="hh-hint" id="hhSelectHint" tabindex="-1">◉ Select</button><button class="hh-hint" id="hhBackHint" tabindex="-1">○ Back</button><button class="hh-hint" id="hhMenuHint" tabindex="-1">☰ Menu</button><span class="right" id="hhFooterRight"></span></footer>
+    <footer class="hh-footer"><span class="hh-hints" id="hhHints" aria-label="Controller buttons"></span><span class="right" id="hhFooterRight"></span></footer>
   </div>
 </section>
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>

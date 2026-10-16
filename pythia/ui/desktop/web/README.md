@@ -67,6 +67,7 @@ which the Activity page's event log and the error console both read.
 | Settings > Advanced | `get_app_info` (schema version, log file), `set_log_level`, `get_ui_config`, `export_diagnostics`, `rebuild_index`, `reset_identity` (unavailable) |
 | Menu bar | File: add/scan/import (`sync_account` of a connected source)/`quit_app`; Library: `sync_all_accounts`, `check_updates` (the F95zone pass); Tools: `rebuild_index`, `get_tools`; Help: `get_app_info`, `open_url` |
 | Path dialogs (Add, Scan, Watch, Export) | `check_path(path, want)` before anything starts (`want`: `game`, `folder`, `writable` or `program`; pythia/path_check.py): the dialog's button stays disabled while it gives a reason, shown under the field; example paths follow the OS (`get_app_info().os`) |
+| Handheld shell input | `start_pad` (the controllers read, or why not) and `padAction` (one named press, sent only while a Pythia window has the focus; pythia/pad.py). The pad model (zones, buttons, hints, focus) is docs/SPEC.md section 2; the page does not read the Gamepad API |
 | Handheld shell | the same model and slots: home (attention, jobs, recent), library, attention with a per-game review page (rescan, open folder, remove), downloads, systems, settings |
 
 ## Error console (testing aid)

@@ -45,7 +45,7 @@
   --accent:#d9a441;--accent-hover:#ebba63;--accent-soft:#39301d;--on-accent:#251b08;
   --positive:#63bd91;--positive-soft:#192c24;--warning:#ee8b4a;--warning-soft:#36231a;
   --critical-token:#df6976;--critical-soft-token:#351d25;--informational:#78a9dc;--informational-soft:#182a3c;
-  --selection:#332c20;--focus:#f4c56e;--focus-inner:#12111a;--overlay:rgba(5,4,9,.76);
+  --selection:#332c20;--focus:#f4c56e;--focus-ring:#6fd0ff;--focus-inner:#12111a;--overlay:rgba(5,4,9,.76);
   --shadow:0 18px 48px rgba(0,0,0,.34);
   /* Notice tones. Info follows the accent unless it would collide with caution
      (here it does: amber accent vs amber caution), so info uses neutral ink and
@@ -66,7 +66,7 @@ html[data-theme="parchment"]{
   --accent:#a8672a;--accent-hover:#bd7a36;--accent-soft:#f0dfc2;--on-accent:#fff9ed;
   --positive:#2f8f5e;--positive-soft:#e2f2e7;--warning:#8a6a00;--warning-soft:#f3ebc8;
   --critical-token:#b8433f;--critical-soft-token:#f7e2df;--informational:#356f9c;--informational-soft:#e0edf6;
-  --selection:#eee1c8;--focus:#8f561e;--focus-inner:#ffffff;--overlay:rgba(49,42,32,.42);
+  --selection:#eee1c8;--focus:#8f561e;--focus-ring:#1d5fb8;--focus-inner:#ffffff;--overlay:rgba(49,42,32,.42);
   --shadow:0 18px 48px rgba(73,55,31,.16);
   --info-ink:#28241f;--info-plate:#e9e3d4;--on-info:#3f3a33;
   --caution-ink:#8a5a00;--caution-plate:#f6e8cc;--on-caution:#4f3a10;
@@ -82,7 +82,7 @@ html[data-theme="cobalt"]{
   --accent:#5fa9d8;--accent-hover:#7dbce2;--accent-soft:#1b3446;--on-accent:#07141f;
   --positive:#63bd91;--positive-soft:#173128;--warning:#d4a95d;--warning-soft:#302819;
   --critical-token:#df6976;--critical-soft-token:#391e27;--informational:#78a9dc;--informational-soft:#182c40;
-  --selection:#203a4d;--focus:#8fd0f4;--focus-inner:#0e141d;--overlay:rgba(2,8,14,.76);
+  --selection:#203a4d;--focus:#8fd0f4;--focus-ring:#ffcf5a;--focus-inner:#0e141d;--overlay:rgba(2,8,14,.76);
   --shadow:0 18px 48px rgba(0,0,0,.38);
   /* The blue accent is far enough from amber, so info uses the accent. */
   --info-ink:#8cc3ea;--info-plate:#182c40;--on-info:#d6e4f0;

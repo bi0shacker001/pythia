@@ -89,12 +89,18 @@ It crosses to another zone only at the zone's edge:
 
 - Left from the content's or the strip's left edge reaches the rail.
 - Right from the rail reaches the content.
-- Up from the content's top reaches the strip.
-- Down from the strip reaches the content.
+- Up from the content's top reaches the strip item nearest above it: the
+  page's own toolbar before the top bar.
+- Down from the strip reaches the content item nearest below it.
+
+"Nearest" is measured edge to edge, not centre to centre, so a narrow
+choice under a full-width button is below it (Droidtop/tracker#538, retest
+B1: Down from "‹ Settings" skipped every choice on Settings > Interface).
 
 Each zone remembers its place on each page, by item: a game, a settings
-link or a button's own id. Coming back to a page, or to a zone, lands on the
-item you left. Returning from a game to the library lands on that game's
+link or a button's own id. Coming back to a page, or crossing to a zone
+with Left or Right, lands on the item you left; Up and Down cross to the
+nearest item, as above. Returning from a game to the library lands on that game's
 row. When the page is redrawn underneath you, focus stays on the same item.
 
 Entering the shell focuses the first content item, not the rail.

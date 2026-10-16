@@ -25,6 +25,7 @@ from the same model and the same backend.
 | `query.js` | the library query (`window.PythiaQuery`): words that must all match, ignoring case, accents and punctuation, across every version, folder, mod, language and kind; filters `source:`, `engine:`, `kind:`, `installed`, `has:update`, `has:nolink` (UX review A11). Tested under node: `tests/web/*.test.mjs` |
 | `versions.js` | ordering a game's versions (`window.PythiaVersions`): droidtop's `Versions.compareLoose`, which labels are version numbers, and the middle-ellipsis for folder paths (UX review A13). Tested under node |
 | `review.js` | the one Review queue (`window.PythiaReview`): scan decisions, possible duplicates, games not identified, updates seen, new downloads and (later) sync conflicts, with one count, the games affected, each counted once (UX review A18). Tested under node |
+| `padfocus.js` | where the D-pad moves focus in the handheld shell (`window.PythiaPad`): the nearest item in a direction, edge to edge, so narrow choices under a full-width button are reached (docs/SPEC.md 2.1; Droidtop/tracker#538 retest B1). Tested under node |
 | `reconcile.js` | possible duplicates as clusters (`window.PythiaReconcile`): the pairs the backend finds joined into clusters, each with its reason in words, the suggestion (Combine as versions, or Same game, another source), the record to keep and what moves (UX review A16). Tested under node |
 | `app.js` | the model (`adaptGame`), the backend bridge, the pages of both shells, the menu bar |
 

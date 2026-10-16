@@ -1377,12 +1377,7 @@ function rescanHH(g) { if (!g || !g.path) return; pythia.start_onboard(g.path); 
 // menu. Focus moves within a zone and crosses only at its edge; each zone remembers its place on each page.
 const hhVisible = (x) => x.offsetParent !== null && getComputedStyle(x).visibility !== 'hidden';
 function hhFocusables(root) { return root ? $$('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]', root).filter(hhVisible) : []; }
-function hhNearest(items, from, direction) {
-  const r = from.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-  let best = null, bestScore = Infinity;
-  for (const x of items) { if (x === from) continue; const q = x.getBoundingClientRect(), xx = q.left + q.width / 2, y = q.top + q.height / 2, dx = xx - cx, dy = y - cy; const sameRow = q.top < r.bottom - 2 && q.bottom > r.top + 2; const valid = direction === 'left' ? dx < 0 && sameRow : direction === 'right' ? dx > 0 && sameRow : direction === 'up' ? dy < 0 && Math.abs(dy) >= Math.abs(dx) * .35 : dy > 0 && Math.abs(dy) >= Math.abs(dx) * .35; if (!valid) continue; const primary = direction === 'left' || direction === 'right' ? Math.abs(dx) : Math.abs(dy), cross = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx), score = primary + cross * 2.2; if (score < bestScore) { best = x; bestScore = score; } }
-  return best;
-}
+const hhNearest = (items, from, direction) => window.PythiaPad.nearest(items, from, direction);
 function hhFocus(node) { if (!node) return false; node.focus(); node.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true; }
 function hhZoneOf(node) {
   if (!node || !node.closest) return null;
@@ -1432,9 +1427,11 @@ function moveHandheldFocus(direction) {
   const items = hhZoneItems(zone);
   const next = items.includes(current) ? hhNearest(items, current, direction) : items[0];
   if (next) { hhFocus(next); return; }
+  // Up and Down cross to the nearest item in that direction, so Up from the first row reaches the page's own
+  // toolbar before the top bar (retest B1); Left and Right land on the zone's remembered place.
   if (direction === 'left' && zone !== 'rail') hhEnterZone('rail');
-  else if (zone === 'content' && direction === 'up') hhEnterZone('strip');
-  else if (zone === 'strip' && direction === 'down') hhEnterZone('content') || hhEnterZone('rail');
+  else if (zone === 'content' && direction === 'up') hhFocus(hhNearest(hhZoneItems('strip'), current, 'up')) || hhEnterZone('strip');
+  else if (zone === 'strip' && direction === 'down') hhFocus(hhNearest(hhZoneItems('content'), current, 'down')) || hhEnterZone('content') || hhEnterZone('rail');
   else if (zone === 'rail' && direction === 'right') hhEnterZone('content') || hhEnterZone('strip');
 }
 // After a page is drawn: focus stays where it is if that is still in the shell; else it returns to the

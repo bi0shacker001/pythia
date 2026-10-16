@@ -39,7 +39,11 @@ NAME_SIMILARITY_THRESHOLD = 0.6
 # finding). This won't catch every real case either (a bare build number like
 # "Bunnycop-049" now just stays part of the name) -- best-effort, not exhaustive; see
 # this function's docstring.
-_NAME_VERSION_RE = re.compile(r"^(.*?)[-_ ](?:v(\d+(?:[._]\d+)*[a-zA-Z]*)|(\d+[._]\d+(?:[._]\d+)*[a-zA-Z]*))(.*)$")
+# A version's tail may be letters then digits ("0.8.09r1", "1.0b2", "2.0rc3"):
+# Droidtop/tracker#538, "0.8.09r1" was cut to "0.8.09r" with "1" as a mod.
+_NAME_VERSION_RE = re.compile(
+    r"^(.*?)[-_ ](?:v(\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?)|(\d+[._]\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?))(.*)$"
+)
 
 # A small set of generic "this is a part/chapter marker, not a title" words -- when a
 # leaf folder is *just* one of these plus a number (e.g. "Week 1", "Part1", "Chap3+"),

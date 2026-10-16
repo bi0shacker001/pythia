@@ -344,6 +344,19 @@ class Backend(QObject):
         threading.Thread(target=self._onboard_worker, args=(path_str, job), daemon=True).start()
 
     def _onboard_worker(self, path_str: str, job: str):
+        from pythia import archives
+
+        if archives.is_archive(Path(path_str)):
+            # A downloaded archive: unpacked beside itself, then added as that folder.
+            try:
+                folder = archives.unpack(Path(path_str))
+            except (archives.ArchiveError, OSError) as ex:
+                self._job_log(job, f"error: {ex}")
+                self._job_finish(job, f"Could not unpack {Path(path_str).name}: {ex}", ok=False)
+                self.onboardComplete.emit({"status": "error", "message": str(ex)})
+                return
+            self._job_log(job, f"Unpacked {Path(path_str).name} into {folder}")
+            path_str = str(folder)
         pv = onboarding.preview(path_str)
         if pv["status"] != "ok":
             self._job_log(job, f"error: {pv['message']}")

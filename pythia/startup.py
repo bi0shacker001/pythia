@@ -164,7 +164,8 @@ def run_all_checks(async_ops: bool = True) -> None:
             threading.Thread(target=check_libs, daemon=True).start()
         else:
             check_libs()
-    check_vulkan()
+        # Vulkan matters to DXVK under Wine/Proton, which only run games on Linux.
+        check_vulkan()
     check_gnome()
     fill_missing_platforms()
     build_path_cache()

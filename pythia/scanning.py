@@ -49,7 +49,7 @@ def _marker_roots(path: Path, plugins):
             return
 
     try:
-        children = sorted(p for p in path.iterdir() if p.is_dir())
+        children = sorted(p for p in path.iterdir() if p.is_dir() and not _hidden(p))
     except OSError:
         children = []
     for child in children:
@@ -77,6 +77,15 @@ def _generic_roots(path: Path, generic):
         yield path
 
 
+def _hidden(folder: Path) -> bool:
+    """A folder no person puts a game in: a dot-folder (Syncthing's `.stfolder`
+    and `.stversions`, `.git`, `.Trash-1000`...) or Windows' own
+    (`$RECYCLE.BIN`, `System Volume Information`). Droidtop/tracker#538: a
+    scan took `.stfolder` for a game."""
+    name = folder.name
+    return name.startswith((".", "$")) or name.casefold() == "system volume information"
+
+
 def _discover_roots(scan_root: Path, plugins, generic):
     """Full discovery: marker-based roots anywhere in the tree, plus a generic
     fallback -- but *only* for direct children of `scan_root` that had no marker-
@@ -87,7 +96,7 @@ def _discover_roots(scan_root: Path, plugins, generic):
         return
 
     try:
-        children = sorted(p for p in scan_root.iterdir() if p.is_dir())
+        children = sorted(p for p in scan_root.iterdir() if p.is_dir() and not _hidden(p))
     except OSError:
         children = []
 

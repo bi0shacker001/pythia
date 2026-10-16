@@ -31,3 +31,32 @@ class WindowsStartupTest(TestCase):
         ):
             self.assertEqual(list(drivers.get_gpu_cards()), [])
         error.assert_not_called()
+
+    def test_start_up_checks_run_no_linux_probe_elsewhere(self):
+        from pythia import startup
+
+        with (
+            mock.patch.object(startup.sys, "platform", "win32"),
+            mock.patch.object(startup, "preload_gpus"),
+            mock.patch.object(startup, "check_libs") as libs,
+            mock.patch.object(startup, "check_vulkan") as vulkan,
+            mock.patch.object(startup, "check_gnome"),
+            mock.patch.object(startup, "fill_missing_platforms"),
+            mock.patch.object(startup, "build_path_cache"),
+        ):
+            startup.run_all_checks(async_ops=False)
+        libs.assert_not_called()
+        vulkan.assert_not_called()
+
+
+class RunAsModuleTest(TestCase):
+    def test_python_dash_m_pythia_runs_the_pythia_command(self):
+        import importlib.util
+
+        spec = importlib.util.find_spec("pythia.__main__")
+        self.assertIsNotNone(spec)
+        with mock.patch("pythia.launch.main") as main:
+            import runpy
+
+            runpy.run_module("pythia", run_name="__main__")
+        main.assert_called_once_with()

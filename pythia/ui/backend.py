@@ -610,7 +610,7 @@ class Backend(QObject):
     @Slot(str, str, result="QVariant")
     @_guarded
     def set_current_version(self, game_id: str, version: str):
-        """"Set as current" (UX review A13): the version this computer treats as
+        """ "Set as current" (UX review A13): the version this computer treats as
         the game's current one, shown on rows and the hero instead of the
         latest installed, and the answer when versions cannot be ordered. An
         empty ``version`` clears it. Recorded in the entry's history."""

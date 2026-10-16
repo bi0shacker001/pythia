@@ -82,3 +82,17 @@ class PlaceholdersTest(TestCase):
             self.assertNotIn("hint: 'C:", line)
             self.assertNotIn("hint: 'G:", line)
             self.assertIn("check: checkPath(", line)
+
+
+class HandOffTest(TestCase):
+    """UX review A3: every hand-off out of Pythia goes through handOff (asks first in the handheld
+    shell; on desktop only a launcher's first use asks), and none is a primary button."""
+
+    def test_open_path_open_url_and_open_in_manager_are_called_only_through_hand_off(self):
+        app = (Path(__file__).parents[1] / "pythia/ui/desktop/web/app.js").read_text(encoding="utf-8")
+        for name in ("'open_path'", "'open_url'", "pythia.open_in_manager("):
+            for line in app.splitlines():
+                if name in line:
+                    self.assertTrue("handOff(" in line or "run: () =>" in line, line[:160])
+        self.assertNotIn('class="btn primary" type="button">Open in', app)
+        self.assertNotIn('class="hh-action primary" ${m.available', app)

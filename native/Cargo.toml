@@ -16,15 +16,15 @@ crate-type = ["cdylib"]
 # droidtop-agent's crates, used as they are: the protocol and channel the
 # handhelds speak (core) and the computer's side (store, pair, scan, saves,
 # service). Pinned by commit; moving the pin is a change of its own.
-droidtop-agent-core = { git = "https://github.com/Droidtop/droidtop-agent", rev = "9b6f7330e5d235d5fcf458d42b6a7b56f63a3609" }
-droidtop-agent-store = { git = "https://github.com/Droidtop/droidtop-agent", rev = "9b6f7330e5d235d5fcf458d42b6a7b56f63a3609" }
-droidtop-agent-pair = { git = "https://github.com/Droidtop/droidtop-agent", rev = "9b6f7330e5d235d5fcf458d42b6a7b56f63a3609" }
-droidtop-agent-scan = { git = "https://github.com/Droidtop/droidtop-agent", rev = "9b6f7330e5d235d5fcf458d42b6a7b56f63a3609" }
-droidtop-agent-saves = { git = "https://github.com/Droidtop/droidtop-agent", rev = "9b6f7330e5d235d5fcf458d42b6a7b56f63a3609" }
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "9b6f7330e5d235d5fcf458d42b6a7b56f63a3609" }
+droidtop-agent-core = { git = "https://github.com/Droidtop/droidtop-agent", rev = "0118dd9adca55770f8920579e332d3a3d42d13e6" }
+droidtop-agent-store = { git = "https://github.com/Droidtop/droidtop-agent", rev = "0118dd9adca55770f8920579e332d3a3d42d13e6" }
+droidtop-agent-pair = { git = "https://github.com/Droidtop/droidtop-agent", rev = "0118dd9adca55770f8920579e332d3a3d42d13e6" }
+droidtop-agent-scan = { git = "https://github.com/Droidtop/droidtop-agent", rev = "0118dd9adca55770f8920579e332d3a3d42d13e6" }
+droidtop-agent-saves = { git = "https://github.com/Droidtop/droidtop-agent", rev = "0118dd9adca55770f8920579e332d3a3d42d13e6" }
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "0118dd9adca55770f8920579e332d3a3d42d13e6" }
 # windowcast's host identity folder, the one droidtop-agent and windowcast share,
 # at the commit droidtop-agent pins.
-windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "93efcb9ebf108ae71222b9fe3e19d0d57cfb102e" }
+windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "53556d7fbf8b1e46c11c07db709db852a9378147" }
 # Where droidtop-agent keeps its files (as its Dirs::locate).
 dirs = "5"
 # Finding and stopping a running droidtop-agent, on every system.

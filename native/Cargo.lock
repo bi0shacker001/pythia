@@ -355,7 +355,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-contexts"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=0118dd9adca55770f8920579e332d3a3d42d13e6#0118dd9adca55770f8920579e332d3a3d42d13e6"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=c09cd764c1c18ad6f81edcbd00f260e9e1114244#c09cd764c1c18ad6f81edcbd00f260e9e1114244"
 dependencies = [
  "droidtop-agent-core",
  "droidtop-agent-store",
@@ -367,7 +367,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-core"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=0118dd9adca55770f8920579e332d3a3d42d13e6#0118dd9adca55770f8920579e332d3a3d42d13e6"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=c09cd764c1c18ad6f81edcbd00f260e9e1114244#c09cd764c1c18ad6f81edcbd00f260e9e1114244"
 dependencies = [
  "boringtun",
  "chacha20poly1305",
@@ -391,7 +391,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-pair"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=0118dd9adca55770f8920579e332d3a3d42d13e6#0118dd9adca55770f8920579e332d3a3d42d13e6"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=c09cd764c1c18ad6f81edcbd00f260e9e1114244#c09cd764c1c18ad6f81edcbd00f260e9e1114244"
 dependencies = [
  "droidtop-agent-core",
  "droidtop-agent-store",
@@ -401,7 +401,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-saves"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=0118dd9adca55770f8920579e332d3a3d42d13e6#0118dd9adca55770f8920579e332d3a3d42d13e6"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=c09cd764c1c18ad6f81edcbd00f260e9e1114244#c09cd764c1c18ad6f81edcbd00f260e9e1114244"
 dependencies = [
  "dirs",
  "droidtop-agent-core",
@@ -416,7 +416,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-scan"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=0118dd9adca55770f8920579e332d3a3d42d13e6#0118dd9adca55770f8920579e332d3a3d42d13e6"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=c09cd764c1c18ad6f81edcbd00f260e9e1114244#c09cd764c1c18ad6f81edcbd00f260e9e1114244"
 dependencies = [
  "dirs",
  "droidtop-agent-core",
@@ -434,7 +434,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-service"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=0118dd9adca55770f8920579e332d3a3d42d13e6#0118dd9adca55770f8920579e332d3a3d42d13e6"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=c09cd764c1c18ad6f81edcbd00f260e9e1114244#c09cd764c1c18ad6f81edcbd00f260e9e1114244"
 dependencies = [
  "dirs",
  "droidtop-agent-contexts",
@@ -455,7 +455,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-store"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=0118dd9adca55770f8920579e332d3a3d42d13e6#0118dd9adca55770f8920579e332d3a3d42d13e6"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=c09cd764c1c18ad6f81edcbd00f260e9e1114244#c09cd764c1c18ad6f81edcbd00f260e9e1114244"
 dependencies = [
  "dirs",
  "droidtop-agent-core",
@@ -1997,8 +1997,8 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windowcast-identity"
-version = "0.34.1"
-source = "git+https://github.com/Droidtop/windowcast?rev=53556d7fbf8b1e46c11c07db709db852a9378147#53556d7fbf8b1e46c11c07db709db852a9378147"
+version = "0.35.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=cd1ed2371b1e793babf6703b5dcfab94d979f1c6#cd1ed2371b1e793babf6703b5dcfab94d979f1c6"
 dependencies = [
  "ed25519-dalek",
  "rand_core",
@@ -2007,8 +2007,8 @@ dependencies = [
 
 [[package]]
 name = "windowcast-pairing"
-version = "0.34.1"
-source = "git+https://github.com/Droidtop/windowcast?rev=53556d7fbf8b1e46c11c07db709db852a9378147#53556d7fbf8b1e46c11c07db709db852a9378147"
+version = "0.35.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=cd1ed2371b1e793babf6703b5dcfab94d979f1c6#cd1ed2371b1e793babf6703b5dcfab94d979f1c6"
 dependencies = [
  "hkdf",
  "hmac",
@@ -2022,8 +2022,8 @@ dependencies = [
 
 [[package]]
 name = "windowcast-rendezvous"
-version = "0.34.1"
-source = "git+https://github.com/Droidtop/windowcast?rev=53556d7fbf8b1e46c11c07db709db852a9378147#53556d7fbf8b1e46c11c07db709db852a9378147"
+version = "0.35.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=cd1ed2371b1e793babf6703b5dcfab94d979f1c6#cd1ed2371b1e793babf6703b5dcfab94d979f1c6"
 dependencies = [
  "ed25519-dalek",
  "rand_core",

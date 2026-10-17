@@ -103,3 +103,13 @@ def launch_and_watch(
 
     _poll(watch_dir, seen, on_new_file, poll_interval, stop_event, proc, stop_when_process_exits)
     return proc
+
+
+def downloader_watching(watcher: dict | None, plugin_id: str) -> str | None:
+    """The folder `plugin_id` is watching: the watch's folder when that
+    downloader started it, else None. A watch started for no downloader, or
+    for another, is not this one's (Droidtop/tracker#538 retest D4: every
+    downloader said Watching)."""
+    if not watcher or watcher.get("plugin") != plugin_id:
+        return None
+    return watcher.get("folder")

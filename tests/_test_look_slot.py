@@ -2,42 +2,26 @@
 it (Droidtop/tracker#538 retest: "starting a second Look while one runs makes
 the first's progress and result overwrite the page and the stored result")."""
 
-import os
-from unittest import TestCase, mock
+from unittest import TestCase
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-from PySide6.QtCore import QCoreApplication  # noqa: E402
-
-from pythia import look  # noqa: E402
-from pythia.ui import backend  # noqa: E402
-
-APP = QCoreApplication.instance() or QCoreApplication([])
+from pythia.look import LookSlot
 
 
-class TwoLooksTest(TestCase):
+class LookSlotTest(TestCase):
     def test_the_newer_look_keeps_the_page(self):
-        b = backend.Backend()
-        workers, emitted = [], []
-        b.lookChanged.connect(emitted.append)
+        slot = LookSlot()
+        slot.start("first", "/games/first")
+        slot.start("second", "/games/second")
+        self.assertIsNone(slot.progress("first", {"folders": 9, "games": 9}))
+        self.assertEqual(slot.progress("second", {"folders": 1, "games": 1})["root"], "/games/second")
+        self.assertTrue(slot.finish("second", {"status": "ok", "root": "/games/second", "job": "second"}))
+        self.assertFalse(slot.finish("first", {"status": "ok", "root": "/games/first", "job": "first"}))
+        self.assertFalse(slot.fail("first"))
+        self.assertEqual(slot.get()["root"], "/games/second")
 
-        def fake_look(path, progress):
-            progress({"folders": 1, "games": 1})
-            return {"status": "ok", "root": path, "summary": f"Found in {path}", "proposals": []}
-
-        with (
-            mock.patch.object(
-                backend.threading,
-                "Thread",
-                side_effect=lambda target, args, **kw: workers.append((target, args)) or mock.Mock(),
-            ),
-            mock.patch.object(look, "look", side_effect=fake_look),
-        ):
-            first = b.start_look("/games/first")["job"]
-            second = b.start_look("/games/second")["job"]
-            emitted.clear()
-            workers[1][0](*workers[1][1])  # the second finishes first
-            workers[0][0](*workers[0][1])  # then the first
-        self.assertEqual(b.get_look()["root"], "/games/second")
-        self.assertEqual(b.get_look()["job"], second)
-        self.assertTrue(all(e.get("job") != first for e in emitted), emitted)
+    def test_one_look_runs_as_before(self):
+        slot = LookSlot()
+        self.assertEqual(slot.start("a", "/g")["status"], "looking")
+        self.assertEqual(slot.progress("a", {"folders": 2, "games": 1})["counts"], {"folders": 2, "games": 1})
+        self.assertTrue(slot.fail("a"))
+        self.assertIsNone(slot.get())

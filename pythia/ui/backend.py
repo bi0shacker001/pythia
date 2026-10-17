@@ -142,16 +142,6 @@ class _UiLogHandler(logging.Handler):
         self._backend._keep(entry)
 
 
-def downloader_watching(watcher: dict | None, plugin_id: str) -> str | None:
-    """The folder `plugin_id` is watching: the watch's folder when that
-    downloader started it, else None. A watch started for no downloader, or
-    for another, is not this one's (Droidtop/tracker#538 retest D4: every
-    downloader said Watching)."""
-    if not watcher or watcher.get("plugin") != plugin_id:
-        return None
-    return watcher.get("folder")
-
-
 class Backend(QObject):
     logLine = Signal(str)
     # Dict and list payloads are declared as QVariant, not a bare Python object:
@@ -196,7 +186,9 @@ class Backend(QObject):
         self._decisions: list[dict] = intake_store.load()
         self._error_console = error_console
         self._pad = None
-        self._look: dict | None = None
+        from pythia.look import LookSlot
+
+        self._look = LookSlot()
         self._log_handler = _UiLogHandler(self)
         logger.addHandler(self._log_handler)
         self.refresh_games()
@@ -412,47 +404,31 @@ class Backend(QObject):
     @_guarded
     def start_look(self, path_str: str):
         """Looks through a folder for games without writing anything; its
-        proposals arrive as lookChanged, with live counts while it walks."""
+        proposals arrive as lookChanged, with live counts while it walks. A
+        Look started while another runs replaces it (pythia.look.LookSlot)."""
         path_str = _normalize_path(path_str)
         job = self._job_start("scan", f"Look in {Path(path_str).name or path_str}", "Nothing is added until you Add")
-        with self._lock:
-            self._look = {"status": "looking", "root": path_str, "counts": {"folders": 0, "games": 0}, "job": job}
-        self.lookChanged.emit(_jsonable(self._look))
+        self.lookChanged.emit(_jsonable(self._look.start(job, path_str)))
         threading.Thread(target=self._look_worker, args=(path_str, job), daemon=True).start()
         return {"status": "ok", "job": job}
 
     def _look_worker(self, path_str: str, job: str):
         from pythia import look
 
-        # Only the newest Look is the page's: one started after this one
-        # replaces it, and this one's progress and result are then dropped
-        # rather than overwriting the newer one's (Droidtop/tracker#538 retest).
-        def current() -> bool:
-            return self._look is not None and self._look.get("job") == job
-
         def progress(counts):
-            with self._lock:
-                if self._look is None or not current():
-                    return
-                self._look["counts"] = counts
-            self.lookChanged.emit(_jsonable({"status": "looking", "root": path_str, "counts": counts, "job": job}))
+            shown = self._look.progress(job, counts)
+            if shown is not None:
+                self.lookChanged.emit(_jsonable(shown))
 
         try:
             result = look.look(path_str, progress=progress)
         except OSError as exc:
             self._job_finish(job, f"Could not look in {path_str}: {exc}", ok=False)
-            with self._lock:
-                if not current():
-                    return
-                self._look = None
-            self.lookChanged.emit({"status": "error", "message": str(exc)})
+            if self._look.fail(job):
+                self.lookChanged.emit({"status": "error", "message": str(exc)})
             return
         result["job"] = job
-        with self._lock:
-            replaced = not current()
-            if not replaced:
-                self._look = result
-        if replaced:
+        if not self._look.finish(job, result):
             self._job_finish(job, "Replaced by a newer Look; nothing was added")
             return
         self._job_finish(job, result["summary"] + ". Review them, then Add.")
@@ -462,8 +438,7 @@ class Backend(QObject):
     @_guarded
     def get_look(self):
         """The current Look: looking (with counts), its proposals, or none."""
-        with self._lock:
-            return _jsonable(self._look or {"status": "none"})
+        return _jsonable(self._look.get() or {"status": "none"})
 
     @Slot("QVariant", result="QVariant")
     @_guarded
@@ -483,8 +458,7 @@ class Backend(QObject):
         for f in result["failures"]:
             self._job_log(job, f"not added: {f['name']} {f['path']}: {f['message']}")
         self.refresh_games()
-        with self._lock:
-            self._look = None
+        self._look.clear()
         text = f"Added {result['games']} game{'s' if result['games'] != 1 else ''} ({result['folders']} folders)"
         if result["failures"]:
             text += f", {len(result['failures'])} not added"
@@ -493,8 +467,7 @@ class Backend(QObject):
 
     @Slot()
     def discard_look(self):
-        with self._lock:
-            self._look = None
+        self._look.clear()
         self.lookChanged.emit({"status": "none"})
 
     @Slot(result="QVariant")
@@ -1046,7 +1019,7 @@ class Backend(QObject):
                     item["state"] = {"installed": caps.get("installed"), "tool_version": caps.get("version")}
                 elif category == "downloader":
                     item["state"] = {
-                        "watching": downloader_watching(self._watcher, p.id),
+                        "watching": downloads.downloader_watching(self._watcher, p.id),
                         "platforms": list(p.platforms),
                     }
             except NotImplementedError:

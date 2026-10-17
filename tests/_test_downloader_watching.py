@@ -3,7 +3,7 @@
 
 from unittest import TestCase
 
-from pythia.ui.backend import downloader_watching
+from pythia.downloads import downloader_watching
 
 
 class DownloaderWatchingTest(TestCase):

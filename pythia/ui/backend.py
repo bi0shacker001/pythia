@@ -2086,7 +2086,27 @@ class Backend(QObject):
             "manager": modes.manager_mode(),
             "agent": modes.agent_mode(),
             "sync": modes.sync_with_droidtop(),
+            "service": modes.service_mode(),
         }
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def set_service_mode(self, action: str):
+        """Service mode (docs/SPEC.md 1.10): ``enable``, ``disable`` or
+        ``uninstall`` windowcast's secure-screen helper. Windows asks for
+        administrator approval; this waits for the person. The page shows the
+        consent before ``enable``."""
+        from pythia import modes, secure_screen
+
+        if action not in ("enable", "disable", "uninstall"):
+            return {"status": "error", "message": f"{action} is not enable, disable or uninstall"}
+        try:
+            done = secure_screen.change(action)
+        except Exception as ex:  # noqa: BLE001 -- the reason is the answer
+            return {"status": "error", "message": str(ex), "service": modes.service_mode()}
+        self.modesChanged.emit()
+        return {"status": "ok", "message": done, "service": modes.service_mode()}
 
     @Slot(bool, result="QVariant")
     @_guarded

@@ -16,12 +16,12 @@ crate-type = ["cdylib"]
 # droidtop-agent's crates, used as they are: the protocol and channel the
 # handhelds speak (core) and the computer's side (store, pair, scan, saves,
 # service). Pinned by commit; moving the pin is a change of its own.
-droidtop-agent-core = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c09cd764c1c18ad6f81edcbd00f260e9e1114244" }
-droidtop-agent-store = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c09cd764c1c18ad6f81edcbd00f260e9e1114244" }
-droidtop-agent-pair = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c09cd764c1c18ad6f81edcbd00f260e9e1114244" }
-droidtop-agent-scan = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c09cd764c1c18ad6f81edcbd00f260e9e1114244" }
-droidtop-agent-saves = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c09cd764c1c18ad6f81edcbd00f260e9e1114244" }
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c09cd764c1c18ad6f81edcbd00f260e9e1114244" }
+droidtop-agent-core = { git = "https://github.com/Droidtop/droidtop-agent", rev = "15851c6bba273df0521f5bc70c18c621369f57e4" }
+droidtop-agent-store = { git = "https://github.com/Droidtop/droidtop-agent", rev = "15851c6bba273df0521f5bc70c18c621369f57e4" }
+droidtop-agent-pair = { git = "https://github.com/Droidtop/droidtop-agent", rev = "15851c6bba273df0521f5bc70c18c621369f57e4" }
+droidtop-agent-scan = { git = "https://github.com/Droidtop/droidtop-agent", rev = "15851c6bba273df0521f5bc70c18c621369f57e4" }
+droidtop-agent-saves = { git = "https://github.com/Droidtop/droidtop-agent", rev = "15851c6bba273df0521f5bc70c18c621369f57e4" }
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "15851c6bba273df0521f5bc70c18c621369f57e4" }
 # windowcast's host identity folder, the one droidtop-agent and windowcast share,
 # at the commit droidtop-agent pins.
 windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "cd1ed2371b1e793babf6703b5dcfab94d979f1c6" }

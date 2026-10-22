@@ -104,3 +104,30 @@ def set_manager_mode(on: bool) -> dict:
         raise ModeLocked(LOCKED_REASON)
     settings.write_setting(MANAGER_SETTING, bool(on))
     return manager_mode()
+
+
+SERVICE_STATES = {
+    "enabled": "On",
+    "disabled": "Off (the helper is installed)",
+    "absent": "Off",
+    "not_available": "Only on Windows",
+}
+
+
+def service_mode() -> dict:
+    """Service mode (docs/SPEC.md 1.10): ``on``, the ``state`` in words
+    (``state_key`` as pythia.secure_screen says it), ``available`` with the
+    ``reason`` when it is not, ``installed`` (the helper is there), and the
+    ``consent`` shown before it is turned on."""
+    from pythia import secure_screen  # noqa: PLC0415
+
+    key = secure_screen.state()
+    return {
+        "on": key == "enabled",
+        "state": SERVICE_STATES.get(key, key),
+        "state_key": key,
+        "available": key != "not_available",
+        "reason": None if key != "not_available" else "Service mode is only on Windows.",
+        "installed": key in ("enabled", "disabled"),
+        "consent": secure_screen.consent(),
+    }

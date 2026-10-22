@@ -109,6 +109,32 @@ the droidtop coordinator for this lane. Later sections follow them.
    forgotten). There is no Syncthing pairing step for the person. The
    agent's `syncthing` setting turns it off.
 
+10. **Service mode is asked for, never assumed.** Owner, on
+    windowcast#467: "We won't just run code as SYSTEM without user
+    approval, we'll ask, and let them enable/disable in settings at their
+    own leisure." Service mode lets a paired device see and answer this
+    computer's Windows security screens (UAC prompts, the lock and sign-in
+    screen) through windowcast's secure-screen helper, which runs as SYSTEM.
+    - It is off on every install. Settings > General > Modes has its switch
+      (disabled, with "Service mode is only on Windows.", elsewhere) and an
+      Info row with what it does.
+    - Turning it on first says in plain words what follows (droidtop-agent's
+      `secure_screen::CONSENT`): the helper is installed in Program Files and
+      runs as SYSTEM; it only shows the security screen, types and clicks on
+      it, and says whether one is open; it answers only installed programs
+      running under the person's own account; and Windows asks for
+      administrator approval to turn it on and again to turn it off.
+    - Each change asks Windows for administrator approval: Pythia runs
+      `python -I -m pythia.secure_screen <action> --confirmed` elevated,
+      which changes only that, through windowcast's client API, and never
+      reads Pythia's settings or data. Declining changes nothing and says
+      so.
+    - Turning it off keeps the helper installed and inert; "Remove the
+      helper" uninstalls it.
+    - Pythia's Windows wheel carries windowcast's helper at the windowcast
+      it pins (`pythia/windowcast-secure-helper.exe`). droidtop-agent does
+      the same (its DESIGN.md section 19).
+
 ## 2. The pad model (handheld shell)
 
 From UX review A7 (HH2, HH10, HH11; conflicts C2 and C3). A4, A5 and A6

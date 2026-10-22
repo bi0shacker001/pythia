@@ -34,6 +34,7 @@ mod agent;
 mod pad;
 mod pair;
 mod saves;
+mod secure;
 mod scan;
 mod service;
 mod store;
@@ -175,6 +176,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "saves", saves::fill)?;
     submodule(m, "service", service::fill)?;
     submodule(m, "pad", pad::fill)?;
+    submodule(m, "secure_screen", secure::fill)?;
     Ok(())
 }
 

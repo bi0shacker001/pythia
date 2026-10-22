@@ -530,6 +530,29 @@ function renderModes(host) {
     });
     if (m.locked) { sw.disabled = true; sw.dataset.reason = 'Locked on by Sync with droidtop.'; }
     h.appendChild(row);
+    // Service mode (docs/SPEC.md 1.10, windowcast#467): off until the person turns it on after reading what it does;
+    // each change asks Windows for administrator approval.
+    const svc = r.service || {};
+    const svcRow = el(`<div class="form-row"><div class="form-label"><strong>Service mode</strong><small>A paired device can see and answer this computer's Windows security screens (UAC prompts, the lock and sign-in screen). ${esc(svc.state || '')}.</small>${svc.available ? '' : `<small class="locked-reason">${esc(svc.reason || '')}</small>`}</div><span class="mode-controls"><button class="toggle" data-service-mode aria-label="Service mode"><span></span></button></span></div>`);
+    $('.mode-controls', svcRow).prepend(info('Service mode', svc.consent || svc.reason || ''));
+    if (svc.installed && !svc.on) {
+      const remove = el('<button class="btn small ghost" type="button">Remove the helper</button>');
+      remove.onclick = async () => {
+        if (!(await confirm({ title: 'Remove the secure-screen helper?', body: 'Windows asks for administrator approval. Service mode stays off.', proceed: 'Remove' }))) return;
+        await act('set_service_mode', ['uninstall'], 'Secure-screen helper removed', { what: 'Removing the secure-screen helper' });
+        renderModes(host);
+      };
+      $('.mode-controls', svcRow).prepend(remove);
+    }
+    const svcSwitch = $('[data-service-mode]', svcRow);
+    bindSwitch(svcSwitch, !!svc.on, async (on) => {
+      if (on && !(await confirm({ title: 'Turn on service mode?', body: svc.consent || '', proceed: 'Turn on' }))) { renderModes(host); return; }
+      if (!on && !(await confirm({ title: 'Turn off service mode?', body: 'Windows asks for administrator approval. The helper stays installed but does nothing until you turn it on again.', proceed: 'Turn off' }))) { renderModes(host); return; }
+      await act('set_service_mode', [on ? 'enable' : 'disable'], on ? 'Service mode on' : 'Service mode off', { what: on ? 'Turning service mode on' : 'Turning service mode off' });
+      renderModes(host);
+    });
+    if (!svc.available) { svcSwitch.disabled = true; svcSwitch.dataset.reason = svc.reason || ''; }
+    h.appendChild(svcRow);
     if (state.shell === 'handheld') hhKeepDisabledReachable();
   }, { what: 'Modes' });
 }

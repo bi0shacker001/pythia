@@ -79,6 +79,13 @@ jobs:
       - name: Build, install and run
         shell: pwsh
         run: |
+          # Service mode's secure-screen helper (docs/SPEC.md 1.10): windowcast's own
+          # program, at the windowcast native/Cargo.toml pins, carried in the wheel.
+          $rev = (Select-String -Path native\Cargo.toml -Pattern 'windowcast-identity = .*rev = "([0-9a-f]+)"').Matches[0].Groups[1].Value
+          if (-not $rev) { throw "no windowcast rev in native/Cargo.toml" }
+          cargo install --locked --git https://github.com/Droidtop/windowcast --rev $rev windowcast-secure-helper --root "$env:RUNNER_TEMP\helper"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item "$env:RUNNER_TEMP\helper\bin\windowcast-secure-helper.exe" pythia\windowcast-secure-helper.exe
           python -m pip install --upgrade pip build
           python -m build --wheel
           python -m venv "$env:RUNNER_TEMP\venv"
@@ -87,6 +94,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Push-Location $env:RUNNER_TEMP
           & "$env:RUNNER_TEMP\venv\Scripts\python.exe" -c "import pythia._native as n; print('pythia._native', n.__version__)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP\venv\Scripts\python.exe" -c "from pythia import secure_screen as s; assert s.HELPER.is_file(), s.HELPER; print('service mode', s.state())"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Pop-Location
           $env:APPDATA = "$env:RUNNER_TEMP\appdata"

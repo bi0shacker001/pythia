@@ -51,3 +51,4 @@ CLAUDE.md
 /native/vendor
 /native/.cargo
 pythia/native-target/
+pythia/windowcast-secure-helper.exe

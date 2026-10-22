@@ -187,6 +187,13 @@ class GamesByDeviceTest(TestCase):
         )
         self.assertEqual(win4, {"id": "win4", "name": "Win 4", "games": []})
 
+    def test_a_paired_computer_is_not_listed_as_a_handheld(self):
+        devices = [
+            {"id": "pc2", "name": "Other PC", "kind": "computer"},
+            {"id": "rp5", "name": "Retroid", "kind": "handheld"},
+        ]
+        self.assertEqual([d["id"] for d in store.games_by_device({}, devices)], ["rp5"])
+
 
 class AgentEventsTest(TestCase):
     def test_events_since_the_last_seen(self):

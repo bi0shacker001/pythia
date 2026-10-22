@@ -12,6 +12,12 @@ def identity() -> dict:
     return submodule("store").identity()
 
 
+def settings() -> dict:
+    """The agent's settings, as droidtop-agent keeps them (``approved``
+    plugin adapters, ``syncthing``, ``launch_devices``...)."""
+    return submodule("store").settings()
+
+
 def devices() -> list[dict]:
     """The paired handhelds: ``id``, ``name``, ``last_seen_ms``,
     ``last_address``, ``trusted``, ``primary`` (its saves win here) and
@@ -46,6 +52,8 @@ def games_by_device(library: dict[str, Any], devices: list[dict]) -> list[dict]:
     synced yet has none."""
     out = []
     for device in devices:
+        if device.get("kind") == "computer":  # a paired computer is no handheld
+            continue
         games = []
         for key, record in library.items():
             install = ((record.get("installs") or {}).get(device["id"]) or {}).get("install") or {}

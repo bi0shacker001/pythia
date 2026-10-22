@@ -1828,6 +1828,129 @@ class Backend(QObject):
         pair.cancel()
         return {"status": "ok"}
 
+    # ---- one code on both screens (docs/SPEC.md 7.1, 7.2) ------------------------
+    @Slot(result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def start_pair_offer(self):
+        """This computer can be picked by a handheld or another computer while
+        the pairing sheet is open; pair_compare_status follows it."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("start_pair_offer")
+        from pythia.droidtop import pair
+
+        return _jsonable({"status": "ok", **pair.offer()})
+
+    @Slot(result="QVariant")
+    @_guarded
+    def pair_compare_status(self):
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("pair_compare_status")
+        from pythia.droidtop import pair
+
+        status = pair.compare_status()
+        if status.get("state") == "paired":
+            self.handheldsChanged.emit()
+        return _jsonable({"status": "ok", **status})
+
+    @Slot(result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def find_computers(self):
+        """Other computers on this network offering to pair (another Pythia
+        with its Devices page open)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("find_computers")
+        from pythia.droidtop import pair
+
+        return _jsonable({"status": "ok", "computers": pair.find()})
+
+    @Slot("QVariant", result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def pick_computer(self, computer):
+        """Starts comparing with a computer find_computers listed: the code."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("pick_computer")
+        from pythia.droidtop import AgentError, pair
+
+        try:
+            return _jsonable({"status": "ok", **pair.pick(dict(computer))})
+        except AgentError as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @Slot(bool, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def confirm_pairing(self, same: bool):
+        """The person's answer to "same code on both screens?"; waits for the
+        other device's."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("confirm_pairing")
+        from pythia.droidtop import AgentError, pair
+
+        try:
+            name = pair.confirm(bool(same))
+        except AgentError as exc:
+            return {"status": "error", "message": str(exc)}
+        self.handheldsChanged.emit()
+        return {"status": "ok", "paired": name}
+
+    @Slot(result="QVariant")
+    @_guarded
+    def stop_pair_offer(self):
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("stop_pair_offer")
+        from pythia.droidtop import pair
+
+        pair.stop()
+        return {"status": "ok"}
+
+    @Slot(result="QVariant")
+    @_guarded
+    def pairing_network_explained(self):
+        """Whether Pythia has said why pairing needs the network (SPEC 7.5)."""
+        from pythia import settings
+
+        return {"status": "ok", "explained": settings.read_bool_setting("pairing_network_explained", False)}
+
+    @Slot(result="QVariant")
+    @_guarded
+    def mark_pairing_network_explained(self):
+        from pythia import settings
+
+        settings.write_setting("pairing_network_explained", True)
+        return {"status": "ok"}
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def device_syncs(self, device_id: str):
+        """What syncs with a paired device (UX review AG6), from the sync model."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("device_syncs")
+        from pythia.droidtop import store, syncs
+
+        device = next((d for d in store.devices() if d.get("id") == device_id), None)
+        if device is None:
+            return {"status": "error", "message": "That device is not paired."}
+        return _jsonable(
+            {"status": "ok", "name": device.get("name"), "rows": syncs.what_syncs(device, store.settings())}
+        )
+
     @Slot(str, result="QVariant")
     @_guarded
     def forget_handheld(self, device_id: str):

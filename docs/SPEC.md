@@ -259,9 +259,9 @@ opens. In order:
    controller is the only input), so the person confirms it rather than
    picks it.
 2. **"Do you use droidtop on a handheld?"** Yes leads to pairing (section
-   7); No and Not now go on. This step is shown only once pairing is built
-   (UX review C1). Until then it is left out, and the step count does not
-   include it.
+   7); No and Not now go on. Pairing is built (UX review C1, 7.7), so the
+   step belongs in the first run; it appears when the first run itself is
+   built (UX review B23).
 3. **Add folders.** Folders and their roles (section 5). Adding a Library
    folder runs Look (A16): nothing is written until the person adds what
    was found.
@@ -419,3 +419,39 @@ listening program and has not been verified on a test machine.
 
 No step needs a camera. The QR code droidtop shows of its invitation is an
 extra for a computer that has one, never the only way.
+
+### 7.7 Where it lives (UX review C1)
+
+Devices (Systems & sync > Paired devices, and the handheld shell's Systems
+page) has "Pair a device" as its main action, with "Show a code" and "Type
+a handheld's code" (7.3) beside it.
+
+- Pair a device first says why the network is needed (7.5, once), then
+  offers this computer (7.1) for as long as the panel is open: "Waiting for
+  a handheld or computer…" with the time left, then the 7.4 state.
+- **Another computer** (1.5): "Pair with another computer" looks for
+  computers offering to pair on this network (another Pythia's Pair a
+  device, or `droidtop-agent pair compare`) and lists them as "Pythia on
+  <name>". Picking one shows the code at once (7.2); the other computer
+  shows it too. Each pins the other as a computer.
+- Both screens show the code in large type with "Same code" and "They
+  don't match". The answer waits for the other device's; either "They
+  don't match" pairs nothing and says so on both.
+- The list shows each paired device with its kind (Handheld or Computer).
+  "Saves win" and "Start games" apply to handhelds only.
+
+### 7.8 What syncs (UX review AG6)
+
+Each paired device has "What syncs": one row per kind of thing, whether it
+syncs with that device and why, generated from the sync model as it is
+(`pythia.droidtop.syncs`), never a fixed text.
+
+- A handheld: the library, saves (who wins when both changed), starting
+  games here (only when allowed), plugin data (the plugins approved), and
+  Syncthing folders (when it offered its Syncthing, 1.9).
+- A computer: nothing of the library, saves or launches syncs between two
+  computers yet; they trust each other, so it can be added without pairing
+  again. Syncthing folders as for a handheld. (Open: what two paired
+  computers carry is the owner's to decide.)
+- Every device: game files never sync. A handheld copies one game's folder
+  only when the person asks for it on the handheld.

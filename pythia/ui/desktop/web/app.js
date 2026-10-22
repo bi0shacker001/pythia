@@ -717,12 +717,15 @@ function renderHandhelds() {
   const startGamesText = () => (hostLaunch ? "Start games: that handheld may start this computer's games: Steam games for Steam Link (Steam must be running here), and the games Pythia tracks through their launcher, for windowcast to stream." : "Start games: that handheld may start this computer's Steam games, to stream them with Steam Link; Steam must be running here.");
   status.then(() => loadInto(host, 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
-    $('#handheldSummary').textContent = fmt.n(devices.length, 'paired handheld');
-    if (!devices.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'On the handheld: Settings > Computers > Pair a computer, then "Pair a handheld" here.' })); return; }
-    const table = el(`<table class="table"><thead><tr><th>Handheld</th><th>Last seen</th><th>Saves win</th><th>Start games</th><th></th></tr></thead><tbody>${devices.map((d) => `<tr><td class="primary-cell"><strong>${esc(d.name)}</strong><small class="mono">${esc(d.id.slice(0, 16))}</small></td><td>${d.last_seen_ms ? esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString())) : 'Never'}<small>${esc(d.last_address || '')}</small></td><td><button class="toggle" data-handheld-primary="${esc(d.id)}" aria-label="Its saves win when both changed"><span></span></button></td><td><button class="toggle" data-handheld-launch="${esc(d.id)}" aria-label="It may start games here"><span></span></button></td><td><button class="btn small" data-handheld-forget="${esc(d.id)}">Forget…</button></td></tr>`).join('')}</tbody></table>`);
+    $('#handheldSummary').textContent = fmt.n(devices.length, 'paired device');
+    if (!devices.length) { h.appendChild(stateBlock({ title: 'No device is paired', body: 'Choose "Pair a device", then on the handheld: droidtop > Settings > Computers > Pair a computer.' })); return; }
+    const kindName = (d) => (d.kind === 'computer' ? 'Computer' : 'Handheld');
+    const table = el(`<table class="table"><thead><tr><th>Device</th><th>Last seen</th><th>Saves win</th><th>Start games</th><th></th></tr></thead><tbody>${devices.map((d) => `<tr><td class="primary-cell"><strong>${esc(d.name)}</strong><small>${kindName(d)} · <span class="mono">${esc(d.id.slice(0, 16))}</span></small></td><td>${d.last_seen_ms ? esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString())) : 'Never'}<small>${esc(d.last_address || '')}</small></td>${d.kind === 'computer' ? '<td>–</td><td>–</td>' : `<td><button class="toggle" data-handheld-primary="${esc(d.id)}" aria-label="Its saves win when both changed"><span></span></button></td><td><button class="toggle" data-handheld-launch="${esc(d.id)}" aria-label="It may start games here"><span></span></button></td>`}<td><button class="btn small" data-device-syncs="${esc(d.id)}">What syncs</button> <button class="btn small" data-handheld-forget="${esc(d.id)}">Forget…</button></td></tr>`).join('')}</tbody></table>`);
     h.appendChild(table);
     h.appendChild(el(`<p><small>Saves win: when a game's saves changed on both sides, that handheld's copy is used here and this computer's is kept under Save backups (off: the newest wins). ${startGamesText()}</small></p>`));
     devices.forEach((d) => {
+      $(`[data-device-syncs="${d.id}"]`, table).onclick = () => showDeviceSyncs(d);
+      if (d.kind === 'computer') { $(`[data-handheld-forget="${d.id}"]`, table).onclick = async () => { if (await confirmDanger({ title: `Forget ${d.name}?`, body: 'It is no longer trusted by this computer until you pair it again.', recommendation: 'We recommend Cancel.', proceed: 'Forget' })) await act('forget_handheld', [d.id], `Forgot ${d.name}`, { what: 'Forgetting it' }); }; return; }
       bindSwitch($(`[data-handheld-primary="${d.id}"]`, table), !!d.primary, async (on, node) => { const r2 = await act('set_primary_handheld', [on ? d.id : ''], on ? `${d.name}'s saves win` : 'The newest saves win', { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } else renderHandhelds(); });
       bindSwitch($(`[data-handheld-launch="${d.id}"]`, table), !!d.launch, async (on, node) => { const r2 = await act('set_handheld_launch', [d.id, on], on ? `${d.name} may start games here` : `${d.name} may no longer start games here`, { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } });
       $(`[data-handheld-forget="${d.id}"]`, table).onclick = async () => { if (await confirmDanger({ title: `Forget ${d.name}?`, body: 'It can no longer sync with this computer until you pair it again.', recommendation: 'We recommend Cancel.', proceed: 'Forget' })) await act('forget_handheld', [d.id], `Forgot ${d.name}`, { what: 'Forgetting it' }); };
@@ -801,6 +804,106 @@ async function showPairCode(host = $('#pairShowing'), showing = () => state.view
     if (s.state === 'paired') { host.innerHTML = ''; flash(`Paired with ${s.paired}`); paired(); }
     else if (s.state === 'failed') { $('#pairOutcome', box).innerHTML = visibleStatus(s.error || 'Pairing stopped', 'critical'); }
   }, 1500);
+}
+// ---- Pair a device: one code on both screens (docs/SPEC.md 7.1-7.5; UX review AG5) -------------
+// While the panel is open this computer can be picked (droidtop's Pair a computer, or another Pythia's "Pair with
+// another computer"), and only then. Both screens then show one code; the person says whether they match on both.
+const PAIR_NETWORK = 'To pair, Pythia talks to the handheld or the other computer over your home network: it listens on TCP and UDP port 47610 and TCP 47612 while you pair. Your system may ask whether Pythia may use the network: allow it on private networks.';
+let pairCompare = null;
+function stopPairCompare() { if (pairCompare) { clearInterval(pairCompare); pairCompare = null; } }
+async function pairDevice(host = $('#pairShowing'), showing = () => state.view === 'systems', paired = renderHandhelds) {
+  if (!host) return;
+  stopPairPoll(); stopPairCompare();
+  const told = await call('pairing_network_explained');
+  if (ok(told) && !told.explained) {
+    if (!(await confirm({ title: 'Pairing uses your network', body: PAIR_NETWORK, proceed: 'Continue' }))) return;
+    await call('mark_pairing_network_explained');
+  }
+  const r = await call('start_pair_offer');
+  host.innerHTML = '';
+  if (!ok(r)) { host.appendChild(fromResult(r, { what: 'Pairing' })); return; }
+  const box = el('<div class="panel" style="margin-bottom:13px"><div class="panel-body" data-pair-body></div></div>');
+  host.appendChild(box);
+  const body = $('[data-pair-body]', box);
+  const close = async () => { stopPairCompare(); await call('stop_pair_offer'); host.innerHTML = ''; };
+  // mode: waiting (offering), finding (this screen looks for computers), code (both screens compare), done.
+  let waitedFrom = 0; let answering = false; let mode = 'waiting'; let drawnLate = null;
+  const fallbacks = () => '<button class="btn small" data-pair-type>Type a code instead</button> <button class="btn small" data-pair-show>Show a code instead</button>';
+  const wire = () => {
+    $('[data-pair-stop]', body)?.addEventListener('click', close);
+    $('[data-pair-type]', body)?.addEventListener('click', async () => { await close(); pairHandheld(); });
+    $('[data-pair-show]', body)?.addEventListener('click', async () => { await close(); showPairCode(host, showing, paired); });
+    $('[data-pair-wait]', body)?.addEventListener('click', () => { waitedFrom = null; drawnLate = null; });
+    $('[data-pair-find]', body)?.addEventListener('click', () => { mode = 'finding'; findComputers(body, wire, showing); });
+  };
+  const drawWaiting = (seconds) => {
+    const late = waitedFrom !== null && seconds - (waitedFrom || 0) >= 60;
+    const left = Math.max(0, 60 - (seconds - (waitedFrom || 0)));
+    if (drawnLate === late) { const secs = $('[data-pair-secs]', body); if (secs) secs.textContent = `(${left} s)`; return; }
+    drawnLate = late;
+    body.innerHTML = late
+      ? `<p>${visibleStatus('Nothing has picked this computer yet', 'pending')}</p><p>Check that the handheld is on the same network as this computer, and that droidtop is open on Settings > Computers > Pair a computer.</p><p><button class="btn small" data-pair-wait>Keep waiting</button> ${fallbacks()} <button class="btn small ghost" data-pair-stop>Stop</button></p>`
+      : `<p><strong>Waiting for a handheld or computer…</strong> <small data-pair-secs>(${left} s)</small></p><p>On the handheld: droidtop > Settings > Computers > Pair a computer, and pick <strong>Pythia on ${esc(r.name || 'this computer')}</strong>. On another computer: Pythia > Devices > Pair a device > Pair with another computer.</p><p><button class="btn small" data-pair-find>Pair with another computer</button> ${fallbacks()} <button class="btn small ghost" data-pair-stop>Stop</button></p>`;
+    wire();
+  };
+  const drawCode = (code, name) => {
+    mode = 'code';
+    body.innerHTML = `<p>${name ? `Pairing with <strong>${esc(name)}</strong>. ` : ''}Does the other screen show this code?</p><p><strong class="mono" style="font-size:2.4rem;letter-spacing:0.12em">${esc(code.slice(0, 3))} ${esc(code.slice(3))}</strong></p><p><button class="btn primary" data-pair-same>Same code</button> <button class="btn" data-pair-differ>They don't match</button></p><p id="pairAnswer"></p>`;
+    const answer = async (same) => {
+      answering = true;
+      $$('button', body).forEach((b) => (b.disabled = true));
+      $('#pairAnswer', body).innerHTML = visibleStatus(same ? 'Waiting for the other device to answer…' : 'Telling the other device…', 'neutral', '…');
+      const a = await call('confirm_pairing', same);
+      mode = 'done'; stopPairCompare(); await call('stop_pair_offer');
+      if (ok(a)) { host.innerHTML = ''; flash(`Paired with ${a.paired}`); paired(); return; }
+      // The crates' words nest ("Nothing was paired: pairing failed: ..."); the page says it once.
+      const why = String(a.message || '').replace(/^Nothing was paired: /, '').replace(/^pairing failed: /, '').replace(/; nothing was paired$/, '');
+      body.innerHTML = `<p>${visibleStatus(same ? `Not paired: ${why}. Nothing was saved on either device.` : 'Not paired: the codes did not match. Nothing was saved on either device.', 'critical')}</p><p><button class="btn small" data-pair-again>Try again</button> ${fallbacks()}</p>`;
+      $('[data-pair-again]', body).onclick = () => pairDevice(host, showing, paired);
+      wire();
+    };
+    $('[data-pair-same]', body).onclick = () => answer(true);
+    $('[data-pair-differ]', body).onclick = () => answer(false);
+  };
+  let shown = '';
+  const tick = async () => {
+    if (!showing()) { close(); return; }
+    if (answering) return;
+    const st = await call('pair_compare_status');
+    if (!ok(st)) return;
+    if (st.state === 'offering') { if (mode !== 'waiting') return; if (waitedFrom === null) waitedFrom = st.seconds; drawWaiting(st.seconds); shown = 'offering'; }
+    else if (st.state === 'comparing' && shown !== `code:${st.code}`) { shown = `code:${st.code}`; drawCode(st.code, st.name); }
+    else if (st.state === 'failed' && shown !== 'failed' && mode !== 'done') { shown = 'failed'; mode = 'done'; stopPairCompare(); body.innerHTML = `<p>${visibleStatus(`Not paired: ${st.error}`, 'critical')}</p><p><button class="btn small" data-pair-again>Try again</button> ${fallbacks()}</p>`; $('[data-pair-again]', body).onclick = () => pairDevice(host, showing, paired); wire(); }
+  };
+  pairCompare = setInterval(tick, 1000);
+  tick();
+  // Picking another computer: this screen shows the code at once.
+  async function findComputers(target, rewire, still) {
+    target.innerHTML = `<p>${visibleStatus('Looking for computers on this network…', 'neutral', '…')}</p>`;
+    const f = await call('find_computers');
+    if (!still()) return;
+    const list = ok(f) ? f.computers || [] : [];
+    if (!list.length) {
+      target.innerHTML = `<p>${visibleStatus(ok(f) ? 'No computer is offering to pair on this network.' : f.message, 'pending')}</p><p>On the other computer, open Pythia's Devices page and choose Pair a device. It must be on the same network.</p><p><button class="btn small" data-pair-find>Look again</button> <button class="btn small ghost" data-pair-stop>Stop</button></p>`;
+      rewire(); return;
+    }
+    target.innerHTML = `<p>Pick the computer to pair with:</p><p>${list.map((c, i) => `<button class="btn small" data-pick="${i}">${esc(c.program === 'pythia' ? `Pythia on ${c.name}` : c.name)}</button>`).join(' ')}</p><p><button class="btn small ghost" data-pair-stop>Stop</button></p>`;
+    $$('[data-pick]', target).forEach((b) => (b.onclick = async () => {
+      answering = true;
+      target.innerHTML = `<p>${visibleStatus('Connecting…', 'neutral', '…')}</p>`;
+      const p = await call('pick_computer', list[Number(b.dataset.pick)]);
+      if (!ok(p)) { answering = false; mode = 'finding'; target.innerHTML = `<p>${visibleStatus(`Not paired: ${p.message}`, 'critical')}</p><p><button class="btn small" data-pair-find>Look again</button> <button class="btn small ghost" data-pair-stop>Stop</button></p>`; rewire(); return; }
+      answering = false; shown = `code:${p.code}`; drawCode(p.code, p.name);
+    }));
+    rewire();
+  }
+}
+// What syncs with a paired device (UX review AG6), from the backend's sync model; game files never sync.
+async function showDeviceSyncs(d) {
+  const r = await call('device_syncs', d.id);
+  if (!ok(r)) { flash(r.message || 'Not available', 'caution'); return; }
+  const node = el(`<div><table class="table"><tbody>${(r.rows || []).map((row) => `<tr><td><strong>${esc(row.what)}</strong></td><td>${row.syncs ? routineStatus('Syncs') : visibleStatus('Does not sync', 'neutral', '–')}</td><td><small>${esc(row.detail)}</small></td></tr>`).join('')}</tbody></table></div>`);
+  infoSheet({ title: `What syncs with ${r.name || d.name}`, node, wide: true });
 }
 function updateSystems(raw) {
   const by = new Map();
@@ -1080,6 +1183,7 @@ async function action(a) {
   }
   if (a === 'pair-handheld') pairHandheld();
   if (a === 'show-pair-code') showPairCode();
+  if (a === 'pair-device') pairDevice();
   if (a === 'clear-jobs') act('clear_finished_jobs', [], 'Cleared', { what: 'Clearing' });
   if (a === 'export-diagnostics') exportDiagnostics();
   if (a === 'install-plugin') infoSheet({ title: 'Install a plugin', details: `Drop a plugin folder (with its manifest) into the plugins folder under ${model.info?.app_data_folder || 'the app data folder'}, or pip-install a package that declares a pythia.plugins entry point, then restart Pythia. Plugins from outside Pythia are marked Unofficial.` });
@@ -1228,14 +1332,19 @@ function renderHHDownloads() {
 }
 function renderHHSystems() {
   const host = $('#hhContent');
-  host.innerHTML = `<div class="hh-system-grid">${systems.map((s) => `<article class="hh-system"><h2>${esc(s.name)}</h2><p>${esc(s.mine && model.app ? model.app.platform : 'Synced record')} · ${fmt.n(s.games, 'game')}</p><div class="line"><span>Installed</span><b>${s.installed}</b></div><div class="line"><span>Record</span><b style="color:var(--positive)">${s.mine ? 'This computer' : 'Synced'}</b></div></article>`).join('')}</div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Handhelds</h2><span class="spacer"></span><button class="hh-action" data-hh-pair>Pair a handheld</button><button class="hh-action" data-hh-pair-show>Show a code</button></div><div class="hh-panel-body"><div id="hhPairShowing"></div><div class="hh-summary-list" id="hhHandhelds"></div></div></section><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Library folder</h2><span class="spacer"></span><small>Shared by every system</small></div><div class="hh-panel-body"><div class="hh-setting"><strong class="mono" style="font-size:0.75rem;word-break:break-all">${esc(model.info?.sync_folder || '')}</strong><small>Copying versions between devices is not built yet.</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div></div></section>`;
+  host.innerHTML = `<div class="hh-system-grid">${systems.map((s) => `<article class="hh-system"><h2>${esc(s.name)}</h2><p>${esc(s.mine && model.app ? model.app.platform : 'Synced record')} · ${fmt.n(s.games, 'game')}</p><div class="line"><span>Installed</span><b>${s.installed}</b></div><div class="line"><span>Record</span><b style="color:var(--positive)">${s.mine ? 'This computer' : 'Synced'}</b></div></article>`).join('')}</div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Paired devices</h2><span class="spacer"></span><button class="hh-action primary" data-hh-pair-device>Pair a device</button><button class="hh-action" data-hh-pair>Type a code</button><button class="hh-action" data-hh-pair-show>Show a code</button></div><div class="hh-panel-body"><div id="hhPairShowing"></div><div class="hh-summary-list" id="hhHandhelds"></div></div></section><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Library folder</h2><span class="spacer"></span><small>Shared by every system</small></div><div class="hh-panel-body"><div class="hh-setting"><strong class="mono" style="font-size:0.75rem;word-break:break-all">${esc(model.info?.sync_folder || '')}</strong><small>Copying versions between devices is not built yet.</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div></div></section>`;
   if (!systems.length) host.prepend(stateBlock({ kind: model.ready ? 'empty' : 'loading', title: 'No systems yet' }));
   $('[data-hh-pair]', host).onclick = pairHandheld;
+  $('[data-hh-pair-device]', host).onclick = () => pairDevice($('#hhPairShowing', host), () => state.shell === 'handheld' && state.hhPage === 'systems', renderHandheld);
   $('[data-hh-pair-show]', host).onclick = () => showPairCode($('#hhPairShowing', host), () => state.shell === 'handheld' && state.hhPage === 'systems', renderHandheld);
   loadInto($('#hhHandhelds', host), 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
-    if (!devices.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'On the handheld: Settings > Computers > Pair a computer.' })); return; }
-    devices.forEach((d) => h.appendChild(el(`<div class="hh-summary" style="cursor:default"><span class="art art-a">${esc(initials(d.name))}</span><span><strong>${esc(d.name)}</strong><small>${d.last_seen_ms ? `Seen ${esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString()))}` : 'Not seen yet'}${d.primary ? ' · its saves win' : ''}</small></span>${routineStatus('Paired')}</div>`)));
+    if (!devices.length) { h.appendChild(stateBlock({ title: 'No device is paired', body: 'Choose Pair a device, then on the handheld: droidtop > Settings > Computers > Pair a computer.' })); return; }
+    devices.forEach((d) => {
+      const row = el(`<button class="hh-summary" type="button"><span class="art art-a">${esc(initials(d.name))}</span><span><strong>${esc(d.name)}</strong><small>${d.kind === 'computer' ? 'Computer' : 'Handheld'} · ${d.last_seen_ms ? `Seen ${esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString()))}` : 'Not seen yet'}${d.primary ? ' · its saves win' : ''} · A: what syncs</small></span>${routineStatus('Paired')}</button>`);
+      row.onclick = () => showDeviceSyncs(d);
+      h.appendChild(row);
+    });
   }, { what: 'Handhelds' });
 }
 function renderHHSettings() {

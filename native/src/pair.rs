@@ -128,7 +128,10 @@ enum Phase {
     /// Offering to be picked, since `since`.
     Offering(std::time::Instant),
     /// Both screens show `code`; waiting for the person's answer.
-    Comparing { code: String, name: String },
+    Comparing {
+        code: String,
+        name: String,
+    },
     /// The person answered; waiting for the other device's.
     Finishing,
     Paired(String),

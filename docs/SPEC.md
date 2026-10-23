@@ -444,6 +444,16 @@ a handheld's code" (7.3) beside it.
   with Library and Saves, a computer with nothing. "Saves win" applies to
   handhelds only.
 
+- **What a device offers this computer** (droidtop-agent DESIGN section 20):
+  each paired device's "Games" opens "On <device>", what it offers this
+  computer (its library, its saves, or nothing, with where it can offer
+  more) and the games installed there. "Copy here" copies one into this
+  computer's first game folder as a new folder (never over one that is
+  there), as a job on the Activity page, then adds it to the library the
+  way an added folder is. "Play there" asks that device to start it and
+  stream only its windows here; the device's own "Start games" switch
+  decides, and a refusal says so and where to allow it.
+
 ### 7.8 What syncs (UX review AG6)
 
 Each paired device has "What syncs": one row per kind of thing, whether it

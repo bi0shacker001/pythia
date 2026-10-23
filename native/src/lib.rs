@@ -33,6 +33,7 @@ use serde_json::{json, Value};
 mod agent;
 mod pad;
 mod pair;
+mod remote;
 mod saves;
 mod scan;
 mod secure;
@@ -174,6 +175,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "pair", pair::fill)?;
     submodule(m, "scan", scan::fill)?;
     submodule(m, "saves", saves::fill)?;
+    submodule(m, "remote", remote::fill)?;
     submodule(m, "service", service::fill)?;
     submodule(m, "pad", pad::fill)?;
     submodule(m, "secure_screen", secure::fill)?;

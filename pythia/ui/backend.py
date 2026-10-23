@@ -1992,6 +1992,83 @@ class Backend(QObject):
         self.handheldsChanged.emit()
         return {"status": "ok"}
 
+    @Slot(str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def device_offered(self, device_id: str):
+        """What a paired device offers this computer, and its games
+        (droidtop-agent DESIGN section 20)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("device_offered")
+        from pythia.droidtop import remote
+
+        return _jsonable({"status": "ok", **remote.offered(device_id)})
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    def accept_offered_game(self, device_id: str, key: str, title: str):
+        """Copies a game a paired device offers into this computer's first
+        game folder, as a job with its progress."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("accept_offered_game")
+        job = self._job_start("accept", f"Copy {title}", "Reaching the device")
+        threading.Thread(target=self._accept_worker, args=(device_id, key, title, job), daemon=True).start()
+        return {"status": "ok", "job": job}
+
+    def _accept_worker(self, device_id: str, key: str, title: str, job: str):
+        import json
+        import tempfile
+
+        from pythia.droidtop import AgentError, remote
+
+        progress = Path(tempfile.gettempdir()) / f"pythia-accept-{job}.json"
+        done = threading.Event()
+
+        def watch():
+            while not done.wait(1.0):
+                try:
+                    p = json.loads(progress.read_text())
+                except (OSError, ValueError):
+                    continue
+                total = p.get("total") or 0
+                with self._lock:
+                    one = next((j for j in self._jobs if j["id"] == job), None)
+                    if one is not None and total:
+                        one["detail"] = f"{p.get('done', 0) * 100 // total}% of {total // (1024 * 1024)} MiB"
+                self.jobsChanged.emit(_jsonable(self._jobs))
+
+        threading.Thread(target=watch, daemon=True).start()
+        try:
+            accepted = remote.accept(device_id, key, title, progress)
+        except AgentError as exc:
+            self._job_finish(job, f"{title} was not copied: {exc}", ok=False)
+        else:
+            # The copy is a new game folder here: it joins Pythia's library the
+            # way any added folder does, asking only when its game is unsure.
+            self._job_log(job, f"Copied {title} into {accepted.get('folder')}")
+            self._onboard_worker(str(accepted.get("folder")), job)
+        finally:
+            done.set()
+            progress.unlink(missing_ok=True)
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def play_on_device(self, device_id: str, key: str, title: str):
+        """Asks a paired device to start a game there and stream it."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("play_on_device")
+        from pythia.droidtop import remote
+
+        started, said = remote.play_said(remote.play_on(device_id, key, title))
+        return {"status": "ok" if started else "error", "message": said}
+
     @Slot(str, str, bool, result="QVariant")
     @_guarded
     def set_device_offer(self, device_id: str, what: str, on: bool):

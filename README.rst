@@ -11,7 +11,7 @@ Based on Lutris
 ===============
 
 **Pythia is largely based on** `Lutris <https://github.com/lutris/lutris>`_.
-The ``lutris-core`` branch is Lutris's own source (imported at upstream commit
+Pythia's ``main`` branch is Lutris's own source (imported at upstream commit
 b33d7d8, 2026-07-30), renamed and reworked. Lutris's runner, service and
 installer infrastructure (Wine/Proton management, Steam/GOG/Epic/itch.io/etc.
 library sync, scripted installers) is reused as it is rather than reinvented.
@@ -45,8 +45,8 @@ exist. If you find Pythia useful, consider supporting Lutris
 Status
 ======
 
-This is an active rework in progress, not a finished product. The current
-branch (``lutris-core``) is Lutris's real source with its GTK UI (``lutris/gui/``,
+This is an active rework in progress, not a finished product. The ``main``
+branch is Lutris's real source with its GTK UI (``lutris/gui/``,
 now ``pythia/gui/``) being decoupled from the rest of the codebase and
 replaced with a new UI. Large parts of the original GTK interface still exist
 in the tree but are being phased out; some Linux-desktop-specific

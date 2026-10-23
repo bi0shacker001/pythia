@@ -102,3 +102,9 @@ jobs:
           $env:LOCALAPPDATA = "$env:RUNNER_TEMP\localappdata"
           & "$env:RUNNER_TEMP\venv\Scripts\pythia.exe" --list-games
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # The wheel a Windows computer installs (pip install <wheel>): the one
+      # this job just built, installed and ran.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pythia-windows
+          path: dist/*.whl

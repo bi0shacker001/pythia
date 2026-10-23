@@ -714,7 +714,7 @@ function renderHandhelds() {
     hostLaunch = !!st.host_launch;
     renderAgentTakeover(h, st.agent || {});
   }, { what: 'This computer as a droidtop agent' });
-  const startGamesText = () => (hostLaunch ? "Start games: that handheld may start this computer's games: Steam games for Steam Link (Steam must be running here), and the games Pythia tracks through their launcher, for windowcast to stream." : "Start games: that handheld may start this computer's Steam games, to stream them with Steam Link; Steam must be running here.");
+  const startGamesText = () => (hostLaunch ? "Start games: that device may start a game on this computer and play it there: the game runs here and only its windows are streamed to it through windowcast (the games Pythia tracks), or through Steam Link for Steam games (Steam must be running here)." : "Start games: that device may start this computer's Steam games and play them through Steam Link; the game runs here, and Steam must be running here.");
   status.then(() => loadInto(host, 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
     $('#handheldSummary').textContent = fmt.n(devices.length, 'paired device');

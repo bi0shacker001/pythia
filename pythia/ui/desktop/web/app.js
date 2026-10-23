@@ -724,11 +724,12 @@ function renderHandhelds() {
     // its library and saves, a computer with nothing. "Saves win" is a handheld's only.
     const offered = (d) => d.offered || { library: d.kind !== 'computer', saves: d.kind !== 'computer' };
     const sw = (attr, id, label) => `<td><button class="toggle" ${attr}="${esc(id)}" aria-label="${esc(label)}"><span></span></button></td>`;
-    const table = el(`<table class="table"><thead><tr><th>Device</th><th>Last seen</th><th>Library</th><th>Saves</th><th>Saves win</th><th>Start games</th><th></th></tr></thead><tbody>${devices.map((d) => `<tr><td class="primary-cell"><strong>${esc(d.name)}</strong><small>${kindName(d)} · <span class="mono">${esc(d.id.slice(0, 16))}</span></small></td><td>${d.last_seen_ms ? esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString())) : 'Never'}<small>${esc(d.last_address || '')}</small></td>${sw('data-offer-library', d.id, 'This computer offers it its library')}${sw('data-offer-saves', d.id, 'This computer offers it its saves')}${d.kind === 'computer' ? '<td>–</td>' : sw('data-handheld-primary', d.id, 'Its saves win when both changed')}${sw('data-handheld-launch', d.id, 'It may start games here')}<td><button class="btn small" data-device-syncs="${esc(d.id)}">What syncs</button> <button class="btn small" data-handheld-forget="${esc(d.id)}">Forget…</button></td></tr>`).join('')}</tbody></table>`);
+    const table = el(`<table class="table"><thead><tr><th>Device</th><th>Last seen</th><th>Library</th><th>Saves</th><th>Saves win</th><th>Start games</th><th></th></tr></thead><tbody>${devices.map((d) => `<tr><td class="primary-cell"><strong>${esc(d.name)}</strong><small>${kindName(d)} · <span class="mono">${esc(d.id.slice(0, 16))}</span></small></td><td>${d.last_seen_ms ? esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString())) : 'Never'}<small>${esc(d.last_address || '')}</small></td>${sw('data-offer-library', d.id, 'This computer offers it its library')}${sw('data-offer-saves', d.id, 'This computer offers it its saves')}${d.kind === 'computer' ? '<td>–</td>' : sw('data-handheld-primary', d.id, 'Its saves win when both changed')}${sw('data-handheld-launch', d.id, 'It may start games here')}<td><button class="btn small" data-device-games="${esc(d.id)}">Games</button> <button class="btn small" data-device-syncs="${esc(d.id)}">What syncs</button> <button class="btn small" data-handheld-forget="${esc(d.id)}">Forget…</button></td></tr>`).join('')}</tbody></table>`);
     h.appendChild(table);
     h.appendChild(el(`<p><small>Library and Saves: what this computer offers that device; it may see this computer's games and copy one when asked there, and keep their saves in step. Saves need the library. A handheld starts with both, a computer with neither. Saves win: when a game's saves changed on both sides, that handheld's copy is used here and this computer's is kept under Save backups (off: the newest wins). ${startGamesText()}</small></p>`));
     devices.forEach((d) => {
       $(`[data-device-syncs="${d.id}"]`, table).onclick = () => showDeviceSyncs(d);
+      $(`[data-device-games="${d.id}"]`, table).onclick = () => showOfferedGames(d);
       const offer = offered(d);
       const offerSwitch = (what, word) => bindSwitch($(`[data-offer-${what}="${d.id}"]`, table), !!offer[what], async (on, node) => { const r2 = await act('set_device_offer', [d.id, what, on], on ? `This computer offers ${d.name} its ${word}` : `This computer no longer offers ${d.name} its ${word}`, { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } else renderHandhelds(); });
       offerSwitch('library', 'library');
@@ -904,6 +905,20 @@ async function pairDevice(host = $('#pairShowing'), showing = () => state.view =
     }));
     rewire();
   }
+}
+// What a paired device offers this computer (droidtop-agent DESIGN section 20): its games, each to copy
+// here or to play there. The device decides what it answers; reaching it can take a few seconds.
+async function showOfferedGames(d) {
+  const r = await call('device_offered', d.id);
+  if (!ok(r)) { flash(r.message || 'Not available', 'caution'); return; }
+  const what = [r.offered?.library && 'its library', r.offered?.saves && 'its saves'].filter(Boolean);
+  const games = r.games || [];
+  const said = what.length ? `${esc(r.name || d.name)} offers this computer ${what.join(' and ')}.` : `${esc(r.name || d.name)} offers this computer nothing. It can offer its library on its own Devices page.`;
+  const size = (n) => (n ? `${(n / (1024 * 1024 * 1024)).toFixed(1)} GiB` : '');
+  const node = el(`<div><p>${said}</p>${games.length ? `<table class="table"><thead><tr><th>Game</th><th>Version</th><th>Size</th><th></th></tr></thead><tbody>${games.map((g, i) => `<tr><td class="primary-cell"><strong>${esc(g.title)}</strong>${g.accepted ? '<small>Copied here before</small>' : ''}</td><td>${esc(g.version || '')}</td><td>${size(g.size)}</td><td><button class="btn small" data-offered-copy="${i}">Copy here</button>${r.offered?.launch ? ` <button class="btn small" data-offered-play="${i}">Play there</button>` : ''}</td></tr>`).join('')}</tbody></table><p><small>Copy here puts the game in this computer's first game folder as a new folder and adds it to the library; nothing already here is changed. Play there starts it on ${esc(r.name || d.name)}, if it lets this computer, and only the game's windows are streamed here.</small></p>` : ''}</div>`);
+  $$('[data-offered-copy]', node).forEach((b) => (b.onclick = async () => { const g = games[Number(b.dataset.offeredCopy)]; b.disabled = true; await act('accept_offered_game', [d.id, g.key, g.title], `Copying ${g.title}; it shows under Activity`, { what: 'Copying it' }); }));
+  $$('[data-offered-play]', node).forEach((b) => (b.onclick = async () => { const g = games[Number(b.dataset.offeredPlay)]; b.disabled = true; const r2 = await call('play_on_device', d.id, g.key, g.title); flash(r2.message || (ok(r2) ? 'Started there.' : 'It did not start.'), ok(r2) ? 'info' : 'caution'); b.disabled = false; }));
+  infoSheet({ title: `On ${r.name || d.name}`, node, wide: true });
 }
 // What syncs with a paired device (UX review AG6), from the backend's sync model; game files never sync.
 async function showDeviceSyncs(d) {

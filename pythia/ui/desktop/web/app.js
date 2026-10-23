@@ -124,7 +124,7 @@ function adaptGame(real) {
     status, statusText, installed, ownedOn, knownOn, updates, added, platforms, unidentified: !!(installed && unknown && !engineKind),
     updated: own.updated_at ? Date.parse(own.updated_at) || 0 : 0,
     art: ART_CLASSES[strHash(real.game_id) % ART_CLASSES.length],
-    cover: real.cover || '', lastPlayed, playtime,
+    cover: real.cover || '', lastPlayed, playtime, favourite: !!real.favourite,
     systems: systemIds.map(systemName), systemIds,
     path: variants.find((v) => v.path)?.path || '',
     note: own.notes || '',
@@ -222,7 +222,7 @@ function filteredGames() {
   const q = PythiaQuery.parse(state.search);
   const list = games.filter((g) => {
     const matches = PythiaQuery.matches(g, q);
-    const shelf = state.libraryShelf === 'installed' ? g.installed : state.libraryShelf === 'attention' ? g.status !== 'ok' : true;
+    const shelf = state.libraryShelf === 'favourites' ? g.favourite : state.libraryShelf === 'installed' ? g.installed : state.libraryShelf === 'attention' ? g.status !== 'ok' : true;
     return matches && shelf && (state.filterStatus === 'all' || (state.filterStatus === 'pending' ? g.status !== 'ok' : g.status === state.filterStatus)) && (state.source === 'all' || g.source === state.source) && (state.engine === 'all' || g.engine === state.engine);
   });
   const rank = { critical: 0, pending: 1, neutral: 2, ok: 3 };
@@ -234,6 +234,7 @@ function filteredGames() {
 // Shelves (droidtop SPEC 7i, UI round): a row each for what is worth picking up, from what Pythia knows.
 const SHELVES = [
   { id: 'played', title: 'Continue playing', pick: (all) => all.filter((g) => g.lastPlayed).sort((a, b) => b.lastPlayed - a.lastPlayed) },
+  { id: 'favourites', title: 'Favourites', pick: (all) => all.filter((g) => g.favourite).sort((a, b) => a.name.localeCompare(b.name)), view: 'favourites' },
   { id: 'added', title: 'Recently added', pick: (all) => all.filter((g) => g.added).sort((a, b) => String(b.added).localeCompare(String(a.added))) },
   { id: 'updates', title: 'Update available', pick: (all) => all.filter((g) => g.updates.length) },
   { id: 'attention', title: 'Needs attention', pick: (all) => all.filter((g) => g.status !== 'ok' && !g.updates.length), view: 'attention' },
@@ -241,7 +242,7 @@ const SHELVES = [
 ];
 const SHELF_MAX = 12;
 function capsuleHtml(g) {
-  return `<button class="capsule" data-capsule="${g.id}" title="${esc(g.name)}"><span ${artAttrs(g, 'capsule-art')}>${artLetters(g)}${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" aria-label="${esc(g.statusText)}"></span>` : ''}</span><span class="capsule-plate"><strong>${esc(g.name)}</strong><small>${esc(playedText(g) || versionText(g))}</small></span></button>`;
+  return `<button class="capsule" data-capsule="${g.id}" title="${esc(g.name)}"><span ${artAttrs(g, 'capsule-art')}>${artLetters(g)}${g.favourite ? '<span class="capsule-star" aria-label="Favourite">★</span>' : ''}${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" aria-label="${esc(g.statusText)}"></span>` : ''}</span><span class="capsule-plate"><strong>${esc(g.name)}</strong><small>${esc(playedText(g) || versionText(g))}</small></span></button>`;
 }
 function renderShelves() {
   const host = $('#libraryShelves');
@@ -484,17 +485,24 @@ function updateSlotHtml(g) {
   if (!g.updates.length) return '';
   return `<button class="btn" type="button" disabled data-reason="Pythia records updates but does not download them yet.">Update to ${esc(g.updates[0].version || 'the newer version')} <span class="reason">· not built yet</span></button>`;
 }
+// A favourite is the person's (owner, 2026-10-23): it reaches every computer and handheld (pythia/favourites.py).
+async function toggleFavourite(g) {
+  const on = !g.favourite;
+  const r = await act('set_favourite', [g.id, on], on ? `${g.name} is a favourite` : `${g.name} is no longer a favourite`, { what: 'Marking it' });
+  if (ok(r)) g.favourite = on;
+}
 function renderDetail(g) {
   const host = $('#gameDetail');
   if (!g) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Pick a game', body: 'Its details open here.' })); return; }
   const updates = g.updates || [];
   state.detailTab = MOVED_TABS[state.detailTab] || state.detailTab;
-  host.innerHTML = `<div class="detail-hero"><div ${artAttrs(g, 'cover-large')}>${artLetters(g)}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${g.status !== 'ok' ? gameStatus(g) : ''}<span class="tag">${g.current ? `Current ${esc(g.current)}` : g.parts.length && !g.latest ? esc(partsText(g)) : g.orderKnown ? (g.latest ? `Version ${esc(g.latest)}` : 'No version number') : 'Order unknown, set Current'}</span>${g.lastPlayed ? `<span class="tag">${esc(playedText(g))}</span>` : ''}${g.managed ? '<span class="tag">Managed by its launcher</span>' : ''}</div><p>${esc(g.note.split('\n')[0] || '')}</p><div class="detail-actions" id="detailActions"><span class="primary-slot" data-primary-slot><button class="btn primary big" type="button" disabled>Checking…</button></span>${updateSlotHtml(g)}<button class="btn" data-detail-action="more" aria-haspopup="menu">More…</button></div></div></div><div class="detail-tabs">${GAME_SECTIONS.map((sec) => `<button class="tab" data-tab="${sec.id}">${sec.title}</button>`).join('')}</div>
+  host.innerHTML = `<div class="detail-hero"><div ${artAttrs(g, 'cover-large')}>${artLetters(g)}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${g.status !== 'ok' ? gameStatus(g) : ''}<span class="tag">${g.current ? `Current ${esc(g.current)}` : g.parts.length && !g.latest ? esc(partsText(g)) : g.orderKnown ? (g.latest ? `Version ${esc(g.latest)}` : 'No version number') : 'Order unknown, set Current'}</span>${g.lastPlayed ? `<span class="tag">${esc(playedText(g))}</span>` : ''}${g.managed ? '<span class="tag">Managed by its launcher</span>' : ''}</div><p>${esc(g.note.split('\n')[0] || '')}</p><div class="detail-actions" id="detailActions"><span class="primary-slot" data-primary-slot><button class="btn primary big" type="button" disabled>Checking…</button></span>${updateSlotHtml(g)}<button class="btn favourite-btn${g.favourite ? ' on' : ''}" data-favourite aria-pressed="${g.favourite}">${g.favourite ? '★ Favourite' : '☆ Favourite'}</button><button class="btn" data-detail-action="more" aria-haspopup="menu">More…</button></div></div></div><div class="detail-tabs">${GAME_SECTIONS.map((sec) => `<button class="tab" data-tab="${sec.id}">${sec.title}</button>`).join('')}</div>
 ${GAME_SECTIONS.map((sec) => `<div class="tab-pane" data-pane="${sec.id}">${sec.html(g, updates)}</div>`).join('')}`;
   GAME_SECTIONS.forEach((sec) => sec.bind && sec.bind(g, $(`[data-pane="${sec.id}"]`, host)));
   $$('[data-tab]', host).forEach((t) => (t.onclick = () => openTab(t.dataset.tab)));
   $$('[data-detail-tab]', host).forEach((t) => (t.onclick = () => openTab(t.dataset.detailTab)));
   $$('[data-detail-action]', host).forEach((b) => (b.onclick = () => detailAction(b.dataset.detailAction, g, b)));
+  $('[data-favourite]', host).onclick = () => toggleFavourite(g);
   $$('[data-variant-menu]', host).forEach((b) => (b.onclick = () => openActionMenu('variant', b, g, b.dataset.variantMenu)));
   openTab(state.detailTab || 'overview');
   fillPrimarySlot(g, $('[data-primary-slot]', host), 'btn primary big');

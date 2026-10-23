@@ -263,6 +263,16 @@ class Backend(QObject):
                     self._record(level, "agent", event.get("message", ""), event.get("kind"))
                 if any(event.get("kind") in _HANDHELD_EVENT_KINDS for event in new):
                     self.handheldsChanged.emit()
+                # A favourite marked or unmarked on a handheld reaches this computer's records, and so the
+                # other computers sharing the library folder (pythia.favourites).
+                if any(event.get("kind") == "library" for event in new):
+                    try:
+                        from pythia import favourites
+
+                        if favourites.take_from_handhelds():
+                            self.refresh_games()
+                    except Exception as ex:  # noqa: BLE001 -- a background thread: say so, keep following
+                        logger.exception("Taking favourites from the handhelds failed: %s", ex)
 
         threading.Thread(target=run, name="droidtop-events", daemon=True).start()
 
@@ -337,10 +347,16 @@ class Backend(QObject):
     # ---- games list -----------------------------------------------------------
     def refresh_games(self):
         games = datadir.list_known_games()
+        from pythia import favourites
         from pythia.covers import cover_url
 
         self._games = [
-            {"game_id": gid, "entries": _jsonable(entries), "cover": cover_url(entries)}
+            {
+                "game_id": gid,
+                "entries": _jsonable(entries),
+                "cover": cover_url(entries),
+                "favourite": favourites.is_favourite(entries),
+            }
             for gid, entries in sorted(games.items())
         ]
         self.gamesChanged.emit()
@@ -733,6 +749,18 @@ class Backend(QObject):
             "status": "error",
             "message": "This computer has no record of that game, so notes cannot be saved here.",
         }
+
+    @Slot(str, bool, result="QVariant")
+    @_guarded
+    def set_favourite(self, game_id: str, on: bool):
+        """Marks a game the person's favourite, or not. It is the person's, so it
+        reaches every computer sharing the library and every paired handheld
+        (pythia.favourites); the newest mark wins wherever it was made."""
+        from pythia import favourites
+
+        result = favourites.set_favourite(game_id, on)
+        self.refresh_games()
+        return result
 
     @Slot(str, str, result="QVariant")
     @_guarded

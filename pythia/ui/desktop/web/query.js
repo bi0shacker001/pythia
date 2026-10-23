@@ -10,6 +10,7 @@
      source:<text>   the source contains it      engine:<text>  the engine contains it
      kind:<text>     a folder of that kind       installed      installed on this computer
      has:update      a newer version was seen    has:nolink     no store link recorded
+     favourite       one of the person's favourites (also: favorite)
    A filter value may be quoted: source:"local folder".
 
    Plain script: window.PythiaQuery in the page, module.exports under node
@@ -26,7 +27,7 @@
   }
 
   const FILTERS = ['source', 'engine', 'kind', 'has'];
-  const FLAGS = ['installed'];
+  const FLAGS = ['installed', 'favourite', 'favorite'];
 
   function parse(text) {
     const words = [];
@@ -65,6 +66,7 @@
     if (f.key === 'engine') return norm(g.engine).includes(f.value);
     if (f.key === 'kind') return variantsOf(g).some((x) => norm(x.kind || 'game').includes(f.value));
     if (f.key === 'installed') return !!g.installed;
+    if (f.key === 'favourite' || f.key === 'favorite') return !!g.favourite;
     if (f.key === 'has') {
       if (f.value === 'update') return (g.updates || []).length > 0;
       if (f.value === 'nolink') return !(g.knownOn || []).length;

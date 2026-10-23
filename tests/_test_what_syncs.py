@@ -33,7 +33,22 @@ class WhatSyncsTest(TestCase):
         self.assertFalse(rows(announced, {"syncthing": False})["Syncthing folders"]["syncs"])
         self.assertFalse(rows({"kind": "handheld"})["Syncthing folders"]["syncs"])
 
-    def test_a_computer_shares_no_library_yet(self):
+    def test_a_computer_is_offered_nothing_until_the_person_offers_it(self):
         r = rows({"kind": "computer"})
-        self.assertFalse(r["Library, saves and launches"]["syncs"])
-        self.assertNotIn("Library", r)
+        self.assertFalse(r["Library"]["syncs"])
+        self.assertFalse(r["Saves"]["syncs"])
+        self.assertFalse(r["Starting games here"]["syncs"])
+        self.assertFalse(r["Plugin data"]["syncs"])
+        r = rows({"kind": "computer", "offered": {"library": True, "saves": False}}, {"approved": {"f95": {}}})
+        self.assertTrue(r["Library"]["syncs"])
+        self.assertFalse(r["Saves"]["syncs"])
+        # Plugin data never syncs between two computers, whatever is approved.
+        self.assertFalse(r["Plugin data"]["syncs"])
+
+    def test_a_handheld_follows_what_it_is_offered(self):
+        r = rows({"kind": "handheld", "offered": {"library": True, "saves": False}})
+        self.assertTrue(r["Library"]["syncs"])
+        self.assertFalse(r["Saves"]["syncs"])
+        self.assertIn("does not offer it its saves", r["Saves"]["detail"])
+        # One from an agent that does not say gets a handheld's default.
+        self.assertTrue(rows({"kind": "handheld"})["Saves"]["syncs"])

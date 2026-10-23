@@ -1992,6 +1992,23 @@ class Backend(QObject):
         self.handheldsChanged.emit()
         return {"status": "ok"}
 
+    @Slot(str, str, bool, result="QVariant")
+    @_guarded
+    def set_device_offer(self, device_id: str, what: str, on: bool):
+        """What this computer offers a paired device: ``library`` or ``saves``
+        (droidtop-agent docs/DESIGN.md section 20; saves need the library)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("set_device_offer")
+        if what not in ("library", "saves"):
+            return {"status": "error", "message": "Only the library or the saves can be offered."}
+        from pythia.droidtop import store
+
+        store.set_offer(device_id, **{what: on})
+        self.handheldsChanged.emit()
+        return {"status": "ok"}
+
     # ---- features with no backend yet -------------------------------------------
     # Each page still calls its slot through the normal path; the slot answers
     # "unavailable" with the reason and logs the attempt. When the feature lands,

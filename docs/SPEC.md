@@ -437,8 +437,12 @@ a handheld's code" (7.3) beside it.
 - Both screens show the code in large type with "Same code" and "They
   don't match". The answer waits for the other device's; either "They
   don't match" pairs nothing and says so on both.
-- The list shows each paired device with its kind (Handheld or Computer).
-  "Saves win" and "Start games" apply to handhelds only.
+- The list shows each paired device with its kind (Handheld or Computer)
+  and what this computer offers it (droidtop-agent docs/DESIGN.md section
+  20): "Library" (it may see this computer's games and copy one when asked
+  there), "Saves" (needs the library) and "Start games". A handheld starts
+  with Library and Saves, a computer with nothing. "Saves win" applies to
+  handhelds only.
 
 ### 7.8 What syncs (UX review AG6)
 
@@ -446,12 +450,10 @@ Each paired device has "What syncs": one row per kind of thing, whether it
 syncs with that device and why, generated from the sync model as it is
 (`pythia.droidtop.syncs`), never a fixed text.
 
-- A handheld: the library, saves (who wins when both changed), starting
-  games here (only when allowed), plugin data (the plugins approved), and
+- Every device: the library and saves as this computer offers them (who
+  wins when both changed), starting games here (only when allowed), and
   Syncthing folders (when it offered its Syncthing, 1.9).
-- A computer: nothing of the library, saves or launches syncs between two
-  computers yet; they trust each other, so it can be added without pairing
-  again. Syncthing folders as for a handheld. (Open: what two paired
-  computers carry is the owner's to decide.)
-- Every device: game files never sync. A handheld copies one game's folder
-  only when the person asks for it on the handheld.
+- A handheld: plugin data (the plugins approved). A computer: plugin data
+  never syncs between two computers.
+- Every device: game files never sync on their own. A device offered the
+  library copies one game's folder only when the person asks for it there.

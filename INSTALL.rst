@@ -66,7 +66,6 @@ run from source::
 
     git clone https://github.com/bi0shacker001/pythia
     cd pythia
-    git checkout lutris-core
     ./bin/pythia
 
 Run Pythia

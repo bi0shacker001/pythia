@@ -337,7 +337,12 @@ class Backend(QObject):
     # ---- games list -----------------------------------------------------------
     def refresh_games(self):
         games = datadir.list_known_games()
-        self._games = [{"game_id": gid, "entries": _jsonable(entries)} for gid, entries in sorted(games.items())]
+        from pythia.covers import cover_url
+
+        self._games = [
+            {"game_id": gid, "entries": _jsonable(entries), "cover": cover_url(entries)}
+            for gid, entries in sorted(games.items())
+        ]
         self.gamesChanged.emit()
         # While this process serves droidtop handhelds, the library is theirs too.
         from pythia.droidtop import library as droidtop_library

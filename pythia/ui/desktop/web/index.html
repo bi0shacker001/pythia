@@ -59,12 +59,10 @@
   <div class="search"><span class="mag">⌕</span><input id="globalSearch" aria-label="Search current view" placeholder="Search games, engines, versions, paths…"><kbd>Ctrl K</kbd></div>
   <div class="top-spacer"></div>
   <button class="btn primary" id="addButton" aria-haspopup="menu" aria-expanded="false" title="Add a game, scan a library, or import from a source">＋ Add <span class="add-caret">⌄</span></button>
-  <button class="icon-btn" data-nav="activity" aria-label="Jobs and activity" title="Jobs and activity">≋<span class="utility-count hidden" id="jobsCount"></span></button>
   <button class="icon-btn hidden" data-console-toggle aria-label="Error console" title="Error console (Ctrl+Shift+E)">⚠<span class="utility-count hidden"></span></button>
-  <button class="icon-btn" id="recentButton" aria-label="Recent" title="Recent">🔔</button>
-  <button class="icon-btn" id="enterHandheldButton" aria-label="Switch to handheld interface" title="Switch to handheld interface">🎮</button>
-  <button class="icon-btn" id="themeButton" aria-label="Change theme" title="Change theme">◐</button>
-  <button class="icon-btn" data-nav="settings" aria-label="Settings" title="Settings">⚙</button>
+  <button class="btn ghost top-btn" id="recentButton" title="What happened recently">🔔 <span>Recent</span></button>
+  <button class="btn ghost top-btn" id="enterHandheldButton" title="Switch to the handheld interface">🎮 <span>Handheld</span></button>
+  <button class="btn ghost top-btn" id="themeButton" title="Change theme">◐ <span>Theme</span></button>
   <div class="sync-indicator" id="syncIndicator"><span class="status-icon neutral" role="img" aria-label="Connecting" title="Connecting">○</span><span id="syncLabel">Connecting</span></div>
 </header>
 <div class="theme-popover hidden" id="themePopover" role="menu" aria-label="Theme">
@@ -81,19 +79,19 @@
 </div>
 <div class="shell">
 <aside class="sidebar" aria-label="Primary navigation">
-  <div class="nav-group"><div class="nav-label">Manage</div>
+  <div class="nav-group"><div class="nav-label">Games</div>
     <button class="nav-row active" data-nav="library"><span class="nav-icon">▦</span>Library<span class="nav-count" id="allCount"></span></button>
     <button class="nav-row" data-nav="downloads"><span class="nav-icon">⇩</span>Downloads</button>
-    <button class="nav-row" data-nav="saves"><span class="nav-icon">⟲</span>Save backups</button>
-    <button class="nav-row" data-nav="launcher"><span class="nav-icon">▶</span>Launcher entries</button>
-  </div>
-  <div class="nav-group"><div class="nav-label">Coordinate</div>
     <button class="nav-row" data-nav="reconcile"><span class="nav-icon">⇄</span>Review<span class="nav-count" id="reviewCount" aria-label=""></span></button>
-    <button class="nav-row" data-nav="systems"><span class="nav-icon">◫</span>Systems &amp; sync</button>
-    <button class="nav-row" data-nav="activity"><span class="nav-icon">≋</span>Activity &amp; jobs<span class="nav-count" id="activityCount"></span></button>
+    <button class="nav-row" data-nav="saves"><span class="nav-icon">⟲</span>Save backups</button>
   </div>
-  <div class="nav-group"><div class="nav-label">Extend</div>
-    <button class="nav-row" data-settings-nav="plugins"><span class="nav-icon">◇</span>Plugins</button>
+  <div class="nav-group"><div class="nav-label">Places</div>
+    <button class="nav-row" data-nav="devices"><span class="nav-icon">◰</span>Devices<span class="nav-count" id="devicesCount"></span></button>
+    <button class="nav-row" data-nav="sources"><span class="nav-icon">⌂</span>Game sources</button>
+    <button class="nav-row" data-nav="shared"><span class="nav-icon">◫</span>Shared library</button>
+  </div>
+  <div class="nav-group">
+    <button class="nav-row" data-nav="activity"><span class="nav-icon">≋</span>Activity<span class="nav-count" id="activityCount"></span></button>
     <button class="nav-row" data-nav="settings"><span class="nav-icon">⚙</span>Settings</button>
   </div>
   <div class="sidebar-system" id="sidebarSystem"><strong>This computer</strong><small id="sidebarSystemText">Connecting to Pythia…</small><div class="mini-progress hidden" id="sidebarProgress"><span></span></div></div>
@@ -102,13 +100,11 @@
   <section class="view active" id="view-library">
     <div class="page-head"><div class="title-block"><h1>Library</h1><p id="librarySummary"></p></div>
       <div class="head-actions">
-        <button class="btn" id="selectionModeButton" aria-pressed="false">☑ Select</button>
-        <div class="seg presentation-switch" aria-label="Desktop library presentation">
-          <button class="active" data-library-mode="list" title="Desktop list and inspector">☰ <span>List</span></button>
-          <button data-library-mode="grid" title="Desktop cover grid and inspector">▦ <span>Grid</span></button>
+        <div class="seg view-strip" role="tablist" aria-label="Library view">
+          <button role="tab" data-library-shelf="overview">Overview</button><button role="tab" data-library-shelf="all">All games</button><button role="tab" data-library-shelf="installed">Installed</button><button role="tab" data-library-shelf="attention">Needs attention</button>
         </div>
-        <div class="seg density-switch" aria-label="Density"><button data-density="compact">Compact</button><button class="active" data-density="comfortable">Comfortable</button><button data-density="spacious">Spacious</button></div>
-        <select class="field" id="sortSelect" aria-label="Sort games" style="width:auto"><option value="name">Sort: Name</option><option value="status">Sort: Attention first</option><option value="updated">Sort: Recently updated</option></select>
+        <div class="seg presentation-switch" aria-label="Show as"><button class="active" data-library-mode="list" title="List">☰ <span>List</span></button><button data-library-mode="grid" title="Covers">▦ <span>Covers</span></button></div>
+        <button class="btn" id="selectionModeButton" aria-pressed="false">☑ Select</button>
       </div>
     </div>
     <div id="libraryNotice"></div>
@@ -124,8 +120,9 @@
         <button class="btn small ghost" id="bulkClear">Done</button>
       </div>
     </div>
+    <div class="shelves hidden" id="libraryShelves"></div>
     <div class="library-layout" id="libraryLayout">
-      <section class="panel library-master" aria-label="Game list"><div class="library-tools"><select id="sourceFilter"><option value="all">All sources</option></select><select id="engineFilter"><option value="all">All engines</option></select><button class="btn small ghost" id="clearFilters">Clear</button></div><div class="game-list" id="gameList"></div></section>
+      <section class="panel library-master" aria-label="Game list"><div class="library-tools"><select id="sourceFilter" aria-label="Source"><option value="all">All sources</option></select><select id="engineFilter" aria-label="Engine"><option value="all">All engines</option></select><select id="sortSelect" aria-label="Sort games"><option value="name">Name</option><option value="played">Last played</option><option value="added">Recently added</option><option value="status">Attention first</option><option value="updated">Recently changed</option></select><button class="btn small ghost" id="clearFilters">Clear</button></div><div class="game-list" id="gameList"></div></section>
       <section class="panel library-detail" id="gameDetail" aria-label="Selected game details"></section>
     </div>
   </section>
@@ -147,18 +144,32 @@
     <div class="panel review-section" id="reviewConflicts"><div class="panel-head"><h2>Sync conflicts</h2><small data-count></small></div><div class="panel-body" data-body></div></div>
   </section>
 
-  <section class="view" id="view-systems">
-    <div class="page-head"><div><h1>Systems &amp; sync</h1><p id="systemsSummary"></p></div><div class="head-actions"><button class="btn" data-action="rebuild-cache">Rebuild local cache</button><button class="btn primary" data-action="add-system">Add system</button></div></div>
-    <div id="systemsNotice"></div>
-    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>Paired devices</h2><small id="handheldSummary"></small><div class="panel-actions"><button class="btn small primary" data-action="pair-device">Pair a device</button><button class="btn small" data-action="show-pair-code">Show a code</button><button class="btn small" data-action="pair-handheld">Type a handheld's code</button></div></div><div class="panel-body"><div id="pairShowing"></div><div id="agentState"></div><div id="handheldState"></div></div></div>
-    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>On your handhelds</h2><small id="handheldGamesSummary"></small></div><div class="panel-body" id="handheldGames"></div></div>
-    <div class="cards" id="systemCards"></div>
-    <div class="panel" style="margin-top:13px"><div class="panel-head"><h2>Cross-system status</h2><small id="crossSystemCount"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead id="crossSystemHead"></thead><tbody id="crossSystemRows"></tbody></table><div id="crossSystemState"></div></div></div>
+  <section class="view" id="view-devices">
+    <div class="page-head"><div><h1>Devices</h1><p id="devicesSummary">Your droidtop handhelds and other computers running Pythia.</p></div><div class="head-actions"><button class="btn primary" data-action="pair-device">Pair a device</button></div></div>
+    <div id="pairShowing"></div>
+    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>This computer</h2></div><div class="panel-body" id="agentState"></div></div>
+    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>Paired</h2><small id="handheldSummary"></small></div><div class="panel-body" id="handheldState"></div></div>
+    <div class="panel"><div class="panel-head"><h2>Games on your handhelds</h2><small id="handheldGamesSummary"></small></div><div class="panel-body" id="handheldGames"></div></div>
   </section>
 
-  <section class="view" id="view-launcher">
-    <div class="page-head"><div><h1>Launcher entries</h1><p id="launcherSummary"></p></div><div class="head-actions"><button class="btn" data-action="reload-launcher">Look again</button></div></div>
-    <div class="panel"><div class="panel-head"><h2>In this computer's launchers</h2><small id="launcherCount"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>System</th><th>Manager</th><th>State</th><th></th></tr></thead><tbody id="launcherRows"></tbody></table><div id="launcherState"></div></div></div>
+  <section class="view" id="view-shared">
+    <div class="page-head"><div><h1>Shared library</h1><p id="systemsSummary"></p></div><div class="head-actions"><button class="btn" data-open-path="sync_folder">Open folder</button><button class="btn" data-option-action="set_sync_folder">Change folder…</button></div></div>
+    <div id="systemsNotice"></div>
+    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>Library folder</h2></div><div class="panel-body">
+      <div class="form-row"><div class="form-label"><strong>Folder</strong><small class="mono" id="syncFolderPath"></small></div></div>
+      <div class="form-row"><div class="form-label"><strong>Warn when two computers disagree</strong><small>Say so under Review when another computer recorded a game differently.</small></div><button class="toggle" data-option="warn_conflicts" aria-label="Warn when two computers disagree"><span></span></button></div>
+      <div class="form-section"><h3>Game transfer</h3><div id="transferSettings"></div></div>
+      <div class="form-section"><h3>Storage roles</h3><div id="storageRoles"></div></div>
+    </div></div>
+    <div class="cards" id="systemCards"></div>
+    <div class="panel" style="margin-top:13px"><div class="panel-head"><h2>Games on more than one computer</h2><small id="crossSystemCount"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead id="crossSystemHead"></thead><tbody id="crossSystemRows"></tbody></table><div id="crossSystemState"></div></div></div>
+  </section>
+
+  <section class="view" id="view-sources">
+    <div class="page-head"><div><h1>Game sources</h1><p>Where Pythia finds games: your game folders, stores and launchers.</p></div><div class="head-actions"><button class="btn" data-action="add-folder">Add game folder</button><button class="btn primary" data-action="scan">Scan a folder</button></div></div>
+    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>Game folders</h2></div><div class="panel-body"><div class="form-section"><div id="libraryFolders"></div></div><div class="form-section"><h3>Scanning</h3><div id="scanSettings"></div></div></div></div>
+    <div class="panel" style="margin-bottom:13px"><div class="panel-head"><h2>Stores</h2><small>A store with an account can list what you own there.</small></div><div class="panel-body"><div data-capability-list="library"></div></div></div>
+    <div class="panel"><div class="panel-head"><h2>Launchers</h2><small id="launcherSummary"></small><div class="panel-actions"><button class="btn small" data-action="reload-launcher">Look again</button></div></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Game</th><th>Launcher</th><th>State</th><th></th></tr></thead><tbody id="launcherRows"></tbody></table><div id="launcherState"></div></div></div>
   </section>
 
   <section class="view" id="view-saves">
@@ -171,7 +182,7 @@
     <div id="lookHost"></div>
   </section>
   <section class="view" id="view-activity">
-    <div class="page-head"><div><h1>Activity &amp; jobs</h1><p id="activitySummary"></p></div><div class="head-actions"><button class="btn" data-action="clear-jobs">Clear completed</button></div></div>
+    <div class="page-head"><div><h1>Activity</h1><p id="activitySummary"></p></div><div class="head-actions"><button class="btn" data-action="clear-jobs">Clear completed</button></div></div>
     <div class="panel"><div class="panel-head"><h2>Jobs</h2><small id="jobsTotal"></small></div><div class="panel-body" style="padding:0"><table class="table"><thead><tr><th>Job</th><th>Progress</th><th>State</th><th>Started</th><th></th></tr></thead><tbody id="jobRows"></tbody></table><div id="jobsState"></div></div></div>
     <div class="panel" style="margin-top:13px"><div class="panel-head"><h2>Event log</h2><small id="eventCount"></small><div class="panel-actions"><button class="btn small" data-action="export-diagnostics">Export</button></div></div><div class="panel-body"><div class="timeline" id="eventLog"></div><div id="eventState"></div></div></div>
   </section>
@@ -180,56 +191,26 @@
     <div class="page-head"><div><h1>Settings</h1><p>Changes apply as you make them.</p></div></div>
     <div class="settings-layout">
       <section class="panel settings-nav" aria-label="Settings categories">
-        <div class="settings-nav-group"><div class="settings-nav-label">Core</div>
-          <button class="active" data-settings="general">General</button><button data-settings="library">Library</button><button data-settings="sync">Systems &amp; sync</button><button data-settings="interface">Interface</button><button data-settings="advanced">Advanced</button>
+        <div class="settings-nav-group">
+          <button class="active" data-settings="general">General</button><button data-settings="interface">Interface</button><button data-settings="plugins">Plugins</button><button data-settings="advanced">Advanced</button>
         </div>
-        <div class="settings-nav-group"><div class="settings-nav-label">Plugin capabilities</div>
-          <button data-settings="sources">Sources</button><button data-settings="downloaders">Downloaders</button><button data-settings="metadata">Metadata</button><button data-settings="managers">Managers</button><button data-settings="engines">Engine detection</button><button data-settings="mods">Mods</button><button data-settings="patchers">Patchers</button>
+        <div class="settings-nav-group"><div class="settings-nav-label">Their own pages</div>
+          <button data-nav-link="devices">Devices <span class="nav-out">›</span></button><button data-nav-link="sources">Game sources <span class="nav-out">›</span></button><button data-nav-link="shared">Shared library <span class="nav-out">›</span></button>
         </div>
-        <div class="settings-nav-group"><div class="settings-nav-label">Extensions</div><button data-settings="plugins">Plugins</button></div>
       </section>
       <section class="panel">
         <div class="settings-pane active" data-pane="general">
           <div class="form-section"><h3>Modes</h3><div id="modesState"></div></div>
           <div class="form-section"><h3>General</h3>
-            <div class="form-row"><div class="form-label"><strong>Application data directory</strong><small class="mono" id="appDataPath"></small></div><div class="inline-actions"><button class="btn" data-open-path="app_data_folder">Open folder</button><button class="btn" data-option-action="move_app_data">Move application data…</button></div></div>
-            <div class="form-row"><div class="form-label"><strong>Resident watcher</strong><small>Offer to register newly added game folders and versions.</small></div><button class="toggle" data-option="resident_watcher" aria-label="Resident watcher"><span></span></button></div>
-            
+            <div class="form-row"><div class="form-label"><strong>Application data</strong><small class="mono" id="appDataPath"></small></div><div class="inline-actions"><button class="btn" data-open-path="app_data_folder">Open folder</button><button class="btn" data-option-action="move_app_data">Move…</button></div></div>
+            <div class="form-row"><div class="form-label"><strong>Watch for new games</strong><small>Offer to add game folders and versions as they appear.</small></div><button class="toggle" data-option="resident_watcher" aria-label="Watch for new games"><span></span></button></div>
           </div>
         </div>
 
-        <div class="settings-pane" data-pane="library">
-          <div class="form-section"><h3>Tracked folders</h3><div id="libraryFolders"></div></div>
-          <div class="form-section"><h3>Scanning</h3><div id="scanSettings"></div></div>
-        </div>
-
-        <div class="settings-pane" data-pane="sources"><div class="form-section"><h3>Sources</h3><p>Where games come from. A source with an account can list what you own there.</p><div data-capability-list="library"></div></div></div>
-
-        <div class="settings-pane" data-pane="downloaders"><div class="form-section"><h3>Downloaders</h3><p>Tools that fetch game files. Pythia watches their download folder and offers what arrives.</p><div data-capability-list="downloader"></div></div>
-        <div class="form-section"><h3>Downloaded tools</h3><div id="toolsState"></div></div></div>
-
-        <div class="settings-pane" data-pane="metadata"><div class="form-section"><h3>Metadata</h3><p>Names, platforms and DLC from a store's public listing.</p><div data-capability-list="metadata"></div></div></div>
-
-        <div class="settings-pane" data-pane="managers"><div class="form-section"><h3>Open games with</h3><p>Launchers Pythia can hand a game to. A launcher opens its own game; Pythia runs a game itself only for a paired handheld you let start games here.</p><div data-capability-list="manager"></div></div></div>
-
-        <div class="settings-pane" data-pane="engines"><div class="form-section"><h3>Engine detection</h3><p>Detects game engines and provides enablement actions when available.</p><div data-capability-list="engine"></div></div></div>
-
-        <div class="settings-pane" data-pane="mods"><div class="form-section"><h3>Mods</h3><div data-capability-list="mod"></div></div></div>
-
-        <div class="settings-pane" data-pane="patchers"><div class="form-section"><h3>Patchers</h3><div data-capability-list="patcher"></div></div></div>
-
-        <div class="settings-pane" data-pane="plugins"><div class="form-section"><h3>Installed plugins</h3><p>Built-in plugins cannot be removed.</p><div class="cards" id="pluginCards"></div><div id="pluginsState"></div><button class="btn primary small" style="margin-top:12px" data-action="install-plugin">＋ Install plugin…</button></div>
+        <div class="settings-pane" data-pane="plugins">
+          <div class="form-section"><div class="plugin-filter" id="pluginFilter" role="group" aria-label="Show plugins of a kind"></div><div class="plugin-list" id="pluginList"></div><div id="pluginsState"></div>
+            <div class="inline-actions" style="margin-top:12px"><button class="btn small" data-action="install-plugin">＋ Install plugin…</button><button class="btn small ghost" data-action="tools">Downloaded tools…</button></div></div>
           <div class="form-section"><h3>Plugin repositories</h3><div id="pluginRepos"></div></div>
-        </div>
-
-        <div class="settings-pane" data-pane="sync">
-          <div class="form-section"><h3>Metadata folder</h3>
-            <div class="form-row"><div class="form-label"><strong>Shared folder</strong><small class="mono" id="syncFolderPath"></small></div><div class="inline-actions"><button class="btn" data-open-path="sync_folder">Open folder</button><button class="btn" data-option-action="set_sync_folder">Change…</button></div></div>
-            <div class="form-row"><div class="form-label"><strong>This system's ID</strong></div><input class="field mono" id="systemIdField" value="" readonly></div>
-            <div class="form-row"><div class="form-label"><strong>Warn on metadata conflicts</strong></div><button class="toggle" data-option="warn_conflicts" aria-label="Warn on metadata conflicts"><span></span></button></div>
-          </div>
-          <div class="form-section"><h3>Game transfer</h3><div id="transferSettings"></div></div>
-          <div class="form-section"><h3>Storage roles</h3><div id="storageRoles"></div></div>
         </div>
 
         <div class="settings-pane" data-pane="interface"><div class="form-section"><h3>Interface</h3>
@@ -244,6 +225,7 @@
 
         <div class="settings-pane" data-pane="advanced"><div class="form-section"><h3>Diagnostics</h3>
           <div class="form-row"><div class="form-label"><strong>Database directory</strong><small class="mono" id="dbPath"></small></div><button class="btn" data-open-path="app_data_folder">Open folder</button></div>
+          <div class="form-row"><div class="form-label"><strong>This computer's ID</strong><small>How other computers sharing the library folder tell this one apart.</small></div><input class="field mono" id="systemIdField" value="" readonly></div>
           <div class="form-row"><div class="form-label"><strong>Schema version</strong></div><span class="status-inline" id="schemaVersion"></span></div>
           <div class="form-row"><div class="form-label"><strong>Log level</strong><small>Debug writes every step to the log file.</small></div><select class="field" id="logLevelSelect"><option value="info">Normal</option><option value="debug">Debug</option></select></div>
           <div class="form-row"><div class="form-label"><strong>Error console</strong><small id="consoleHint">Shows failures live. Start Pythia with --error-console, or set error_console = True in pythia.conf.</small></div><div class="inline-actions"><button class="btn" data-open-path="log_file_dir">Open log folder</button><button class="btn hidden" data-console-toggle>Open console</button></div></div>

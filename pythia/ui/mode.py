@@ -4,42 +4,28 @@ in `pythia.cli`'s subcommands (scan/onboard/list/renpy-patch) ever imports this 
 or PySide6, so they keep working on a bare stdlib install. Only `python -m pythia`
 with no subcommand reaches here.
 
-Precedence: an explicit --ui hint > a saved per-system preference (local.db, via
-identity.get_setting -- not synced, matches how "settings" is described in the
-Milestone 1 data layout) > a screen-size heuristic > desktop by default.
+Precedence: an explicit --ui hint > a saved choice of Big Picture (local.db, via
+identity.get_setting -- not synced) > the web UI.
+
+The web UI (pythia/ui/webview/app.py) is what Pythia starts in (UI review
+2026-10-23, U1 and U3, Droidtop/tracker#538): it holds both the desktop and the
+handheld shell and picks between them itself, by the device and the person's
+"Start in" setting (pythia.start_shell). The QtWidgets "desktop" front end is
+still a placeholder and Big Picture is the older handheld UI; each starts only
+when asked for, by --ui or a saved choice of Big Picture.
 """
 
 import sys
 
 from pythia.identity import get_setting
 
-# Below this on the screen's shorter dimension (px), default to big-picture -- sized
-# to catch small handhelds (e.g. a Retroid Pocket 5) while leaving normal desktop and
-# even most tablet-class displays in desktop mode.
-SMALL_SCREEN_THRESHOLD_PX = 900
-
-
-def _detect_screen_mode(app) -> str:
-    screen = app.primaryScreen()
-    if screen is None:
-        return "desktop"
-    size = screen.size()
-    if min(size.width(), size.height()) <= SMALL_SCREEN_THRESHOLD_PX:
-        return "bigpicture"
-    return "desktop"
-
 
 def resolve_mode(app, hint: str | None) -> str:
-    # "web" (UI-next, see pythia/ui/webview/app.py) is deliberately never
-    # auto-selected by the saved-preference or screen-size paths below -- it's
-    # the fast-iteration testing surface, reached only via an explicit --ui
-    # web hint, never something a user lands in by default.
     if hint in ("desktop", "bigpicture", "web"):
         return hint
-    saved = get_setting("ui_mode")
-    if saved in ("desktop", "bigpicture"):
-        return saved
-    return _detect_screen_mode(app)
+    if get_setting("ui_mode") == "bigpicture":
+        return "bigpicture"
+    return "web"
 
 
 def launch(hint: str | None = None, relaunch: bool = False, error_console: bool = False):

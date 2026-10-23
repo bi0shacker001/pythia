@@ -444,6 +444,17 @@ a handheld's code" (7.3) beside it.
   with Library and Saves, a computer with nothing. "Saves win" applies to
   handhelds only.
 
+- **While Sync with droidtop is off** (UI review 2026-10-23, U6), Devices
+  says once that a device can be paired now but syncs only once it is on,
+  with the switch beside it, and shows no serving line or addresses.
+  "No device is paired" names the path that works with droidtop today: its
+  Pair a computer shows a code, typed here with "Type a handheld's code";
+  "Pair a device" is for another computer running Pythia, until droidtop
+  finds computers itself.
+- **Settings shows what can be set** (U4): a section whose slot answers
+  "not built yet", or a plugin kind with no plugin installed, is hidden, and
+  so is a page left with nothing; each comes back on its own once it has
+  something.
 - **What a device offers this computer** (droidtop-agent DESIGN section 20):
   each paired device's "Games" opens "On <device>", what it offers this
   computer (its library, its saves, or nothing, with where it can offer

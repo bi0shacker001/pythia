@@ -58,6 +58,12 @@ class ScannedGamesTest(TestCase):
         gone = self.entry(versions=[{"version": "1", "variants": [{"path": os.path.join(self.dir.name, "gone")}]}])
         self.assertEqual(library.scanned_games([self.entry(system_uuid="other"), gone], "me"), [])
 
+    def test_the_engine_pythia_identified_goes_with_the_game(self):
+        renpy = self.entry(versions=[{"version": "1", "variants": [{"path": self.new, "source": {"kind": "renpy"}}]}])
+        store = self.entry(versions=[{"version": "1", "variants": [{"path": self.new, "source": {"kind": "steam"}}]}])
+        self.assertEqual(library.scanned_games([renpy], "me")[0]["engine"], "renpy")
+        self.assertNotIn("engine", library.scanned_games([store], "me")[0])
+
     def test_a_version_that_repeats_the_title_is_no_version(self):
         e = self.entry(versions=[{"version": "Eternum", "variants": [{"path": self.new}]}])
         (game,) = library.scanned_games([e], "me")

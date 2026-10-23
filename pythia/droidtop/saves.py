@@ -19,7 +19,9 @@ def copies() -> list[dict]:
 
 def lookup(key: str, title: str = "", fetch: bool = False) -> dict:
     """Where a game keeps its saves here: ``patterns`` (None when nothing is
-    known) and the ``files`` there now, each with ``name`` and ``path``. With
+    known) and the ``files`` there now, each with ``name`` and ``path``;
+    ``syncthing``, the locations the Syncthing here already syncs (``pattern``,
+    ``label``, ``path``), left to it, and ``all_by_syncthing``. With
     ``fetch``, the Ludusavi manifest is fetched first when there is none yet.
     May rescan (slow)."""
     return submodule("saves").lookup(key, title, fetch=fetch)

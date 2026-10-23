@@ -514,11 +514,18 @@ function renderSavesTab(g, fetch = false, pane = $('#gameDetail [data-pane="save
   loadInto(pane, 'get_game_saves', [g.id, fetch], (r, host) => {
     const files = r.files || [];
     if (!r.patterns) {
-      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `droidtop knows where a game keeps its saves from the Ludusavi manifest, by its key (${r.key}) or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true, pane) }] }));
+      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `Pythia knows where Ren'Py games keep their saves by the engine's own rule. For other games it looks in the Ludusavi manifest, by the game's store id or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true, pane) }] }));
       return;
     }
-    host.appendChild(el(`<div class="kv"><div class="key">Looked for</div><div class="mono" style="word-break:break-all">${(r.patterns || []).map(esc).join('<br>')}</div></div>`));
-    if (!files.length) { host.appendChild(stateBlock({ title: 'No save files here yet', body: 'Nothing matches those places on this computer now. They sync with paired handhelds once there are some.' })); return; }
+    // Save locations the Syncthing here already syncs are left to it (Droidtop/tracker#538): said first.
+    const st = r.syncthing || [];
+    if (st.length) {
+      const labels = [...new Set(st.map((x) => x.label))].join(', ');
+      host.appendChild(el(`<p>${visibleStatus(r.all_by_syncthing ? `Synced by Syncthing (folder ${labels})` : `Partly synced by Syncthing (folder ${labels})`, 'neutral', '⇄')}</p>`));
+      host.appendChild(el(`<p><small>${r.all_by_syncthing ? 'Syncthing already keeps these saves in step on this computer, so Pythia does not sync them too: two programs writing the same files would fight.' : 'Syncthing already keeps some of these places in step; Pythia syncs only the others.'}</small></p>`));
+    }
+    host.appendChild(el(`<div class="kv"><div class="key">Looked for</div><div class="mono" style="word-break:break-all">${(r.patterns || []).map((p) => `${esc(p)}${st.some((x) => x.pattern === p) ? ' <span class="tag">Syncthing</span>' : ''}`).join('<br>')}</div></div>`));
+    if (!files.length) { host.appendChild(stateBlock({ title: 'No save files here yet', body: r.all_by_syncthing ? 'Nothing matches those places on this computer now.' : 'Nothing matches those places on this computer now. They sync with paired handhelds once there are some.' })); return; }
     host.appendChild(el(`<table class="table"><thead><tr><th>File</th><th></th></tr></thead><tbody>${files.map((f) => `<tr><td class="primary-cell"><strong>${esc(f.name)}</strong><small class="mono">${esc(f.path)}</small></td><td><button class="btn small" data-open-save="${esc(f.path)}">Show</button></td></tr>`).join('')}</tbody></table>`));
     $$('[data-open-save]', host).forEach((b) => (b.onclick = () => openFolder(b.dataset.openSave.replace(/[\\/][^\\/]*$/, ''), 'Opening the folder')));
   }, { what: "This game's saves" });

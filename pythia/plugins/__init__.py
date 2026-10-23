@@ -77,7 +77,7 @@ resources, embedded strings, archive headers -- is also fair game for detection
 Since Pythia became this computer's droidtop agent, the owner: "given windowcast,
 yeah, have it be able to do general launches", and "It is clearly a new exception
 to that" (this boundary). So Pythia does start a game itself, in this one case: a
-paired handheld the person allowed ("Start games" in Systems & sync, off per
+paired handheld the person allowed ("Let it start games here" on Devices, off per
 handheld until turned on) asks for one of this computer's tracked games, which
 windowcast then streams to it. The handheld only names the game by its key; Pythia
 looks the key up among its own tracked games and runs nothing the handheld sent.

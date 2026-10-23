@@ -321,3 +321,11 @@ body:has(#libraryShelves:not(.hidden)) #view-library .presentation-switch,body:h
 .nav-row .utility-count{position:static;margin-left:6px}
 .favourite-btn.on{color:var(--accent-hover);border-color:var(--accent)}
 .capsule-star{position:absolute;left:8px;top:6px;color:var(--accent);font-size:1rem;text-shadow:0 1px 4px color-mix(in srgb,var(--shadow-ink) 70%,transparent)}
+/* Handheld in droidtop's look (UI round): shelves of 2:3 capsules with name plates, one focus ring */
+.hh-shelf-head{display:flex;align-items:baseline;gap:9px;margin:4px 2px 8px}.hh-shelf-head h2{margin:0;font:500 1.0625rem var(--serif)}.hh-shelf-head small{color:var(--text-tertiary)}
+.hh-shelf-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(7.5rem,9rem);gap:12px;overflow-x:auto;padding:6px 4px 10px;scroll-snap-type:x proximity}
+.hh-capsule{display:flex;flex-direction:column;min-width:0;padding:0;border:0;background:transparent;color:var(--text-primary);text-align:left;cursor:pointer;scroll-snap-align:start;border-radius:12px}
+.hh-capsule-art{position:relative;aspect-ratio:2/3;border-radius:10px;display:grid;place-items:center;font:700 1.75rem var(--serif);color:var(--on-art-warm);border:1px solid color-mix(in srgb,var(--text-primary) 12%,transparent);transition:transform .12s ease}
+.handheld-active #handheldShell .hh-capsule:focus{outline:none}.handheld-active #handheldShell .hh-capsule:focus .hh-capsule-art{outline:0.25rem solid var(--focus-ring);outline-offset:0.15rem;transform:scale(1.04)}.hh-capsule:hover .hh-capsule-art{transform:scale(1.04)}
+.hh-plate{display:block;padding:7px 2px 0;min-width:0}.hh-plate strong{display:block;font-size:0.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hh-plate small{display:block;color:var(--text-tertiary);font-size:0.6875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hh-library-grid{grid-template-columns:repeat(auto-fill,minmax(7.5rem,1fr));gap:14px}

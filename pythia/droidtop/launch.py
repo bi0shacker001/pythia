@@ -4,7 +4,7 @@ Owner, 2026-10-16: the agent launching only for Steam Link is the Steam
 case; "given windowcast, yeah, have it be able to do general launches". So
 Pythia registers a launcher with the agent's service
 (``pythia._native.service.set_launcher``): for a handheld the person let
-start games here ("Start games" in Systems & sync), every key that is not
+start games here ("Let it start games here" on Devices), every key that is not
 Steam's comes here. Steam keys stay the agent's (Steam Link).
 
 This is an exception to Pythia's "never launches anything" boundary, made on

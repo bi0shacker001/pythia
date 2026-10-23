@@ -76,10 +76,10 @@ both. If droidtop-agent is already running, it keeps serving and Pythia says so.
 The games Pythia tracks stay on the handhelds when droidtop-agent serves after
 Pythia closed.
 
-In the window, Systems & sync lists the paired handhelds (which one's saves
-win, which may start games here, Forget) and pairs new ones: "Pair a handheld"
-takes the code the handheld shows, "Show a code" shows one for a handheld that
-cannot reach this computer. Save backups lists the copies kept on this computer
+In the window, the Devices page pairs handhelds and other computers ("Pair a
+device"; typing or showing a code is offered in its flow) and lists each paired
+device with what this computer shares with it, whose saves win, whether it may
+start games here, and Forget under More. Save backups lists the copies kept on this computer
 when a sync would have overwritten saves that differ.
 
 Install the ``droidtop_agent`` wheel for your system from

@@ -185,8 +185,8 @@ Buttons are named by position, with Xbox labels (as on the GPD Win 4).
 | Y | Search. |
 | LB / RB | The previous or next entry in the page's strip: the library's source filter, the settings pages, or a game page's sections. |
 | D-pad / left stick | Moves focus (2.1). A held direction repeats after 400 ms, then every 120 ms. On a choice row, Left and Right change the value (A5). |
-| Start (Menu) | The Pythia menu: Activity, Save backups, Launcher entries, Duplicates, Add, the error console when its flag is on, Desktop, Quit. |
-| Select (View) | Switches List and Grid where a page has both. |
+| Start (Menu) | The Pythia menu: Activity, Save backups, Game sources, Duplicates, Add, the error console when its flag is on, Desktop, Quit. |
+| Select (View) | Switches List and Covers where a page has both. |
 | LT / RT | Reserved and unused, so they can later hold a Quick menu, as droidtop's R2 does. |
 
 ### 2.3 Hints
@@ -309,8 +309,7 @@ seen.
 
 From UX review A19 (AG2).
 
-The Devices page (today "Systems & sync") lists every device this computer
-knows. Each device has:
+The Devices page (section 8) lists every device this computer knows. Each device has:
 
 - **A name**, which the person can change on this computer.
 - **A type**: a computer (another Pythia, or droidtop-agent; see the open
@@ -422,9 +421,11 @@ extra for a computer that has one, never the only way.
 
 ### 7.7 Where it lives (UX review C1)
 
-Devices (Systems & sync > Paired devices, and the handheld shell's Systems
-page) has "Pair a device" as its main action, with "Show a code" and "Type
-a handheld's code" (7.3) beside it.
+Devices (section 8; the desktop's Devices page and the handheld shell's
+Devices page) has "Pair a device" as its one main action. "Show a code" and
+"Type a code instead" (7.3) are offered inside its flow, not beside it. When
+Sync with droidtop is off, Pair a device first offers to turn it on ("Turn
+on and pair", or "Pair only").
 
 - Pair a device first says why the network is needed (7.5, once), then
   offers this computer (7.1) for as long as the panel is open: "Waiting for
@@ -437,26 +438,24 @@ a handheld's code" (7.3) beside it.
 - Both screens show the code in large type with "Same code" and "They
   don't match". The answer waits for the other device's; either "They
   don't match" pairs nothing and says so on both.
-- The list shows each paired device with its kind (Handheld or Computer)
-  and what this computer offers it (droidtop-agent docs/DESIGN.md section
-  20): "Library" (it may see this computer's games and copy one when asked
-  there), "Saves" (needs the library) and "Start games". A handheld starts
-  with Library and Saves, a computer with nothing. "Saves win" applies to
-  handhelds only.
+- Each paired device is a card: its name, kind (Handheld or Computer) and
+  when it was last seen, then labelled switches for what this computer
+  offers it (droidtop-agent docs/DESIGN.md section 20): "Share this library
+  with it" (it may see this computer's games and copy one when asked
+  there), "Share saves" (needs the library), "Its saves win" (handhelds
+  only) and "Let it start games here". A handheld starts with the library
+  and saves, a computer with nothing. "Its games" and "What syncs" are
+  beside the name; its ID and Forget are under More.
 
 - **While Sync with droidtop is off** (UI review 2026-10-23, U6), Devices
   says once that a device can be paired now but syncs only once it is on,
-  with the switch beside it, and shows no serving line or addresses.
-  "No device is paired" names the path that works with droidtop today: its
-  Pair a computer shows a code, typed here with "Type a handheld's code";
-  "Pair a device" is for another computer running Pythia, until droidtop
-  finds computers itself.
+  under the switch, and shows no serving line or addresses. With nothing
+  paired, the list says "Pair your handheld" with the steps on both sides.
 - **Settings shows what can be set** (U4): a section whose slot answers
-  "not built yet", or a plugin kind with no plugin installed, is hidden, and
-  so is a page left with nothing; each comes back on its own once it has
-  something.
+  "not built yet" is hidden, and so is a panel left with nothing; each comes
+  back on its own once it has something.
 - **What a device offers this computer** (droidtop-agent DESIGN section 20):
-  each paired device's "Games" opens "On <device>", what it offers this
+  each paired device's "Its games" opens "On <device>", what it offers this
   computer (its library, its saves, or nothing, with where it can offer
   more) and the games installed there. "Copy here" copies one into this
   computer's first game folder as a new folder (never over one that is
@@ -478,3 +477,98 @@ syncs with that device and why, generated from the sync model as it is
   never syncs between two computers.
 - Every device: game files never sync on their own. A device offered the
   library copies one game's folder only when the person asks for it there.
+
+## 8. Places (UI round, 2026-10-23)
+
+From the owner's review of 0.5.23 ("no clear path for pairing", "very full",
+"no Devices page", "two systems and sync tabs") and the coordinator's round
+(Droidtop/tracker#538). One rule: **each thing has one place**. A new
+feature picks its place first; a page does not grow a panel for it. Pythia
+learns from droidtop (places, shelves, capsules, one action per screen) but
+the desktop stays a desktop application in Lutris's tradition; the handheld
+shell takes droidtop's look.
+
+### 8.1 The places
+
+The sidebar: **Games** (Library, Downloads, Review, Save backups), **Places**
+(Devices, Game sources, Shared library), then Activity and Settings.
+
+- **Devices**: pairing (7.7), Sync with droidtop and service mode ("Answer
+  Windows security screens"), each paired device's card, and the games on
+  the handhelds.
+- **Game sources**: game folders and scanning, stores (a store with an
+  account can list what you own there), and what this computer's launchers
+  list (once "Launcher entries"), with Record for one not in the library.
+- **Shared library**: the library folder other computers share (the
+  metadata folder), "Warn when two computers disagree", game transfer and
+  storage roles when built, each computer's card, and the games on more
+  than one computer.
+
+The handheld rail has the same names: Home, Library, Review, Downloads,
+Devices, Activity, Settings.
+
+### 8.2 Settings
+
+General, Interface, Plugins and Advanced, with links to the three places
+("Their own pages"). Settings links to a place; it does not copy it.
+
+- **General**: manager mode; Sync with droidtop and service mode as rows
+  that say their state and open Devices; the application data folder;
+  "Watch for new games".
+- **Plugins**: one list, every plugin once, with its kind's own state
+  (a store's account, a launcher's presence, an engine's tool) and Details.
+  A filter by kind (All, Stores, Downloaders, Metadata, Launchers, Engine
+  detection, Mods, Patchers, Remote sources) shows only kinds with a plugin;
+  under All, the engine detectors fold into one row that opens.
+- **Advanced**: diagnostics, recovery, and this computer's ID (an ID is
+  never on an everyday page).
+
+Old names still lead somewhere: Systems & sync and Launcher entries open
+Shared library and Game sources; the plugin-kind pages open Plugins with
+that kind picked.
+
+### 8.3 Library
+
+A view strip: **Overview**, All games, Favourites, Installed, Needs
+attention. Overview is shelves of 2:3 capsules with name plates: Continue
+playing, Favourites, Recently added, Update available, Needs attention,
+Installed, each up to 12 with "All N" when longer. The other views are the
+list (List or Covers) with the game page beside it. A game's cover is what
+this computer already has (Lutris's cover art, Steam's library art); none
+is downloaded, and without one the drawn art and initials stay.
+
+### 8.4 A game's page
+
+One primary action (Play, Install or Update, 1.1), the Favourite button and
+More…, then four tabs: **Overview** (version, played, added, store, owned
+on, engine, notes), **Versions**, **Saves** and **Details** (the record
+with its IDs and paths, the engine report, each computer, the history).
+IDs and paths are only under Details.
+
+### 8.5 Favourites
+
+A library belongs to one person, so a favourite is theirs and follows them
+(owner). Each computer's record keeps `favourite: {on, at}`; the newest mark
+across a game's records wins, so un-marking travels too. cache.db indexes
+the marks (`favourites`). A mark made here is droidtop's `favourite` mark
+too, and a newer one made on a handheld is written into this computer's
+record. Search has `favourite` (or `favorite`).
+
+### 8.6 States and words
+
+Something to look at is not a failure: "Not identified", a launcher's
+"Folder moved" and "Not connected" are neutral, not red; red is for what
+failed (a job, a check, a pairing). Top-bar buttons have labels. One name
+per thing: "computer" for a system, "library folder" for the metadata
+folder, "Covers" for the cover grid.
+
+### 8.7 Saves Syncthing already syncs
+
+A save location inside a folder the Syncthing on this computer syncs (its
+config.xml, paused folders aside) is left to Syncthing: Pythia neither
+serves it to a device nor writes it, so two programs never write the same
+files. Ren'Py keeps one set of saves in two places and merges them itself,
+so Syncthing carrying either makes the whole game Syncthing's. The Saves
+tab says "Synced by Syncthing (folder <label>)". Ren'Py's two places are
+known by the engine's rule, with no Ludusavi manifest (droidtop-agent
+`saves::engines`).

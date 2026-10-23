@@ -14,6 +14,7 @@ link for the game. Add writes only the games kept, as reviewed.
 
 import hashlib
 import re
+import threading
 from collections import Counter
 from pathlib import Path
 
@@ -207,3 +208,57 @@ def add(rows: list[dict]) -> dict:
         folders_added += len(ok_paths)
         logger.info("Added %s (%d folders) from a reviewed scan", row["name"], len(ok_paths))
     return {"status": "ok", "games": added, "folders": folders_added, "failures": failures}
+
+
+class LookSlot:
+    """The one Look the page shows. Only the newest Look started is the
+    page's: a Look started after another replaces it, and the older one's
+    progress and result are then dropped rather than written over the newer
+    one's (Droidtop/tracker#538 retest: a second Look while one ran had the
+    first's progress and result overwrite the page and the stored result)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._state: dict | None = None
+
+    def get(self) -> dict | None:
+        with self._lock:
+            return self._state
+
+    def start(self, job: str, root: str) -> dict:
+        """The Look `job` in `root` is now the page's; returns its state."""
+        state = {"status": "looking", "root": root, "counts": {"folders": 0, "games": 0}, "job": job}
+        with self._lock:
+            self._state = state
+        return dict(state)
+
+    def _current(self, job: str) -> bool:
+        return self._state is not None and self._state.get("job") == job
+
+    def progress(self, job: str, counts: dict) -> dict | None:
+        """The state to show for `job`'s new counts, or None when a newer Look replaced it."""
+        with self._lock:
+            if self._state is None or not self._current(job):
+                return None
+            self._state["counts"] = counts
+            return {"status": "looking", "root": self._state["root"], "counts": counts, "job": job}
+
+    def finish(self, job: str, result: dict) -> bool:
+        """Keeps `job`'s result; False (and nothing kept) when a newer Look replaced it."""
+        with self._lock:
+            if not self._current(job):
+                return False
+            self._state = result
+            return True
+
+    def fail(self, job: str) -> bool:
+        """Clears a Look that failed; False when a newer Look replaced it."""
+        with self._lock:
+            if not self._current(job):
+                return False
+            self._state = None
+            return True
+
+    def clear(self) -> None:
+        with self._lock:
+            self._state = None

@@ -65,6 +65,9 @@ include = ["pythia", "pythia.*"]
 # The Qt UIs' pages and QML, loaded from beside their modules.
 "pythia.ui.desktop" = ["web/*"]
 "pythia.ui.bigpicture" = ["qml/*"]
+# Service mode's secure-screen helper (docs/SPEC.md 1.10), put here by the
+# Windows wheel build; absent elsewhere.
+"pythia" = ["windowcast-secure-helper.exe"]
 
 [[tool.setuptools-rust.ext-modules]]
 # Pythia's droidtop side (native/), one build for every Python from 3.10 on.

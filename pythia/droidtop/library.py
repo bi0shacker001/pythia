@@ -24,6 +24,10 @@ from pythia.util.log import logger
 STORE_KEYS = {"steam": "steam", "gog": "gog", "itch": "itch", "egs": "epic"}
 
 
+# Source kinds that name a store or say nothing, not an engine.
+NOT_ENGINES = {"unknown", "steam", "gog", "egs", "itch", "f95", "amazon", "dlsite"}
+
+
 def title_key(title: str) -> str:
     """The agent's key for a game without a store id: its title in lower case
     with only letters and digits (droidtop-agent core `library::title_key`)."""
@@ -79,15 +83,13 @@ def scanned_games(entries: list[dict], system_uuid: str) -> list[dict]:
         install = {"installed": True, "path": variant["path"], "launcher": "pythia"}
         if version:
             install["version"] = version
-        out.append(
-            {
-                "key": game_key(entry),
-                "title": title,
-                "platform": "pc",
-                "install": install,
-                "base": variant["path"],
-            }
-        )
+        game = {"key": game_key(entry), "title": title, "platform": "pc", "install": install, "base": variant["path"]}
+        # The engine Pythia identified: the agent's save lookup asks the engine's own rule first
+        # (Ren'Py's save folders need no Ludusavi manifest; Droidtop/tracker#538).
+        engine = (variant.get("source") or {}).get("kind")
+        if engine and engine not in NOT_ENGINES:
+            game["engine"] = engine
+        out.append(game)
     return out
 
 

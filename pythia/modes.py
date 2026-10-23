@@ -35,9 +35,10 @@ SYNC_INFO = (
     "Sync with droidtop is droidtop's agent mode: Pythia serves your paired droidtop handhelds as this "
     "computer's droidtop agent, syncing the library, saves and launches with them, and turns the separate "
     "droidtop-agent program off so the two never serve at once. While it is on, manager mode stays on, "
-    "because what syncs is the library manager mode keeps. Turning it off puts droidtop-agent's start at "
-    "sign-in back as it was, with Pythia's state written into its folder; Pythia stops serving when it quits. "
-    "Pythia still reads what droidtop-agent records."
+    "because what syncs is the library manager mode keeps. It starts on only where droidtop-agent is already "
+    "on this computer. Turning it off puts droidtop-agent's start at sign-in back as it was, with Pythia's state "
+    "written into its folder; Pythia stops serving when it quits. While it is off Pythia does not use the network "
+    "for handhelds or touch droidtop-agent's folder."
 )
 
 
@@ -103,3 +104,30 @@ def set_manager_mode(on: bool) -> dict:
         raise ModeLocked(LOCKED_REASON)
     settings.write_setting(MANAGER_SETTING, bool(on))
     return manager_mode()
+
+
+SERVICE_STATES = {
+    "enabled": "On",
+    "disabled": "Off (the helper is installed)",
+    "absent": "Off",
+    "not_available": "Only on Windows",
+}
+
+
+def service_mode() -> dict:
+    """Service mode (docs/SPEC.md 1.10): ``on``, the ``state`` in words
+    (``state_key`` as pythia.secure_screen says it), ``available`` with the
+    ``reason`` when it is not, ``installed`` (the helper is there), and the
+    ``consent`` shown before it is turned on."""
+    from pythia import secure_screen  # noqa: PLC0415
+
+    key = secure_screen.state()
+    return {
+        "on": key == "enabled",
+        "state": SERVICE_STATES.get(key, key),
+        "state_key": key,
+        "available": key != "not_available",
+        "reason": None if key != "not_available" else "Service mode is only on Windows.",
+        "installed": key in ("enabled", "disabled"),
+        "consent": secure_screen.consent(),
+    }

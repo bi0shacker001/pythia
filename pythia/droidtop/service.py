@@ -37,12 +37,12 @@ def start_in_background() -> None:
         from pythia.droidtop import takeover  # noqa: PLC0415
 
         try:
+            if serving().get("state") == "serving":
+                return
             if not takeover.serves():
-                summary = takeover.sync(write_back=False)
                 logger.info(
-                    "Not serving droidtop handhelds: droidtop-agent serves them (turned back on); "
-                    "took in its state: %s",
-                    summary,
+                    "Sync with droidtop is off: Pythia does not listen for handhelds, announce this computer "
+                    "or write droidtop-agent's folder"
                 )
                 return
             taken = takeover.take_over()

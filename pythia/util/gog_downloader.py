@@ -161,9 +161,12 @@ class GOGDownloader(BaseDownloader):
         try:
             with open(self.dest, "r+b") as f:
                 while True:
-                    if self.stop_request and self.stop_request.is_set():
-                        # Drain remaining items on cancel
-                        break
+                    # Chunks already downloaded are written even after a stop
+                    # (a cancel, or another range failing), so the ranges they
+                    # finish are recorded for the resume; the sentinel that
+                    # async_download always sends ends the loop. Stopping at
+                    # stop_request dropped them (Droidtop/tracker#538 retest:
+                    # test_progress_file_records_completed_ranges on Windows).
                     try:
                         item = self._write_queue.get(timeout=0.5)
                     except queue.Empty:

@@ -5,6 +5,7 @@ from __future__ import annotations
 # isort:skip_file
 import enum
 import os
+import shutil
 import sys
 import subprocess
 from collections.abc import Iterable
@@ -285,7 +286,14 @@ def _check_compositor_active(command_set: dict[str, Any]) -> bool:
     was the desired 'active_result'; if that is omitted, we check for
     any result at all."""
     command = command_set["check"]
+    # A check whose program is not installed (pgrep on Windows, a desktop's
+    # own tool elsewhere) finds no compositor, without an error in the log
+    # (Droidtop/tracker#538 retest W3).
+    if shutil.which(command[0]) is None:
+        return False
     result = _get_command_output(command)
+    if result is None:
+        return False
 
     if "active_result" in command_set:
         return bool(result == command_set["active_result"])

@@ -92,6 +92,14 @@ DATABASE: dict[str, DBSchema] = {
         {"name": "game_id", "type": "TEXT", "indexed": False},  # game_id, not an autoincrement int -- see games table
         {"name": "category_id", "type": "INTEGER", "indexed": False},
     ],
+    # The person's favourites (UI round, owner 2026-10-23): one row per record that has said, copied from
+    # datadir like games and variants. The newest "at" across a game's rows is its favourite.
+    "favourites": [
+        {"name": "game_id", "type": "TEXT", "indexed": False},
+        {"name": "system_uuid", "type": "TEXT", "indexed": False},
+        {"name": "favourite", "type": "INTEGER", "indexed": False},
+        {"name": "at", "type": "TEXT", "indexed": False},
+    ],
     "saved_searches": [
         {"name": "id", "type": "INTEGER", "indexed": True},
         {"name": "name", "type": "TEXT", "unique": True},

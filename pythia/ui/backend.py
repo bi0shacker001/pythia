@@ -186,7 +186,9 @@ class Backend(QObject):
         self._decisions: list[dict] = intake_store.load()
         self._error_console = error_console
         self._pad = None
-        self._look: dict | None = None
+        from pythia.look import LookSlot
+
+        self._look = LookSlot()
         self._log_handler = _UiLogHandler(self)
         logger.addHandler(self._log_handler)
         self.refresh_games()
@@ -261,6 +263,16 @@ class Backend(QObject):
                     self._record(level, "agent", event.get("message", ""), event.get("kind"))
                 if any(event.get("kind") in _HANDHELD_EVENT_KINDS for event in new):
                     self.handheldsChanged.emit()
+                # A favourite marked or unmarked on a handheld reaches this computer's records, and so the
+                # other computers sharing the library folder (pythia.favourites).
+                if any(event.get("kind") == "library" for event in new):
+                    try:
+                        from pythia import favourites
+
+                        if favourites.take_from_handhelds():
+                            self.refresh_games()
+                    except Exception as ex:  # noqa: BLE001 -- a background thread: say so, keep following
+                        logger.exception("Taking favourites from the handhelds failed: %s", ex)
 
         threading.Thread(target=run, name="droidtop-events", daemon=True).start()
 
@@ -335,7 +347,18 @@ class Backend(QObject):
     # ---- games list -----------------------------------------------------------
     def refresh_games(self):
         games = datadir.list_known_games()
-        self._games = [{"game_id": gid, "entries": _jsonable(entries)} for gid, entries in sorted(games.items())]
+        from pythia import favourites
+        from pythia.covers import cover_url
+
+        self._games = [
+            {
+                "game_id": gid,
+                "entries": _jsonable(entries),
+                "cover": cover_url(entries),
+                "favourite": favourites.is_favourite(entries),
+            }
+            for gid, entries in sorted(games.items())
+        ]
         self.gamesChanged.emit()
         # While this process serves droidtop handhelds, the library is theirs too.
         from pythia.droidtop import library as droidtop_library
@@ -390,6 +413,9 @@ class Backend(QObject):
     # ---- scan a library (automatic; ambiguous results reviewed afterward) -----
     @Slot(str)
     def start_scan(self, path_str: str):
+        """Scans a folder and records what it finds: the big-picture UI's
+        scan (bigpicture/qml/HomeScreen.qml). The web UI looks first
+        (start_look) and adds what the person keeps."""
         path_str = _normalize_path(path_str)
         job = self._job_start("scan", f"Scan {path_str}", "Finds every game folder inside")
         threading.Thread(target=self._scan_worker, args=(path_str, job), daemon=True).start()
@@ -399,12 +425,11 @@ class Backend(QObject):
     @_guarded
     def start_look(self, path_str: str):
         """Looks through a folder for games without writing anything; its
-        proposals arrive as lookChanged, with live counts while it walks."""
+        proposals arrive as lookChanged, with live counts while it walks. A
+        Look started while another runs replaces it (pythia.look.LookSlot)."""
         path_str = _normalize_path(path_str)
         job = self._job_start("scan", f"Look in {Path(path_str).name or path_str}", "Nothing is added until you Add")
-        with self._lock:
-            self._look = {"status": "looking", "root": path_str, "counts": {"folders": 0, "games": 0}, "job": job}
-        self.lookChanged.emit(_jsonable(self._look))
+        self.lookChanged.emit(_jsonable(self._look.start(job, path_str)))
         threading.Thread(target=self._look_worker, args=(path_str, job), daemon=True).start()
         return {"status": "ok", "job": job}
 
@@ -412,22 +437,21 @@ class Backend(QObject):
         from pythia import look
 
         def progress(counts):
-            with self._lock:
-                if self._look and self._look.get("job") == job:
-                    self._look["counts"] = counts
-            self.lookChanged.emit(_jsonable({"status": "looking", "root": path_str, "counts": counts, "job": job}))
+            shown = self._look.progress(job, counts)
+            if shown is not None:
+                self.lookChanged.emit(_jsonable(shown))
 
         try:
             result = look.look(path_str, progress=progress)
         except OSError as exc:
             self._job_finish(job, f"Could not look in {path_str}: {exc}", ok=False)
-            with self._lock:
-                self._look = None
-            self.lookChanged.emit({"status": "error", "message": str(exc)})
+            if self._look.fail(job):
+                self.lookChanged.emit({"status": "error", "message": str(exc)})
             return
         result["job"] = job
-        with self._lock:
-            self._look = result
+        if not self._look.finish(job, result):
+            self._job_finish(job, "Replaced by a newer Look; nothing was added")
+            return
         self._job_finish(job, result["summary"] + ". Review them, then Add.")
         self.lookChanged.emit(_jsonable(result))
 
@@ -435,8 +459,7 @@ class Backend(QObject):
     @_guarded
     def get_look(self):
         """The current Look: looking (with counts), its proposals, or none."""
-        with self._lock:
-            return _jsonable(self._look or {"status": "none"})
+        return _jsonable(self._look.get() or {"status": "none"})
 
     @Slot("QVariant", result="QVariant")
     @_guarded
@@ -456,8 +479,7 @@ class Backend(QObject):
         for f in result["failures"]:
             self._job_log(job, f"not added: {f['name']} {f['path']}: {f['message']}")
         self.refresh_games()
-        with self._lock:
-            self._look = None
+        self._look.clear()
         text = f"Added {result['games']} game{'s' if result['games'] != 1 else ''} ({result['folders']} folders)"
         if result["failures"]:
             text += f", {len(result['failures'])} not added"
@@ -466,8 +488,7 @@ class Backend(QObject):
 
     @Slot()
     def discard_look(self):
-        with self._lock:
-            self._look = None
+        self._look.clear()
         self.lookChanged.emit({"status": "none"})
 
     @Slot(result="QVariant")
@@ -595,8 +616,14 @@ class Backend(QObject):
         self.onboardComplete.emit(_jsonable(result))
 
     # ---- download watching -----------------------------------------------------
+    @Slot(str, str, str)
+    def start_watch_for(self, plugin_id: str, command_str: str, watch_dir_str: str):
+        """start_watch for one downloader plugin: only that plugin's card and
+        row say Watching (Droidtop/tracker#538 retest D4)."""
+        self.start_watch(command_str, watch_dir_str, plugin_id)
+
     @Slot(str, str)
-    def start_watch(self, command_str: str, watch_dir_str: str):
+    def start_watch(self, command_str: str, watch_dir_str: str, plugin_id: str = ""):
         """Launch `command_str` (a single executable path -- no argument splitting
         yet) and watch `watch_dir_str` for new files, emitting downloadDetected for
         each. See downloads.launch_and_watch; this doesn't move or import anything
@@ -612,7 +639,13 @@ class Backend(QObject):
         self.stop_watch()
         self._watch_stop_event = threading.Event()
         job = self._job_start("watch", f"Watching {watch_dir_str}", f"Running {command_str}" if command_str else "")
-        self._watcher = {"program": command_str, "folder": watch_dir_str, "started_at": _now(), "job": job}
+        self._watcher = {
+            "program": command_str,
+            "folder": watch_dir_str,
+            "plugin": plugin_id or None,
+            "started_at": _now(),
+            "job": job,
+        }
         self._emit_intake()
         threading.Thread(
             target=self._watch_worker, args=(command_str, watch_dir_str, self._watch_stop_event, job), daemon=True
@@ -716,6 +749,18 @@ class Backend(QObject):
             "status": "error",
             "message": "This computer has no record of that game, so notes cannot be saved here.",
         }
+
+    @Slot(str, bool, result="QVariant")
+    @_guarded
+    def set_favourite(self, game_id: str, on: bool):
+        """Marks a game the person's favourite, or not. It is the person's, so it
+        reaches every computer sharing the library and every paired handheld
+        (pythia.favourites); the newest mark wins wherever it was made."""
+        from pythia import favourites
+
+        result = favourites.set_favourite(game_id, on)
+        self.refresh_games()
+        return result
 
     @Slot(str, str, result="QVariant")
     @_guarded
@@ -1006,7 +1051,10 @@ class Backend(QObject):
                     caps = p.capabilities(ctx)
                     item["state"] = {"installed": caps.get("installed"), "tool_version": caps.get("version")}
                 elif category == "downloader":
-                    item["state"] = {"watching": (self._watcher or {}).get("folder"), "platforms": list(p.platforms)}
+                    item["state"] = {
+                        "watching": downloads.downloader_watching(self._watcher, p.id),
+                        "platforms": list(p.platforms),
+                    }
             except NotImplementedError:
                 item["state"] = {"unknown": "This plugin does not report its state."}
             except Exception as exc:  # noqa: BLE001 -- one plugin's failure is that row's state
@@ -1709,14 +1757,16 @@ class Backend(QObject):
     @Slot(result="QVariant")
     @_guarded
     def serve_from_pythia_again(self):
-        """Pythia serves the handhelds again from its next start."""
+        """Sync with droidtop on, which is the person's consent (docs/SPEC.md
+        1.7): Pythia takes droidtop-agent's place and serves now."""
         from pythia import droidtop
 
         if not droidtop.available():
             return self._agent_unavailable("serve_from_pythia_again")
-        from pythia.droidtop import takeover
+        from pythia.droidtop import service, takeover
 
         takeover.serve_from_pythia_again()
+        service.start_in_background()
         self.modesChanged.emit()
         return {"status": "ok"}
 
@@ -1811,6 +1861,129 @@ class Backend(QObject):
         pair.cancel()
         return {"status": "ok"}
 
+    # ---- one code on both screens (docs/SPEC.md 7.1, 7.2) ------------------------
+    @Slot(result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def start_pair_offer(self):
+        """This computer can be picked by a handheld or another computer while
+        the pairing sheet is open; pair_compare_status follows it."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("start_pair_offer")
+        from pythia.droidtop import pair
+
+        return _jsonable({"status": "ok", **pair.offer()})
+
+    @Slot(result="QVariant")
+    @_guarded
+    def pair_compare_status(self):
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("pair_compare_status")
+        from pythia.droidtop import pair
+
+        status = pair.compare_status()
+        if status.get("state") == "paired":
+            self.handheldsChanged.emit()
+        return _jsonable({"status": "ok", **status})
+
+    @Slot(result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def find_computers(self):
+        """Other computers on this network offering to pair (another Pythia
+        with its Devices page open)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("find_computers")
+        from pythia.droidtop import pair
+
+        return _jsonable({"status": "ok", "computers": pair.find()})
+
+    @Slot("QVariant", result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def pick_computer(self, computer):
+        """Starts comparing with a computer find_computers listed: the code."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("pick_computer")
+        from pythia.droidtop import AgentError, pair
+
+        try:
+            return _jsonable({"status": "ok", **pair.pick(dict(computer))})
+        except AgentError as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @Slot(bool, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def confirm_pairing(self, same: bool):
+        """The person's answer to "same code on both screens?"; waits for the
+        other device's."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("confirm_pairing")
+        from pythia.droidtop import AgentError, pair
+
+        try:
+            name = pair.confirm(bool(same))
+        except AgentError as exc:
+            return {"status": "error", "message": str(exc)}
+        self.handheldsChanged.emit()
+        return {"status": "ok", "paired": name}
+
+    @Slot(result="QVariant")
+    @_guarded
+    def stop_pair_offer(self):
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("stop_pair_offer")
+        from pythia.droidtop import pair
+
+        pair.stop()
+        return {"status": "ok"}
+
+    @Slot(result="QVariant")
+    @_guarded
+    def pairing_network_explained(self):
+        """Whether Pythia has said why pairing needs the network (SPEC 7.5)."""
+        from pythia import settings
+
+        return {"status": "ok", "explained": settings.read_bool_setting("pairing_network_explained", False)}
+
+    @Slot(result="QVariant")
+    @_guarded
+    def mark_pairing_network_explained(self):
+        from pythia import settings
+
+        settings.write_setting("pairing_network_explained", True)
+        return {"status": "ok"}
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def device_syncs(self, device_id: str):
+        """What syncs with a paired device (UX review AG6), from the sync model."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("device_syncs")
+        from pythia.droidtop import store, syncs
+
+        device = next((d for d in store.devices() if d.get("id") == device_id), None)
+        if device is None:
+            return {"status": "error", "message": "That device is not paired."}
+        return _jsonable(
+            {"status": "ok", "name": device.get("name"), "rows": syncs.what_syncs(device, store.settings())}
+        )
+
     @Slot(str, result="QVariant")
     @_guarded
     def forget_handheld(self, device_id: str):
@@ -1849,6 +2022,100 @@ class Backend(QObject):
         from pythia.droidtop import store
 
         store.set_launch(device_id, allowed)
+        self.handheldsChanged.emit()
+        return {"status": "ok"}
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def device_offered(self, device_id: str):
+        """What a paired device offers this computer, and its games
+        (droidtop-agent DESIGN section 20)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("device_offered")
+        from pythia.droidtop import remote
+
+        return _jsonable({"status": "ok", **remote.offered(device_id)})
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    def accept_offered_game(self, device_id: str, key: str, title: str):
+        """Copies a game a paired device offers into this computer's first
+        game folder, as a job with its progress."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("accept_offered_game")
+        job = self._job_start("accept", f"Copy {title}", "Reaching the device")
+        threading.Thread(target=self._accept_worker, args=(device_id, key, title, job), daemon=True).start()
+        return {"status": "ok", "job": job}
+
+    def _accept_worker(self, device_id: str, key: str, title: str, job: str):
+        import json
+        import tempfile
+
+        from pythia.droidtop import AgentError, remote
+
+        progress = Path(tempfile.gettempdir()) / f"pythia-accept-{job}.json"
+        done = threading.Event()
+
+        def watch():
+            while not done.wait(1.0):
+                try:
+                    p = json.loads(progress.read_text())
+                except (OSError, ValueError):
+                    continue
+                total = p.get("total") or 0
+                with self._lock:
+                    one = next((j for j in self._jobs if j["id"] == job), None)
+                    if one is not None and total:
+                        one["detail"] = f"{p.get('done', 0) * 100 // total}% of {total // (1024 * 1024)} MiB"
+                self.jobsChanged.emit(_jsonable(self._jobs))
+
+        threading.Thread(target=watch, daemon=True).start()
+        try:
+            accepted = remote.accept(device_id, key, title, progress)
+        except AgentError as exc:
+            self._job_finish(job, f"{title} was not copied: {exc}", ok=False)
+        else:
+            # The copy is a new game folder here: it joins Pythia's library the
+            # way any added folder does, asking only when its game is unsure.
+            self._job_log(job, f"Copied {title} into {accepted.get('folder')}")
+            self._onboard_worker(str(accepted.get("folder")), job)
+        finally:
+            done.set()
+            progress.unlink(missing_ok=True)
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def play_on_device(self, device_id: str, key: str, title: str):
+        """Asks a paired device to start a game there and stream it."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("play_on_device")
+        from pythia.droidtop import remote
+
+        started, said = remote.play_said(remote.play_on(device_id, key, title))
+        return {"status": "ok" if started else "error", "message": said}
+
+    @Slot(str, str, bool, result="QVariant")
+    @_guarded
+    def set_device_offer(self, device_id: str, what: str, on: bool):
+        """What this computer offers a paired device: ``library`` or ``saves``
+        (droidtop-agent docs/DESIGN.md section 20; saves need the library)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("set_device_offer")
+        if what not in ("library", "saves"):
+            return {"status": "error", "message": "Only the library or the saves can be offered."}
+        from pythia.droidtop import store
+
+        store.set_offer(device_id, **{what: on})
         self.handheldsChanged.emit()
         return {"status": "ok"}
 
@@ -2069,7 +2336,27 @@ class Backend(QObject):
             "manager": modes.manager_mode(),
             "agent": modes.agent_mode(),
             "sync": modes.sync_with_droidtop(),
+            "service": modes.service_mode(),
         }
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def set_service_mode(self, action: str):
+        """Service mode (docs/SPEC.md 1.10): ``enable``, ``disable`` or
+        ``uninstall`` windowcast's secure-screen helper. Windows asks for
+        administrator approval; this waits for the person. The page shows the
+        consent before ``enable``."""
+        from pythia import modes, secure_screen
+
+        if action not in ("enable", "disable", "uninstall"):
+            return {"status": "error", "message": f"{action} is not enable, disable or uninstall"}
+        try:
+            done = secure_screen.change(action)
+        except Exception as ex:  # noqa: BLE001 -- the reason is the answer
+            return {"status": "error", "message": str(ex), "service": modes.service_mode()}
+        self.modesChanged.emit()
+        return {"status": "ok", "message": done, "service": modes.service_mode()}
 
     @Slot(bool, result="QVariant")
     @_guarded

@@ -3,7 +3,7 @@
 
 use droidtop_agent_core::cert;
 use droidtop_agent_core::keys::PeerId;
-use droidtop_agent_store::{Settings, Store};
+use droidtop_agent_store::{offer_for, Settings, Store};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde_json::{json, Value};
@@ -18,6 +18,7 @@ pub fn fill(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(unpair, m)?)?;
     m.add_function(wrap_pyfunction!(set_primary, m)?)?;
     m.add_function(wrap_pyfunction!(set_launch, m)?)?;
+    m.add_function(wrap_pyfunction!(set_offer, m)?)?;
     m.add_function(wrap_pyfunction!(library, m)?)?;
     m.add_function(wrap_pyfunction!(set_mark, m)?)?;
     m.add_function(wrap_pyfunction!(announcements, m)?)?;
@@ -71,16 +72,15 @@ fn set_settings(py: Python<'_>, changes: Option<&Bound<'_, PyDict>>) -> PyResult
 /// `name`, `kind` (`handheld`; None for one paired before pairing said),
 /// `paired_ms`, `last_seen_ms`, `last_address`, whether it is still
 /// `trusted`, whether its saves win here (`primary`), whether it may start
-/// games here (`launch`), and what it `announced` per plugin (and when,
-/// `announced_ms`).
+/// games here (`launch`), what this computer offers it (`offered`:
+/// `library`, `saves`; docs/DESIGN.md section 20), and what it `announced`
+/// per plugin (and when, `announced_ms`).
 #[pyfunction]
 fn devices(py: Python<'_>) -> PyResult<PyObject> {
     run(py, || {
         let a = agent()?;
-        let (primary, launch) = {
-            let s = a.store.settings.lock().unwrap();
-            (s.primary_device.clone(), s.launch_devices.clone())
-        };
+        let settings = a.store.settings.lock().unwrap().clone();
+        let (primary, launch) = (settings.primary_device.clone(), settings.launch_devices.clone());
         let devices: Vec<Value> = a
             .store
             .devices_now()
@@ -93,6 +93,7 @@ fn devices(py: Python<'_>) -> PyResult<PyObject> {
                 v["fingerprint"] = json!(PeerId::from_hex(&d.id).ok().map(|p| cert::fingerprint_hex(&p)));
                 v["primary"] = json!(is_primary);
                 v["launch"] = json!(may_launch);
+                v["offered"] = json!(offer_for(&settings, &d));
                 v
             })
             .collect();
@@ -149,6 +150,22 @@ fn set_launch(py: Python<'_>, id: String, allowed: bool) -> PyResult<PyObject> {
     })
 }
 
+/// What this computer offers a paired device (the start of its id is
+/// enough): its library, its saves, or both; a value left out stays as it
+/// is. Saves need the library, so offering saves offers it too and
+/// withdrawing it withdraws them (docs/DESIGN.md section 20).
+#[pyfunction]
+#[pyo3(signature = (id, library = None, saves = None))]
+fn set_offer(py: Python<'_>, id: String, library: Option<bool>, saves: Option<bool>) -> PyResult<PyObject> {
+    run(py, move || {
+        let a = agent()?;
+        let id = one_device(&a.store, &id)?.to_hex();
+        a.store.set_offer(&id, library, saves);
+        a.store.save_settings().map_err(|e| e.to_string())?;
+        Ok(json!(null))
+    })
+}
+
 /// The library every paired device shares, by game key: each game's
 /// installs per device, the person's marks and its versions.
 #[pyfunction]
@@ -166,13 +183,13 @@ fn set_mark(py: Python<'_>, game: String, field: String, value: &Bound<'_, PyAny
 }
 
 /// The paired device whose id starts with [`id`].
-fn one_device(store: &Store, id: &str) -> Result<PeerId, String> {
+pub(crate) fn one_device(store: &Store, id: &str) -> Result<PeerId, String> {
     let id = id.to_lowercase();
     let matches: Vec<String> = store.devices_now().into_iter().filter(|d| d.id.starts_with(&id)).map(|d| d.id).collect();
     match matches.as_slice() {
         [one] => PeerId::from_hex(one).map_err(|e| e.to_string()),
-        [] => Err("No paired handheld has that id.".into()),
-        _ => Err("More than one paired handheld starts with that; give more of the id.".into()),
+        [] => Err("No paired device has that id.".into()),
+        _ => Err("More than one paired device starts with that; give more of the id.".into()),
     }
 }
 

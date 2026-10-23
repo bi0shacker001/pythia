@@ -30,13 +30,110 @@ the droidtop coordinator for this lane. Later sections follow them.
    same as droidtop-agent's own pairing (Droidtop/tracker#556): each device
    has a self-signed certificate over its key, pairing pins the other's
    certificate fingerprint, and every session is mutual TLS 1.3 with those
-   certificates. A computer can also pair with another computer. (Open:
-   droidtop-agent's crates today refuse computer-to-computer pairing,
-   DESIGN.md section 3, "Kinds of device"; the owner's word and the crates
-   disagree, and the crates are not changed until that is settled.)
+   certificates. A computer can also pair with another computer (owner,
+   2026-10-16: "Computer to computer pairing is ABSOLUTELY a pythia
+   feature, it's the whole fucking reason it exists"). droidtop-agent's
+   DESIGN.md section 3 records it, and its crates pin a computer as they
+   pin a handheld (droidtop-agent 377b92d, which Pythia's native module
+   is built from).
 6. **One entry per game across stores.** A game owned on several stores is
    one library entry with several store ids (Droidtop/tracker#133, droidtop
    SPEC 7m), not one entry per store.
+   - Which records are one game follows droidtop SPEC 7m, "What merges,
+     and what only suggests": names equal once case and punctuation are
+     dropped (droidtop's `GameNaming.nameKey`), or part folders side by
+     side, are one game. Names at least 0.6 alike only suggest, one pair
+     at a time. Review's Possible duplicates groups the first kind and
+     lists each alike pair on its own, so a common word never chains
+     unrelated games together (Droidtop/tracker#538, retest B2).
+7. **Sync with droidtop starts on only where droidtop is in use.** Owner,
+   2026-10-16, on the Windows retest's B3 (Droidtop/tracker#538): "Pythia
+   isn't necessarily used with droidtop. It's a game library manager, I
+   just happen to be taking advantage of it already knowing the library to
+   make it a more convenient agent for droidtop". The owner also called
+   serving at once "appropriate behavior for a production install" for a
+   droidtop user. So:
+   - On a new profile the switch starts on when droidtop-agent is already
+     on this computer (it has its files, runs, or starts at sign-in), and
+     Pythia then serves at first start: it listens on TCP and UDP 47610,
+     answers discovery, announces this computer to the relay, and writes
+     droidtop-agent's folder, because it is the agent. Otherwise the
+     switch starts off. That first answer is kept as the setting.
+   - While it is off Pythia does not listen on the network for handhelds,
+     look for or answer them, announce this computer, or write
+     droidtop-agent's folder or its start at sign-in.
+   - Turning it on says first, in plain words, what follows: the ports,
+     the announcement to a public discovery server, and that
+     droidtop-agent is turned off while Pythia serves. Serving starts at
+     once.
+   - Turning it off writes Pythia's state back into droidtop-agent's
+     folder and puts the agent's start at sign-in back only when Pythia
+     had taken the agent's place.
+   - Every folder Pythia's native module uses comes from Pythia's own
+     data folder or the system's folders as this process sees them, so a
+     profile moved with PYTHIA_DATA_DIR, APPDATA and LOCALAPPDATA is never
+     written outside.
+   - Pairing a handheld from Pythia's Devices page is the person's own
+     action, so it listens for that pairing only, while the page shows it.
+
+8. **Taking the agent role loses nothing the agent had.** Owner,
+   2026-10-16: "pythia imports the droidtop agent context when it takes
+   the agent role, too, so data shouldn't be lost". Before Pythia serves,
+   it takes in droidtop-agent's state, reading the agent's folder and
+   writing only its own:
+   - The identity and device certificate, and the trusted devices: shared
+     in windowcast's host folder. An older agent's own identity
+     (identity.key, trusted-devices) is taken before Pythia's state is
+     opened, so it becomes this computer's rather than a new one.
+   - The paired devices, settings (with the plugin adapters' approvals),
+     saves choices, manager games, launcher marks and plugin adapter
+     offers. The first time, every one the agent has comes in whatever
+     its age, and the paired devices are merged with any Pythia has.
+     After that the newer copy wins.
+   - The library: both change logs merged, so nothing is lost.
+   - Save copies and the plugin adapters: any file Pythia lacks is
+     copied; none is replaced or deleted.
+
+9. **Syncthing rides the existing device pairing.** Owner, 2026-10-16:
+   "We control an existing one if it exists, or spawn our own if one
+   doesn't. We use the standard syncthing config location regardless, to
+   make sure the user can switch to or from a dedicated instance if they
+   want". droidtop's Syncthing plugin (`droidtop.syncthing`,
+   Droidtop/tracker#553) accepts exactly the Syncthing IDs its paired
+   counterparts announce, and names Pythia as one. While Pythia serves, the
+   service it runs from droidtop-agent's crates (droidtop-agent DESIGN.md
+   section 18) does this: it uses the Syncthing answering in Syncthing's
+   standard folder or starts one there, announces its device ID and LAN
+   addresses as `droidtop.syncthing`, and adds each paired device's
+   announced ID to it (removing only the ones it added once a device is
+   forgotten). There is no Syncthing pairing step for the person. The
+   agent's `syncthing` setting turns it off.
+
+10. **Service mode is asked for, never assumed.** Owner, on
+    windowcast#467: "We won't just run code as SYSTEM without user
+    approval, we'll ask, and let them enable/disable in settings at their
+    own leisure." Service mode lets a paired device see and answer this
+    computer's Windows security screens (UAC prompts, the lock and sign-in
+    screen) through windowcast's secure-screen helper, which runs as SYSTEM.
+    - It is off on every install. Settings > General > Modes has its switch
+      (disabled, with "Service mode is only on Windows.", elsewhere) and an
+      Info row with what it does.
+    - Turning it on first says in plain words what follows (droidtop-agent's
+      `secure_screen::CONSENT`): the helper is installed in Program Files and
+      runs as SYSTEM; it only shows the security screen, types and clicks on
+      it, and says whether one is open; it answers only installed programs
+      running under the person's own account; and Windows asks for
+      administrator approval to turn it on and again to turn it off.
+    - Each change asks Windows for administrator approval: Pythia runs
+      `python -I -m pythia.secure_screen <action> --confirmed` elevated,
+      which changes only that, through windowcast's client API, and never
+      reads Pythia's settings or data. Declining changes nothing and says
+      so.
+    - Turning it off keeps the helper installed and inert; "Remove the
+      helper" uninstalls it.
+    - Pythia's Windows wheel carries windowcast's helper at the windowcast
+      it pins (`pythia/windowcast-secure-helper.exe`). droidtop-agent does
+      the same (its DESIGN.md section 19).
 
 ## 2. The pad model (handheld shell)
 
@@ -60,12 +157,18 @@ It crosses to another zone only at the zone's edge:
 
 - Left from the content's or the strip's left edge reaches the rail.
 - Right from the rail reaches the content.
-- Up from the content's top reaches the strip.
-- Down from the strip reaches the content.
+- Up from the content's top reaches the strip item nearest above it: the
+  page's own toolbar before the top bar.
+- Down from the strip reaches the content item nearest below it.
+
+"Nearest" is measured edge to edge, not centre to centre, so a narrow
+choice under a full-width button is below it (Droidtop/tracker#538, retest
+B1: Down from "‹ Settings" skipped every choice on Settings > Interface).
 
 Each zone remembers its place on each page, by item: a game, a settings
-link or a button's own id. Coming back to a page, or to a zone, lands on the
-item you left. Returning from a game to the library lands on that game's
+link or a button's own id. Coming back to a page, or crossing to a zone
+with Left or Right, lands on the item you left; Up and Down cross to the
+nearest item, as above. Returning from a game to the library lands on that game's
 row. When the page is redrawn underneath you, focus stays on the same item.
 
 Entering the shell focuses the first content item, not the rail.
@@ -156,9 +259,9 @@ opens. In order:
    controller is the only input), so the person confirms it rather than
    picks it.
 2. **"Do you use droidtop on a handheld?"** Yes leads to pairing (section
-   7); No and Not now go on. This step is shown only once pairing is built
-   (UX review C1). Until then it is left out, and the step count does not
-   include it.
+   7); No and Not now go on. Pairing is built (UX review C1, 7.7), so the
+   step belongs in the first run; it appears when the first run itself is
+   built (UX review B23).
 3. **Add folders.** Folders and their roles (section 5). Adding a Library
    folder runs Look (A16): nothing is written until the person adds what
    was found.
@@ -316,3 +419,62 @@ listening program and has not been verified on a test machine.
 
 No step needs a camera. The QR code droidtop shows of its invitation is an
 extra for a computer that has one, never the only way.
+
+### 7.7 Where it lives (UX review C1)
+
+Devices (Systems & sync > Paired devices, and the handheld shell's Systems
+page) has "Pair a device" as its main action, with "Show a code" and "Type
+a handheld's code" (7.3) beside it.
+
+- Pair a device first says why the network is needed (7.5, once), then
+  offers this computer (7.1) for as long as the panel is open: "Waiting for
+  a handheld or computer…" with the time left, then the 7.4 state.
+- **Another computer** (1.5): "Pair with another computer" looks for
+  computers offering to pair on this network (another Pythia's Pair a
+  device, or `droidtop-agent pair compare`) and lists them as "Pythia on
+  <name>". Picking one shows the code at once (7.2); the other computer
+  shows it too. Each pins the other as a computer.
+- Both screens show the code in large type with "Same code" and "They
+  don't match". The answer waits for the other device's; either "They
+  don't match" pairs nothing and says so on both.
+- The list shows each paired device with its kind (Handheld or Computer)
+  and what this computer offers it (droidtop-agent docs/DESIGN.md section
+  20): "Library" (it may see this computer's games and copy one when asked
+  there), "Saves" (needs the library) and "Start games". A handheld starts
+  with Library and Saves, a computer with nothing. "Saves win" applies to
+  handhelds only.
+
+- **While Sync with droidtop is off** (UI review 2026-10-23, U6), Devices
+  says once that a device can be paired now but syncs only once it is on,
+  with the switch beside it, and shows no serving line or addresses.
+  "No device is paired" names the path that works with droidtop today: its
+  Pair a computer shows a code, typed here with "Type a handheld's code";
+  "Pair a device" is for another computer running Pythia, until droidtop
+  finds computers itself.
+- **Settings shows what can be set** (U4): a section whose slot answers
+  "not built yet", or a plugin kind with no plugin installed, is hidden, and
+  so is a page left with nothing; each comes back on its own once it has
+  something.
+- **What a device offers this computer** (droidtop-agent DESIGN section 20):
+  each paired device's "Games" opens "On <device>", what it offers this
+  computer (its library, its saves, or nothing, with where it can offer
+  more) and the games installed there. "Copy here" copies one into this
+  computer's first game folder as a new folder (never over one that is
+  there), as a job on the Activity page, then adds it to the library the
+  way an added folder is. "Play there" asks that device to start it and
+  stream only its windows here; the device's own "Start games" switch
+  decides, and a refusal says so and where to allow it.
+
+### 7.8 What syncs (UX review AG6)
+
+Each paired device has "What syncs": one row per kind of thing, whether it
+syncs with that device and why, generated from the sync model as it is
+(`pythia.droidtop.syncs`), never a fixed text.
+
+- Every device: the library and saves as this computer offers them (who
+  wins when both changed), starting games here (only when allowed), and
+  Syncthing folders (when it offered its Syncthing, 1.9).
+- A handheld: plugin data (the plugins approved). A computer: plugin data
+  never syncs between two computers.
+- Every device: game files never sync on their own. A device offered the
+  library copies one game's folder only when the person asks for it there.

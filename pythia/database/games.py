@@ -192,6 +192,16 @@ def _upsert_cache_from_entry(entry: dict[str, Any]) -> None:
                 json.dumps(entry.get("available_updates") or []),
             ),
         )
+        sql.cursor_execute(
+            cursor, "DELETE FROM favourites WHERE game_id = ? AND system_uuid = ?", (game_id, system_uuid)
+        )
+        favourite = entry.get("favourite")
+        if isinstance(favourite, dict) and favourite.get("at"):
+            sql.cursor_execute(
+                cursor,
+                "INSERT INTO favourites (game_id, system_uuid, favourite, at) VALUES (?, ?, ?, ?)",
+                (game_id, system_uuid, 1 if favourite.get("on") else 0, favourite["at"]),
+            )
         sql.cursor_execute(cursor, "DELETE FROM variants WHERE game_id = ?", (game_id,))
         for variant in _iter_variants(entry):
             sql.cursor_execute(
@@ -252,6 +262,7 @@ def rebuild_cache() -> None:
     with sql.db_cursor(settings.DB_PATH) as cursor:
         sql.cursor_execute(cursor, "DELETE FROM games")
         sql.cursor_execute(cursor, "DELETE FROM variants")
+        sql.cursor_execute(cursor, "DELETE FROM favourites")
     for entry in datadir.list_all_entries():
         _upsert_cache_from_entry(entry)
 
@@ -384,6 +395,19 @@ def get_games_where(**conditions: Any) -> list[DbGameDict]:
     for field, limit in below.items():
         games = [g for g in games if g.get(field) is not None and g[field] < limit]
     return games
+
+
+def get_favourite_game_ids() -> set[str]:
+    """The games the person marked a favourite: for each game, the newest
+    of its records' marks (any computer's) decides (pythia.favourites)."""
+    from pythia import settings
+
+    rows = sql.db_query(
+        settings.DB_PATH,
+        "SELECT game_id, favourite FROM favourites f WHERE at = "
+        "(SELECT MAX(at) FROM favourites g WHERE g.game_id = f.game_id)",
+    )
+    return {row["game_id"] for row in rows if row["favourite"]}
 
 
 def get_games_by_ids(game_ids: Iterable[str]) -> list[DbGameDict]:

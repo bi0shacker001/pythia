@@ -53,3 +53,17 @@ def submodule(name: str) -> ModuleType:
         _module.use_folder(path=FOLDER)
         _folder_named = True
     return getattr(_module, name)
+
+
+def plain_path(path):
+    """A Windows path as people write it: without the extended-length
+    prefix (``\\\\?\\G:\\games`` is ``G:\\games``; ``\\\\?\\UNC\\server\\share`` is
+    ``\\\\server\\share``) that the native side's canonical paths carry
+    (Droidtop/tracker#538 retest S1, S2). Anything else is returned as it is."""
+    if not isinstance(path, str):
+        return path
+    if path.startswith("\\\\?\\UNC\\"):
+        return "\\\\" + path[8:]
+    if path.startswith("\\\\?\\"):
+        return path[4:]
+    return path

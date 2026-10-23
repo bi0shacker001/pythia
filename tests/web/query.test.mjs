@@ -16,7 +16,7 @@ const novel = {
 };
 const quest = {
   name: 'Zeta Quest', source: 'F95zone', engine: 'RPG Maker', version: '0.9', installed: false,
-  updates: [{ version: '1.0' }], knownOn: [{ platform: 'f95', id: '123' }], versions: [],
+  updates: [{ version: '1.0' }], knownOn: [{ platform: 'f95', id: '123' }], versions: [], favourite: true,
 };
 const find = (text) => [novel, quest].filter((g) => Q.matches(g, Q.parse(text))).map((g) => g.name);
 
@@ -46,6 +46,8 @@ test('filters', () => {
   assert.deepEqual(find('source:"local folder"'), ['UX Test Novel']);
   assert.deepEqual(find('engine:renpy'), ['UX Test Novel']);
   assert.deepEqual(find('installed'), ['UX Test Novel']);
+  assert.deepEqual(find('favourite'), ['Zeta Quest']);
+  assert.deepEqual(find('favorite'), ['Zeta Quest']);
   assert.deepEqual(find('has:update'), ['Zeta Quest']);
   assert.deepEqual(find('has:nolink'), ['UX Test Novel']);
   assert.deepEqual(find('kind:translation'), ['UX Test Novel']);

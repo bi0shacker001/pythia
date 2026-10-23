@@ -106,10 +106,12 @@ function adaptGame(real) {
   const added = variants.map((v) => v.detected_at).filter(Boolean).sort()[0] || null;
   const pendingDecision = model.intake.decisions.some((d) => variants.some((v) => v.path === d.path));
   let status = 'ok', statusText = 'No action required';
-  if (installed && unknown && !engineKind) { status = 'critical'; statusText = 'Not identified'; }
+  if (installed && unknown && !engineKind) { status = 'neutral'; statusText = 'Not identified'; }
   if (updates.length) { status = 'pending'; statusText = 'Update available'; }
   if (pendingDecision) { status = 'pending'; statusText = 'Needs a decision'; }
   const platforms = [...new Set(variants.flatMap((v) => v.platforms || []))];
+  const lastPlayed = Math.max(0, ...variants.map((v) => Number(v.lastplayed) || 0)) * 1000;
+  const playtime = variants.reduce((n, v) => n + (parseFloat(v.playtime) || 0), 0);
   const systemIds = [...new Set(entries.map((e) => e.system_uuid))];
   return {
     id: real.game_id, name, own, entries, variants,
@@ -122,6 +124,7 @@ function adaptGame(real) {
     status, statusText, installed, ownedOn, knownOn, updates, added, platforms, unidentified: !!(installed && unknown && !engineKind),
     updated: own.updated_at ? Date.parse(own.updated_at) || 0 : 0,
     art: ART_CLASSES[strHash(real.game_id) % ART_CLASSES.length],
+    cover: real.cover || '', lastPlayed, playtime, favourite: !!real.favourite,
     systems: systemIds.map(systemName), systemIds,
     path: variants.find((v) => v.path)?.path || '',
     note: own.notes || '',
@@ -142,7 +145,12 @@ function adaptPlugin(real) {
   };
 }
 
-let state = { view: 'library', history: [], selected: null, filterStatus: 'all', density: localStorage.getItem('pythia-density') || 'comfortable', libraryMode: localStorage.getItem('pythia-desktop-library') || 'list', search: '', source: 'all', engine: 'all', sort: 'name', bulk: new Set(), selectionMode: false, shell: 'desktop', hhPage: 'home', hhHistory: [], hhLibraryMode: localStorage.getItem('pythia-handheld-library') || 'list', hhSearch: '', hhSelected: null, hhSource: 'all', hhSettingsPage: 'root', hhReviewSection: '', detailTab: 'overview', settingsPane: 'general', libraryPlace: { search: '', scroll: 0 } };
+let state = { view: 'library', history: [], selected: null, filterStatus: 'all', density: localStorage.getItem('pythia-density') || 'comfortable', libraryMode: localStorage.getItem('pythia-desktop-library') || 'list', search: '', source: 'all', engine: 'all', sort: 'name', bulk: new Set(), selectionMode: false, shell: 'desktop', hhPage: 'home', hhHistory: [], hhLibraryMode: localStorage.getItem('pythia-handheld-library') || 'list', hhSearch: '', hhSelected: null, hhSource: 'all', hhSettingsPage: 'root', hhReviewSection: '', detailTab: 'overview', settingsPane: 'general', pluginKind: '', libraryShelf: localStorage.getItem('pythia-library-shelf') || 'overview', libraryPlace: { search: '', scroll: 0 } };
+// A game's art: its cover when this computer has one (pythia/covers.py), else the drawn art and its initials.
+const artAttrs = (g, cls) => `class="${cls} art-${g.art}${g.cover ? ' has-cover' : ''}"${g.cover ? ` style="background-image:url('${esc(g.cover.replace(/'/g, '%27'))}')"` : ''}`;
+const artLetters = (g) => (g.cover ? '' : esc(initials(g.name)));
+const playedText = (g) => (g.lastPlayed ? `Played ${fmt.ago(new Date(g.lastPlayed).toISOString())}` : '');
+const playtimeText = (g) => (g.playtime >= 1 ? `${Math.round(g.playtime)} h played` : g.playtime > 0 ? `${Math.max(1, Math.round(g.playtime * 60))} min played` : '');
 const initials = (n) => String(n).split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase();
 // List-level version-count affordance -- only worth a mention when there's more than one.
 // Parts (Part1, Week 2: droidtop's segments, UX review A16) are counted apart from versions.
@@ -183,11 +191,14 @@ function bindStoreLinks(g, host) {
 const versionText = (g) => g.current || (g.parts.length && !g.latest ? partsText(g) : null) || (g.orderKnown ? g.latest || 'no version' : 'order unknown, set Current');
 const routineStatus = (label, kind = 'ok', symbol = '✓') => `<span class="status-icon ${kind}" role="img" aria-label="${esc(label)}" title="${esc(label)}">${symbol}</span>`;
 const visibleStatus = (label, kind = 'pending', symbol = '!') => `<span class="status-inline ${kind}"><span class="status-icon ${kind}" aria-hidden="true">${symbol}</span>${esc(label)}</span>`;
-const gameStatus = (g) => (g.status === 'ok' ? routineStatus(g.statusText || 'No action required') : visibleStatus(g.statusText, g.status, g.status === 'critical' ? '!' : '↻'));
+const gameStatus = (g) => (g.status === 'ok' ? routineStatus(g.statusText || 'No action required') : visibleStatus(g.statusText, g.status, g.unidentified ? '?' : '↻'));
 const fileName = (p) => String(p || '').split(/[\\/]/).pop();
 
 // ---- Navigation ----------------------------------------------------------------------
+// Old page names (menus, links from other pages) lead to where that page went in the UI round.
+const MOVED_VIEWS = { systems: 'shared', launcher: 'sources' };
 function navigate(view, push = true) {
+  view = MOVED_VIEWS[view] || view;
   if (view === state.view) { renderCurrent(); return; }
   if (state.view === 'library') saveLibraryPlace();
   if (push) state.history.push(state.view);
@@ -195,7 +206,7 @@ function navigate(view, push = true) {
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
   $$('.nav-row[data-nav]').forEach((n) => n.classList.toggle('active', n.dataset.nav === view));
   $('#backButton').disabled = !state.history.length;
-  const titles = { look: 'Search…', library: 'Search games, engines, versions, paths…', downloads: 'Search…', reconcile: 'Search possible duplicates…', systems: 'Search systems…', launcher: 'Search launcher entries…', saves: 'Search save backups…', activity: 'Search jobs and events…', settings: 'Search settings…' };
+  const titles = { look: 'Search…', library: 'Search games, engines, versions, paths…', downloads: 'Search…', reconcile: 'Search possible duplicates…', devices: 'Search devices…', sources: 'Search launchers and stores…', shared: 'Search computers…', saves: 'Search save backups…', activity: 'Search jobs and events…', settings: 'Search settings…' };
   $('#globalSearch').placeholder = titles[view] || 'Search…';
   // The library keeps its place (query, selection, scroll, collection) across navigation (UX review A11).
   state.search = view === 'library' ? state.libraryPlace.search : '';
@@ -205,24 +216,62 @@ function navigate(view, push = true) {
   if (view === 'library') restoreLibraryPlace();
 }
 function renderCurrent() {
-  ({ look: () => renderLook(), library: renderLibrary, downloads: renderDownloads, reconcile: renderReconcile, systems: renderSystems, launcher: renderLauncher, saves: renderSaves, activity: renderJobs, settings: renderSettings })[state.view]?.();
+  ({ look: () => renderLook(), library: renderLibrary, downloads: renderDownloads, reconcile: renderReconcile, devices: renderDevices, sources: renderSources, shared: renderShared, saves: renderSaves, activity: renderJobs, settings: renderSettings })[state.view]?.();
 }
 function filteredGames() {
   const q = PythiaQuery.parse(state.search);
   const list = games.filter((g) => {
     const matches = PythiaQuery.matches(g, q);
-    return matches && (state.filterStatus === 'all' || (state.filterStatus === 'pending' ? g.status !== 'ok' : g.status === state.filterStatus)) && (state.source === 'all' || g.source === state.source) && (state.engine === 'all' || g.engine === state.engine);
+    const shelf = state.libraryShelf === 'favourites' ? g.favourite : state.libraryShelf === 'installed' ? g.installed : state.libraryShelf === 'attention' ? g.status !== 'ok' : true;
+    return matches && shelf && (state.filterStatus === 'all' || (state.filterStatus === 'pending' ? g.status !== 'ok' : g.status === state.filterStatus)) && (state.source === 'all' || g.source === state.source) && (state.engine === 'all' || g.engine === state.engine);
   });
-  const rank = { critical: 0, pending: 1, ok: 2 };
-  list.sort((a, b) => (state.sort === 'status' ? (rank[a.status] - rank[b.status]) || a.name.localeCompare(b.name) : state.sort === 'updated' ? b.updated - a.updated : a.name.localeCompare(b.name)));
+  const rank = { critical: 0, pending: 1, neutral: 2, ok: 3 };
+  list.sort((a, b) => (state.sort === 'status' ? (rank[a.status] - rank[b.status]) || a.name.localeCompare(b.name) : state.sort === 'updated' ? b.updated - a.updated : state.sort === 'played' ? (b.lastPlayed - a.lastPlayed) || a.name.localeCompare(b.name) : state.sort === 'added' ? String(b.added || '').localeCompare(String(a.added || '')) : a.name.localeCompare(b.name)));
   return list;
 }
 
 // ---- Library -------------------------------------------------------------------------
+// Shelves (droidtop SPEC 7i, UI round): a row each for what is worth picking up, from what Pythia knows.
+const SHELVES = [
+  { id: 'played', title: 'Continue playing', pick: (all) => all.filter((g) => g.lastPlayed).sort((a, b) => b.lastPlayed - a.lastPlayed) },
+  { id: 'favourites', title: 'Favourites', pick: (all) => all.filter((g) => g.favourite).sort((a, b) => a.name.localeCompare(b.name)), view: 'favourites' },
+  { id: 'added', title: 'Recently added', pick: (all) => all.filter((g) => g.added).sort((a, b) => String(b.added).localeCompare(String(a.added))) },
+  { id: 'updates', title: 'Update available', pick: (all) => all.filter((g) => g.updates.length) },
+  { id: 'attention', title: 'Needs attention', pick: (all) => all.filter((g) => g.status !== 'ok' && !g.updates.length), view: 'attention' },
+  { id: 'installed', title: 'Installed', pick: (all) => all.filter((g) => g.installed).sort((a, b) => a.name.localeCompare(b.name)), view: 'installed' },
+];
+const SHELF_MAX = 12;
+function capsuleHtml(g) {
+  return `<button class="capsule" data-capsule="${g.id}" title="${esc(g.name)}"><span ${artAttrs(g, 'capsule-art')}>${artLetters(g)}${g.favourite ? '<span class="capsule-star" aria-label="Favourite">★</span>' : ''}${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" aria-label="${esc(g.statusText)}"></span>` : ''}</span><span class="capsule-plate"><strong>${esc(g.name)}</strong><small>${esc(playedText(g) || versionText(g))}</small></span></button>`;
+}
+function renderShelves() {
+  const host = $('#libraryShelves');
+  const q = PythiaQuery.parse(state.search);
+  const all = games.filter((g) => PythiaQuery.matches(g, q));
+  host.innerHTML = '';
+  SHELVES.forEach((sh) => {
+    const list = sh.pick(all);
+    if (!list.length) return;
+    const more = list.length > SHELF_MAX ? `<button class="btn small ghost" data-shelf-more="${sh.view || 'all'}" data-shelf-sort="${sh.id}">All ${list.length} ›</button>` : '';
+    host.appendChild(el(`<section class="shelf" aria-label="${esc(sh.title)}"><div class="shelf-head"><h2>${esc(sh.title)}</h2><small>${list.length}</small><span class="spacer"></span>${more}</div><div class="shelf-row">${list.slice(0, SHELF_MAX).map(capsuleHtml).join('')}</div></section>`));
+  });
+  if (!host.children.length) host.appendChild(stateBlock({ title: 'Nothing matches', body: 'Try another search.' }));
+  $$('[data-capsule]', host).forEach((b) => (b.onclick = () => openGame(b.dataset.capsule)));
+  $$('[data-shelf-more]', host).forEach((b) => (b.onclick = () => { const sort = { played: 'played', added: 'added' }[b.dataset.shelfSort]; if (sort) { state.sort = sort; $('#sortSelect').value = sort; } setLibraryShelf(b.dataset.shelfMore); }));
+}
+function setLibraryShelf(shelf) { state.libraryShelf = shelf; try { localStorage.setItem('pythia-library-shelf', shelf); } catch {} renderLibrary(); }
+// A capsule opens its game: the list, with the game picked and its page beside it.
+function openGame(id) { state.selected = id; state.detailTab = 'overview'; if (state.libraryShelf === 'overview') state.libraryShelf = 'all'; renderLibrary(); $(`#gameList [data-game="${id}"]`)?.scrollIntoView({ block: 'nearest' }); }
 function renderLibrary() {
+  const overview = state.libraryShelf === 'overview' && games.length > 0;
+  $$('[data-library-shelf]').forEach((b) => { b.classList.toggle('active', b.dataset.libraryShelf === state.libraryShelf); b.setAttribute('aria-selected', String(b.dataset.libraryShelf === state.libraryShelf)); });
+  $('#libraryShelves').classList.toggle('hidden', !overview);
+  $('#libraryLayout').classList.toggle('hidden', overview);
+  if (overview && model.ready) { $('#librarySummary').textContent = `${fmt.n(games.length, 'game')} · ${games.filter((g) => g.installed).length} installed here`; $('#libraryNotice').innerHTML = ''; renderShelves(); return; }
   const list = filteredGames();
+
   const nSystems = new Set(games.flatMap((g) => g.systemIds)).size || 1;
-  $('#librarySummary').textContent = model.ready ? `${list.length} of ${games.length} shown · ${fmt.n(nSystems, 'system')}` : '';
+  $('#librarySummary').textContent = model.ready ? `${list.length} of ${games.length} shown${nSystems > 1 ? ` · ${fmt.n(nSystems, 'computer')}` : ''}` : '';
   const noticeHost = $('#libraryNotice'); noticeHost.innerHTML = '';
   if (!model.ready) noticeHost.appendChild(stateBlock({ kind: 'loading' }));
   if (!list.some((g) => g.id === state.selected) && list[0]) state.selected = list[0].id;
@@ -244,10 +293,10 @@ const VIRTUAL_MIN = 150;
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 function gameItemHtml(g) {
   if (state.libraryMode === 'grid') return `<article class="game-card ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0" aria-label="${esc(g.name)}">
-      <div class="game-card-art art-${g.art}"><label class="bulk-hit" style="position:absolute;z-index:3;right:0;bottom:0;width:48px;height:48px;align-items:center;justify-content:center;cursor:pointer"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}" style="width:22px;height:22px;margin:0"></label><span class="game-card-source">${esc(g.source)}</span>${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" title="${esc(g.statusText)}"></span>` : ''}<strong>${esc(g.name)}</strong></div>
+      <div ${artAttrs(g, 'game-card-art')}><label class="bulk-hit" style="position:absolute;z-index:3;right:0;bottom:0;width:48px;height:48px;align-items:center;justify-content:center;cursor:pointer"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}" style="width:22px;height:22px;margin:0"></label><span class="game-card-source">${esc(g.source)}</span>${g.status !== 'ok' ? `<span class="game-card-attention ${g.status}" title="${esc(g.statusText)}"></span>` : ''}<strong>${esc(g.name)}</strong></div>
       <div class="game-card-copy"><div class="game-card-meta">${esc(g.engine)} · ${esc(versionText(g))}${versionsBadge(g)}</div>${g.status !== 'ok' ? `<div class="game-card-state ${g.status}">${esc(g.statusText)}</div>` : ''}</div>
     </article>`;
-  return `<article class="game-row ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}"><div class="cover-mini art-${g.art}">${esc(initials(g.name))}</div><div><h3>${esc(g.name)}</h3><div class="game-meta"><span>${esc(g.source)}</span><span>·</span><span>${esc(g.engine)}</span><span>·</span><span>${esc(versionText(g))}${versionsBadge(g)}</span></div></div><div class="status-text ${g.status}">${g.status === 'ok' ? '' : esc(g.statusText)}</div></article>`;
+  return `<article class="game-row ${g.id === state.selected ? 'active' : ''}" data-game="${g.id}" tabindex="0"><input type="checkbox" class="bulk-check" data-bulk-check="${g.id}" ${state.bulk.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}"><div ${artAttrs(g, 'cover-mini')}>${artLetters(g)}</div><div><h3>${esc(g.name)}</h3><div class="game-meta"><span>${esc(g.source)}</span><span>·</span><span>${esc(g.engine)}</span><span>·</span><span>${esc(versionText(g))}${versionsBadge(g)}</span>${g.lastPlayed ? `<span>·</span><span>${esc(playedText(g))}</span>` : ''}</div></div><div class="status-text ${g.status}">${g.status === 'ok' ? '' : esc(g.statusText)}</div></article>`;
 }
 function drawGameList(host, list) {
   host._list = list;
@@ -379,15 +428,31 @@ async function bulkAction(a) {
 }
 
 // One section list per game, for both shells (UX review A12): desktop tabs, one handheld scroll with LB/RB.
-const GAME_SECTIONS = [
-  { id: 'overview', title: 'Overview', html: (g, updates) => `<div class="stats-grid"><div class="stat"><div class="label">Latest installed</div><div class="value">${esc(g.orderKnown ? g.latest || 'No version number' : 'Order unknown, set Current')}</div>${!g.orderKnown ? `<div class="sub">${esc(g.versions.map((v) => v.label || 'no label').join(' · '))}</div>` : g.current ? `<div class="sub">Current: ${esc(g.current)}</div>` : ''}</div><div class="stat"><div class="label">Systems</div><div class="value">${g.systems.length}</div><div class="sub">${esc(g.systems.join(' · '))}</div></div><div class="stat"><div class="label">Status</div><div class="value" style="text-align:left;font-size:0.875rem">${gameStatus(g)}</div>${g.added ? `<div class="sub">Added ${esc(fmt.date(g.added))}</div>` : ''}</div></div><div class="kv"><div class="key">Canonical name</div><div class="value">${esc(g.name)} ${g.mine ? '<button class="row-action" style="float:right" data-detail-action="rename" aria-label="Rename">✎</button>' : ''}</div><div class="key">Game ID</div><div class="value mono">${esc(g.id)}</div><div class="key">Source</div><div class="value">${esc(g.source)}</div><div class="key">Engine</div><div class="value">${esc(g.engine)}</div><div class="key">Platforms</div><div class="value">${esc(g.platforms.map(platformName).join(' · ') || '—')}</div><div class="key">Primary path</div><div class="value mono">${esc(g.path || '—')}</div><div class="key">Store page</div><div class="value">${storeLinksHtml(g, '', g.knownOn)}</div>${g.ownedOn.length ? `<div class="key">Owned on</div><div class="value">${esc(g.ownedOn.map((k) => kindName(k) || k).join(' · '))}</div>` : ''}</div>`, bind: (g, pane) => bindStoreLinks(g, pane) },
+const GAME_PARTS = [
+  { id: 'facts', title: 'Record', html: (g) => `<div class="kv"><div class="key">Name</div><div class="value">${esc(g.name)} ${g.mine ? '<button class="row-action" style="float:right" data-detail-action="rename" aria-label="Rename">✎</button>' : ''}</div><div class="key">Game ID</div><div class="value mono">${esc(g.id)}</div><div class="key">Source</div><div class="value">${esc(g.source)}</div><div class="key">Engine</div><div class="value">${esc(g.engine)}</div><div class="key">Platforms</div><div class="value">${esc(g.platforms.map(platformName).join(' · ') || '—')}</div><div class="key">Folder</div><div class="value mono">${esc(g.path || '—')}</div>${g.knownOn.length ? `<div class="key">Store ids</div><div class="value mono">${esc(g.knownOn.map((k) => `${storeName(k.platform)} ${k.id}`).join(' · '))}</div>` : ''}</div>`, bind: null },
   { id: 'engine', title: 'Engine &amp; Compatibility', html: (g, updates) => ``, bind: (g, pane) => renderEngineTab(g, pane) },
   { id: 'versions', title: 'Versions', html: (g, updates) => `${updates.length ? `<h3 style="font:500 1.0625rem var(--serif);margin:0 0 9px">Available, not installed</h3>${updates.map((u) => `<div class="available-update"><span class="status-icon pending" aria-hidden="true">↻</span><div><strong>${esc(u.version || 'Newer version')} · ${esc(platformName(u.platform))}</strong><br><small>${u.for ? `For ${esc(fileName(u.for))} · ` : ''}Seen via ${esc(u.source || 'a store')}${u.detected_at ? ` · ${esc(fmt.date(u.detected_at))}` : ''}</small></div><button class="btn small primary" style="margin-left:auto" data-detail-action="apply-update" data-version="${esc(u.version || '')}">Review update</button></div>`).join('')}` : ''}<h3 style="font:500 1.0625rem var(--serif);margin:14px 0 9px">Installed versions</h3>${g.parts.length ? `<h3 style="font:500 1.0625rem var(--serif);margin:0 0 9px">Parts</h3><p class="order-note">${esc(partsText(g))}</p>${g.parts.map((part) => `<div class="version-group"><div class="version-head"><strong>${esc(part)}</strong><small>${esc(g.variants.filter((x) => x.part === part).map((x) => (x.version ? `version ${x.version}` : '')).filter(Boolean).join(', '))}</small></div>${g.variants.filter((x) => x.part === part).map((x) => `<div class="variant-row"><div><div class="variant-name">${esc(variantName(x))}</div><div class="variant-path mono" aria-label="${esc(x.path || '')}">${esc(PythiaVersions.middleEllipsis(x.path || '', 72))}</div></div><div></div><div></div><button class="row-action" data-variant-menu="${esc(x.path || '')}" aria-label="Folder actions">•••</button></div>`).join('')}</div>`).join('')}` : ''}${!g.orderKnown ? `<p class="order-note">${visibleStatus('Order unknown', 'pending', '?')} These labels are not version numbers, so Pythia does not guess which is newest: ${esc(g.unorderedLabels.join(', '))}. Set one as Current.</p>` : ''}${g.versions.length ? g.versions.filter((v) => (v.variants || []).filter((x) => !x.part).some((x) => !x.part)).map((v) => `<div class="version-group"><div class="version-head"><strong>${esc(v.label || 'No version number')}</strong>${g.orderKnown && v.label && v.label === g.latest ? '<span class="tag">Latest installed</span>' : ''}<small>${(v.variants || []).filter((x) => !x.part).length} variant${(v.variants || []).filter((x) => !x.part).length === 1 ? '' : 's'}</small><span class="spacer"></span>${g.mine ? (g.current === v.version ? '<span class="tag ok">Current</span> <button class="btn small ghost" type="button" data-set-current="">Clear</button>' : `<button class="btn small" type="button" data-set-current="${esc(v.version || '')}">Set as current</button>`) : ''}</div>${(v.variants || []).filter((x) => !x.part).map((x) => `<div class="variant-row"><div><div class="variant-name">${esc(variantName(x))}${x.base_version ? ` <span class="tag">for ${esc(x.base_version)}</span>` : ''}${(x.platform_ids || []).map((l) => ` <span class="tag">${esc(storeName(l.platform))} ${esc(shortId(l.id))}</span>`).join('')}</div><div class="variant-path mono" aria-label="${esc(x.path || '')}">${esc(PythiaVersions.middleEllipsis(x.path || '', 72))}</div></div><div class="platforms">${(x.platforms || []).map((p) => `<span class="platform">${esc(platformName(p))}</span>`).join('')}</div><div>${(x.mods || []).length ? x.mods.map((m) => `<span class="tag">${esc(m.name || m)}</span>`).join(' ') : '<span style="color:var(--dim);font-size:0.625rem">No mods</span>'}</div><button class="row-action" data-variant-menu="${esc(x.path || '')}" aria-label="Variant actions">•••</button></div>`).join('')}</div>`).join('') : ''}<div data-versions-state></div><div style="margin-top:10px"><button class="btn small" data-detail-action="add-folder">＋ Add another folder</button></div>`, bind: (g, pane) => { $$('[data-set-current]', pane).forEach((b) => (b.onclick = () => act('set_current_version', [g.id, b.dataset.setCurrent], b.dataset.setCurrent ? `Current: ${b.dataset.setCurrent}` : 'Current cleared', { what: 'Setting Current' }))); if (!g.versions.length) $('[data-versions-state]', pane).appendChild(stateBlock({ title: 'Nothing installed here', body: g.ownedOn.length ? `Owned on ${g.ownedOn.map((k) => kindName(k) || k).join(', ')}, not installed on this computer.` : 'No folder is known for this game on this computer.' })); } },
-  { id: 'devices', title: 'Devices', html: (g, updates) => `<table class="table"><thead><tr><th>System</th><th>Availability</th><th>Versions</th><th>Readiness</th><th></th></tr></thead><tbody>${g.entries.map((e) => `<tr><td class="primary-cell"><strong>${esc(systemName(e.system_uuid))}</strong><small>${e.updated_at ? `Record updated ${esc(fmt.dateTime(e.updated_at))}` : 'Synced record'}</small></td><td>${(e.versions || []).some((v) => (v.variants || []).some((x) => x.path)) ? (e.system_uuid === model.mySystem ? routineStatus('Installed here') : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">i</span>Installed there</span>`) : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not installed</span>`}</td><td>${esc((e.versions || []).map((v) => (v.version && v.version !== e.canonical_name ? v.version : 'no version')).join(', ') || '—')}</td><td data-readiness="${esc(e.system_uuid)}">${e.system_uuid === model.mySystem ? '…' : '<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not checked here</span>'}</td><td>${e.system_uuid === model.mySystem ? '<button class="btn small" data-detail-tab="engine">Inspect</button>' : ''}</td></tr>`).join('')}</tbody></table>`, bind: null },
+  { id: 'devices', title: 'Devices', html: (g, updates) => `<table class="table"><thead><tr><th>Computer</th><th>Availability</th><th>Versions</th><th>Readiness</th><th></th></tr></thead><tbody>${g.entries.map((e) => `<tr><td class="primary-cell"><strong>${esc(systemName(e.system_uuid))}</strong><small>${e.updated_at ? `Record updated ${esc(fmt.dateTime(e.updated_at))}` : 'Synced record'}</small></td><td>${(e.versions || []).some((v) => (v.variants || []).some((x) => x.path)) ? (e.system_uuid === model.mySystem ? routineStatus('Installed here') : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">i</span>Installed there</span>`) : `<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not installed</span>`}</td><td>${esc((e.versions || []).map((v) => (v.version && v.version !== e.canonical_name ? v.version : 'no version')).join(', ') || '—')}</td><td data-readiness="${esc(e.system_uuid)}">${e.system_uuid === model.mySystem ? '…' : '<span class="status-inline neutral"><span class="status-icon neutral" aria-hidden="true">–</span>Not checked here</span>'}</td><td></td></tr>`).join('')}</tbody></table>`, bind: null },
   { id: 'notes', title: 'Notes', html: (g, updates) => `${g.mine ? `<textarea class="notes-area" id="notesArea" aria-label="Notes">${esc(g.note)}</textarea><div style="display:flex;justify-content:flex-end;margin-top:9px"><button class="btn primary" data-detail-action="save-note">Save note</button></div>` : ''}<div data-notes-state></div>`, bind: (g, pane) => { if (!g.mine) $('[data-notes-state]', pane).appendChild(stateBlock({ title: 'Notes live on their computer', body: `This record belongs to ${g.systems.find((s) => s !== 'This computer') || 'another computer'}; notes are read-only here.${g.note ? `\n\n${g.note}` : ''}` })); } },
   { id: 'saves', title: 'Saves', html: (g, updates) => ``, bind: (g, pane) => renderSavesTab(g, false, pane) },
   { id: 'history', title: 'History', html: (g, updates) => `<div class="timeline">${[...g.events].reverse().map((e) => `<div class="timeline-item"><strong>${esc(EVENT_NAMES[e.type] || e.type)}</strong><p>${esc(e.detail || '')}</p><time>${esc(fmt.dateTime(e.timestamp))}</time></div>`).join('')}</div><div data-history-state></div>`, bind: (g, pane) => { if (!g.events.length) $('[data-history-state]', pane).appendChild(stateBlock({ title: 'No history yet', body: 'Events are recorded as Pythia changes this record.' })); } },
 ];
+// The game page's tabs (UI round): Overview, Versions, Saves and Details. Notes are on Overview; the record with
+// its IDs and paths, the engine report, each computer and the history are on Details.
+const GAME_PART = Object.fromEntries(GAME_PARTS.map((p) => [p.id, p]));
+const paneHead = (t) => `<h3 class="pane-head">${t}</h3>`;
+function overviewHtml(g) {
+  const version = g.current || (g.orderKnown ? g.latest || 'No version number' : 'Order unknown');
+  return `<div class="stats-grid"><div class="stat"><div class="label">Version</div><div class="value">${esc(version)}</div><div class="sub">${g.current ? 'Current' : g.orderKnown ? (g.latest ? 'Latest installed' : '') : 'Set one as Current'}${g.versionCount > 1 ? ` · ${g.versionCount} versions` : ''}</div></div><div class="stat"><div class="label">Played</div><div class="value">${esc(playtimeText(g) || (g.lastPlayed ? 'Under a minute' : 'Not yet'))}</div><div class="sub">${esc(playedText(g))}</div></div><div class="stat"><div class="label">Added</div><div class="value">${esc(g.added ? fmt.date(g.added) : '—')}</div><div class="sub">${esc(g.systems.length > 1 ? `On ${g.systems.length} computers` : g.installed ? 'Installed here' : 'Not installed here')}</div></div></div><div class="facts">${g.knownOn.length ? `<div><span class="facts-key">Store</span>${storeLinksHtml(g, '', g.knownOn)}</div>` : ''}${g.ownedOn.length ? `<div><span class="facts-key">Owned on</span>${esc(g.ownedOn.map((k) => kindName(k) || k).join(' · '))}</div>` : ''}<div><span class="facts-key">Engine</span>${esc(g.engine)}</div></div>`;
+}
+const GAME_SECTIONS = [
+  { id: 'overview', title: 'Overview', html: (g, updates) => `${overviewHtml(g)}${paneHead('Notes')}${GAME_PART.notes.html(g, updates)}`, bind: (g, pane) => { bindStoreLinks(g, pane); GAME_PART.notes.bind(g, pane); } },
+  GAME_PART.versions,
+  GAME_PART.saves,
+  { id: 'details', title: 'Details', html: (g, updates) => `${paneHead('Record')}${GAME_PART.facts.html(g)}${paneHead('Engine and compatibility')}<div data-engine-host></div>${paneHead('On each computer')}${GAME_PART.devices.html(g, updates)}${paneHead('History')}${GAME_PART.history.html(g, updates)}`, bind: (g, pane) => { renderEngineTab(g, $('[data-engine-host]', pane)); GAME_PART.history.bind(g, pane); } },
+];
+// Tabs that became parts of another tab keep working as names (menus, Review's links).
+const MOVED_TABS = { engine: 'details', devices: 'details', systems: 'details', history: 'details', notes: 'overview' };
 // The primary slot (UX review A12, owner decision 1): Play, Install or Update, first and largest. Its space
 // is drawn before the backend answers, so nothing in the hero moves when it does.
 function fillPrimarySlot(g, slot, cls) {
@@ -420,17 +485,24 @@ function updateSlotHtml(g) {
   if (!g.updates.length) return '';
   return `<button class="btn" type="button" disabled data-reason="Pythia records updates but does not download them yet.">Update to ${esc(g.updates[0].version || 'the newer version')} <span class="reason">· not built yet</span></button>`;
 }
+// A favourite is the person's (owner, 2026-10-23): it reaches every computer and handheld (pythia/favourites.py).
+async function toggleFavourite(g) {
+  const on = !g.favourite;
+  const r = await act('set_favourite', [g.id, on], on ? `${g.name} is a favourite` : `${g.name} is no longer a favourite`, { what: 'Marking it' });
+  if (ok(r)) g.favourite = on;
+}
 function renderDetail(g) {
   const host = $('#gameDetail');
   if (!g) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Pick a game', body: 'Its details open here.' })); return; }
   const updates = g.updates || [];
-  if (state.detailTab === 'systems') state.detailTab = 'devices';
-  host.innerHTML = `<div class="detail-hero"><div class="cover-large art-${g.art}">${esc(initials(g.name))}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${gameStatus(g)}<span class="tag">${g.current ? `Current ${esc(g.current)}` : g.parts.length && !g.latest ? esc(partsText(g)) : g.orderKnown ? (g.latest ? `Version ${esc(g.latest)}` : 'No version number') : 'Order unknown, set Current'}</span><span class="tag">${g.systems.length} system${g.systems.length === 1 ? '' : 's'}</span>${g.managed ? '<span class="tag">Externally managed</span>' : ''}</div><p>${esc(g.note.split('\n')[0] || '')}</p><div class="detail-actions" id="detailActions"><span class="primary-slot" data-primary-slot><button class="btn primary big" type="button" disabled>Checking…</button></span>${updateSlotHtml(g)}${g.knownOn.length ? '<button class="btn" type="button" data-detail-action="store-page">Open store page</button>' : ''}<button class="icon-btn" data-detail-action="more" aria-label="More actions">•••</button></div></div></div><div class="detail-tabs">${GAME_SECTIONS.map((sec) => `<button class="tab" data-tab="${sec.id}">${sec.title}</button>`).join('')}</div>
+  state.detailTab = MOVED_TABS[state.detailTab] || state.detailTab;
+  host.innerHTML = `<div class="detail-hero"><div ${artAttrs(g, 'cover-large')}>${artLetters(g)}</div><div class="detail-copy"><div class="eyebrow">${esc(g.source)} · ${esc(g.engine)}</div><h2>${esc(g.name)}</h2><div class="tag-row">${g.status !== 'ok' ? gameStatus(g) : ''}<span class="tag">${g.current ? `Current ${esc(g.current)}` : g.parts.length && !g.latest ? esc(partsText(g)) : g.orderKnown ? (g.latest ? `Version ${esc(g.latest)}` : 'No version number') : 'Order unknown, set Current'}</span>${g.lastPlayed ? `<span class="tag">${esc(playedText(g))}</span>` : ''}${g.managed ? '<span class="tag">Managed by its launcher</span>' : ''}</div><p>${esc(g.note.split('\n')[0] || '')}</p><div class="detail-actions" id="detailActions"><span class="primary-slot" data-primary-slot><button class="btn primary big" type="button" disabled>Checking…</button></span>${updateSlotHtml(g)}<button class="btn favourite-btn${g.favourite ? ' on' : ''}" data-favourite aria-pressed="${g.favourite}">${g.favourite ? '★ Favourite' : '☆ Favourite'}</button><button class="btn" data-detail-action="more" aria-haspopup="menu">More…</button></div></div></div><div class="detail-tabs">${GAME_SECTIONS.map((sec) => `<button class="tab" data-tab="${sec.id}">${sec.title}</button>`).join('')}</div>
 ${GAME_SECTIONS.map((sec) => `<div class="tab-pane" data-pane="${sec.id}">${sec.html(g, updates)}</div>`).join('')}`;
   GAME_SECTIONS.forEach((sec) => sec.bind && sec.bind(g, $(`[data-pane="${sec.id}"]`, host)));
   $$('[data-tab]', host).forEach((t) => (t.onclick = () => openTab(t.dataset.tab)));
   $$('[data-detail-tab]', host).forEach((t) => (t.onclick = () => openTab(t.dataset.detailTab)));
   $$('[data-detail-action]', host).forEach((b) => (b.onclick = () => detailAction(b.dataset.detailAction, g, b)));
+  $('[data-favourite]', host).onclick = () => toggleFavourite(g);
   $$('[data-variant-menu]', host).forEach((b) => (b.onclick = () => openActionMenu('variant', b, g, b.dataset.variantMenu)));
   openTab(state.detailTab || 'overview');
   fillPrimarySlot(g, $('[data-primary-slot]', host), 'btn primary big');
@@ -442,11 +514,18 @@ function renderSavesTab(g, fetch = false, pane = $('#gameDetail [data-pane="save
   loadInto(pane, 'get_game_saves', [g.id, fetch], (r, host) => {
     const files = r.files || [];
     if (!r.patterns) {
-      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `droidtop knows where a game keeps its saves from the Ludusavi manifest, by its key (${r.key}) or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true, pane) }] }));
+      host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `Pythia knows where Ren'Py games keep their saves by the engine's own rule. For other games it looks in the Ludusavi manifest, by the game's store id or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true, pane) }] }));
       return;
     }
-    host.appendChild(el(`<div class="kv"><div class="key">Looked for</div><div class="mono" style="word-break:break-all">${(r.patterns || []).map(esc).join('<br>')}</div></div>`));
-    if (!files.length) { host.appendChild(stateBlock({ title: 'No save files here yet', body: 'Nothing matches those places on this computer now. They sync with paired handhelds once there are some.' })); return; }
+    // Save locations the Syncthing here already syncs are left to it (Droidtop/tracker#538): said first.
+    const st = r.syncthing || [];
+    if (st.length) {
+      const labels = [...new Set(st.map((x) => x.label))].join(', ');
+      host.appendChild(el(`<p>${visibleStatus(r.all_by_syncthing ? `Synced by Syncthing (folder ${labels})` : `Partly synced by Syncthing (folder ${labels})`, 'neutral', '⇄')}</p>`));
+      host.appendChild(el(`<p><small>${r.all_by_syncthing ? 'Syncthing already keeps these saves in step on this computer, so Pythia does not sync them too: two programs writing the same files would fight.' : 'Syncthing already keeps some of these places in step; Pythia syncs only the others.'}</small></p>`));
+    }
+    host.appendChild(el(`<div class="kv"><div class="key">Looked for</div><div class="mono" style="word-break:break-all">${(r.patterns || []).map((p) => `${esc(p)}${st.some((x) => x.pattern === p) ? ' <span class="tag">Syncthing</span>' : ''}`).join('<br>')}</div></div>`));
+    if (!files.length) { host.appendChild(stateBlock({ title: 'No save files here yet', body: r.all_by_syncthing ? 'Nothing matches those places on this computer now.' : 'Nothing matches those places on this computer now. They sync with paired handhelds once there are some.' })); return; }
     host.appendChild(el(`<table class="table"><thead><tr><th>File</th><th></th></tr></thead><tbody>${files.map((f) => `<tr><td class="primary-cell"><strong>${esc(f.name)}</strong><small class="mono">${esc(f.path)}</small></td><td><button class="btn small" data-open-save="${esc(f.path)}">Show</button></td></tr>`).join('')}</tbody></table>`));
     $$('[data-open-save]', host).forEach((b) => (b.onclick = () => openFolder(b.dataset.openSave.replace(/[\\/][^\\/]*$/, ''), 'Opening the folder')));
   }, { what: "This game's saves" });
@@ -458,10 +537,10 @@ function renderEngineTab(g, pane = $('#gameDetail [data-pane="engine"]')) {
     model.platformStatus[g.id] = r;
     const readiness = $(`[data-readiness="${model.mySystem}"]`, $('#gameDetail'));
     if (!r.engine) {
-      host.appendChild(el(`<div class="engine-banner">${visibleStatus('Not identified', 'critical')}<div><strong>No engine plugin matched this install.</strong><div style="color:var(--text-secondary);font-size:0.6875rem;margin-top:2px">The folder is tracked without an engine assignment. Rescan after turning on the right engine plugin.</div></div><span class="spacer"></span><button class="btn small" data-fix="correct">Correct manually…</button></div>`));
-      if (readiness) readiness.innerHTML = visibleStatus('Not identified', 'critical');
+      host.appendChild(el(`<div class="engine-banner">${visibleStatus('Not identified', 'neutral', '?')}<div><strong>No engine plugin matched this install.</strong><div style="color:var(--text-secondary);font-size:0.6875rem;margin-top:2px">The folder is tracked without an engine assignment. Rescan after turning on the right engine plugin.</div></div><span class="spacer"></span><button class="btn small" data-fix="correct">Correct manually…</button></div>`));
+      if (readiness) readiness.innerHTML = visibleStatus('Not identified', 'neutral', '?');
     } else {
-      const rows = Object.entries(r.platforms || {}).map(([platform, p]) => `<div class="platform-row"><strong>${esc(platformName(platform))}</strong><div class="req">${esc(p.supported ? (p.native ? 'Runs natively' : 'Supported') : (p.requires || []).join(', ') || 'Not supported for this install')}</div>${p.supported ? routineStatus('Ready') : p.fixable ? `<button class="btn small primary" data-fix="${esc(platform)}">Add support</button>` : visibleStatus('Unavailable for this install', 'critical')}</div>`).join('');
+      const rows = Object.entries(r.platforms || {}).map(([platform, p]) => `<div class="platform-row"><strong>${esc(platformName(platform))}</strong><div class="req">${esc(p.supported ? (p.native ? 'Runs natively' : 'Supported') : (p.requires || []).join(', ') || 'Not supported for this install')}</div>${p.supported ? routineStatus('Ready') : p.fixable ? `<button class="btn small primary" data-fix="${esc(platform)}">Add support</button>` : visibleStatus('Not available for this install', 'neutral', '–')}</div>`).join('');
       host.appendChild(el(`<div><div class="engine-banner">${routineStatus('Identified')}<div><strong>${esc(r.engine)}</strong></div><span class="spacer"></span><button class="btn small ghost" data-fix="correct">Correct manually…</button></div><div class="platform-status">${rows || ''}</div></div>`));
       if (!rows) host.appendChild(stateBlock({ title: 'No platform report', body: `${r.engine} does not report per-platform needs yet.` }));
       const supported = Object.values(r.platforms || {}).filter((p) => p.supported).length;
@@ -473,7 +552,7 @@ function renderEngineTab(g, pane = $('#gameDetail [data-pane="engine"]')) {
     }));
   }, { what: 'The engine report' });
 }
-function openTab(name) { state.detailTab = name; $$('.tab', $('#gameDetail')).forEach((t) => t.classList.toggle('active', t.dataset.tab === name)); $$('.tab-pane', $('#gameDetail')).forEach((p) => p.classList.toggle('active', p.dataset.pane === name)); }
+function openTab(name) { name = MOVED_TABS[name] || name; state.detailTab = name; $$('.tab', $('#gameDetail')).forEach((t) => t.classList.toggle('active', t.dataset.tab === name)); $$('.tab-pane', $('#gameDetail')).forEach((p) => p.classList.toggle('active', p.dataset.pane === name)); }
 function rescan(g, path) { pythia.start_onboard(path || g.path); flash('Rescanning'); navigate('activity'); }
 async function detailAction(a, g, btn) {
   if (a === 'open-folder') openFolder(g.path);
@@ -499,34 +578,75 @@ function managerPaused(page) { const m = model.modes?.manager; return !!m && !m.
 function managerOffBlock(what) {
   return stateBlock({ title: 'Manager mode is off', body: `${what} is part of manager mode.`, actions: [{ label: 'Turn manager mode on', run: async () => { const r = await act('set_manager_mode', [true], 'Manager mode on', { what: 'Turning manager mode on' }); if (ok(r)) { await refreshModes(); renderCurrent(); } } }] });
 }
+const SYNC_CONSENT = 'Pythia will serve your paired droidtop handhelds from this computer. To do that it listens on your network (TCP and UDP port 47610, TCP 47612 while pairing, UDP 47611 for reaching it away from home) and tells a public discovery server this computer\u2019s address, so a paired handheld can find it away from home. If droidtop-agent runs here, Pythia turns it off while it serves. Your system may ask whether Pythia may use the network: allow it on private networks. Nothing of this happens until you turn it on.';
+const modeInfo = (title, details) => { const b = el('<button class="btn small ghost" type="button">Info</button>'); b.onclick = () => infoSheet({ title, details }); return b; };
+// Sync with droidtop (UX review A9): agent mode, named by its outcome; "agent" is said only in Info. Its place is Devices.
+function syncModeRow(r, redraw) {
+  const sync = r.sync || {};
+  const syncState = !sync.available ? 'Not available' : sync.on ? (sync.serving ? 'On' : 'Starting') : sync.serving ? 'Off when Pythia quits' : 'Off';
+  const row = el(`<div class="form-row"><div class="form-label"><strong>Sync with droidtop</strong><small>Your paired devices get this library, its saves and its launches from Pythia. ${esc(syncState)}.</small>${sync.available ? '' : `<small class="locked-reason">${esc(sync.reason || '')}</small>`}</div><span class="mode-controls"><button class="toggle" data-sync-mode aria-label="Sync with droidtop"><span></span></button></span></div>`);
+  $('.mode-controls', row).prepend(modeInfo('Sync with droidtop', sync.info || ''));
+  const sw = $('[data-sync-mode]', row);
+  bindSwitch(sw, !!sync.on, async (on) => {
+    // Turning it on is the consent to use the network (docs/SPEC.md 1.7): said plainly first, nothing listens before.
+    if (on && !(await confirm({ title: 'Turn on Sync with droidtop?', body: SYNC_CONSENT, proceed: 'Turn on' }))) { redraw(); return; }
+    if (!on && !(await confirm({ title: 'Turn off Sync with droidtop?', body: 'Pythia stops serving your handhelds when it quits. If Pythia had turned droidtop-agent off, it is turned back on.', proceed: 'Turn off' }))) { redraw(); return; }
+    await act(on ? 'serve_from_pythia_again' : 'turn_agent_back_on', [], on ? 'Sync with droidtop on' : 'Sync with droidtop off', { what: 'Changing Sync with droidtop' });
+    await refreshModes();
+    redraw();
+  });
+  if (!sync.available) { sw.disabled = true; sw.dataset.reason = sync.reason || ''; }
+  return row;
+}
+// Service mode (docs/SPEC.md 1.10, windowcast#467): off until the person turns it on after reading what it does;
+// each change asks Windows for administrator approval. Its place is Devices: it is what a paired device may see.
+function serviceModeRow(r, redraw) {
+  const svc = r.service || {};
+  const row = el(`<div class="form-row"><div class="form-label"><strong>Answer Windows security screens</strong><small>A paired device can see and answer this computer's UAC prompts and its lock and sign-in screen (service mode). ${esc(svc.state || '')}.</small>${svc.available ? '' : `<small class="locked-reason">${esc(svc.reason || '')}</small>`}</div><span class="mode-controls"><button class="toggle" data-service-mode aria-label="Service mode"><span></span></button></span></div>`);
+  $('.mode-controls', row).prepend(modeInfo('Service mode', svc.consent || svc.reason || ''));
+  if (svc.installed && !svc.on) {
+    const remove = el('<button class="btn small ghost" type="button">Remove the helper</button>');
+    remove.onclick = async () => {
+      if (!(await confirm({ title: 'Remove the secure-screen helper?', body: 'Windows asks for administrator approval. Service mode stays off.', proceed: 'Remove' }))) return;
+      await act('set_service_mode', ['uninstall'], 'Secure-screen helper removed', { what: 'Removing the secure-screen helper' });
+      redraw();
+    };
+    $('.mode-controls', row).prepend(remove);
+  }
+  const sw = $('[data-service-mode]', row);
+  bindSwitch(sw, !!svc.on, async (on) => {
+    if (on && !(await confirm({ title: 'Turn on service mode?', body: svc.consent || '', proceed: 'Turn on' }))) { redraw(); return; }
+    if (!on && !(await confirm({ title: 'Turn off service mode?', body: 'Windows asks for administrator approval. The helper stays installed but does nothing until you turn it on again.', proceed: 'Turn off' }))) { redraw(); return; }
+    await act('set_service_mode', [on ? 'enable' : 'disable'], on ? 'Service mode on' : 'Service mode off', { what: on ? 'Turning service mode on' : 'Turning service mode off' });
+    redraw();
+  });
+  if (!svc.available) { sw.disabled = true; sw.dataset.reason = svc.reason || ''; }
+  return row;
+}
+// A row in Settings for something whose place is a page of its own: what it is now, and a way there.
+function linkRow(title, small, view) {
+  const row = el(`<div class="form-row"><div class="form-label"><strong>${esc(title)}</strong><small>${esc(small)}</small></div><button class="btn small" type="button">Open ${esc(VIEW_NAMES[view] || view)} <span class="nav-out">›</span></button></div>`);
+  $('button', row).onclick = () => navigate(view);
+  return row;
+}
+const VIEW_NAMES = { devices: 'Devices', sources: 'Game sources', shared: 'Shared library' };
 function renderModes(host) {
   if (!host) return;
   loadInto(host, 'get_modes', [], (r, h) => {
     model.modes = r;
-    const m = r.manager || {}; const sync = r.sync || {};
-    const info = (title, details) => { const b = el('<button class="btn small ghost" type="button">Info</button>'); b.onclick = () => infoSheet({ title, details }); return b; };
-    // Sync with droidtop (UX review A9): agent mode, named by its outcome; "agent" is said only in Info.
-    const syncState = !sync.available ? 'Not available' : sync.on ? (sync.serving ? 'On' : 'On from the next start') : sync.serving ? 'Off when Pythia quits' : 'Off';
-    const syncRow = el(`<div class="form-row"><div class="form-label"><strong>Sync with droidtop</strong><small>Your paired droidtop handhelds get this library, its saves and its launches from Pythia. ${esc(syncState)}.</small>${sync.available ? '' : `<small class="locked-reason">${esc(sync.reason || '')}</small>`}</div><span class="mode-controls"><button class="toggle" data-sync-mode aria-label="Sync with droidtop"><span></span></button></span></div>`);
-    $('.mode-controls', syncRow).prepend(info('Sync with droidtop', sync.info || ''));
-    const syncSwitch = $('[data-sync-mode]', syncRow);
-    bindSwitch(syncSwitch, !!sync.on, async (on) => {
-      if (!on && !(await confirm({ title: 'Turn off Sync with droidtop?', body: 'Your handhelds are served by droidtop-agent again from its next start; Pythia stops when it quits.', proceed: 'Turn off' }))) { renderModes(host); return; }
-      await act(on ? 'serve_from_pythia_again' : 'turn_agent_back_on', [], on ? 'Sync with droidtop on from the next start' : 'Sync with droidtop off', { what: 'Changing Sync with droidtop' });
-      renderModes(host);
-    });
-    if (!sync.available) { syncSwitch.disabled = true; syncSwitch.dataset.reason = sync.reason || ''; }
-    h.appendChild(syncRow);
-    const row = el(`<div class="form-row"><div class="form-label"><strong>Manager mode</strong><small>The library and version manager: tagging game folders, versions against the latest release, and tagging downloads with their game and kind.</small>${m.locked ? `<small class="locked-reason">${visibleStatus('Locked on by Sync with droidtop', 'neutral', '🔒')}</small>` : ''}</div><span class="mode-controls"><button class="toggle" data-manager-mode aria-label="Manager mode"><span></span></button></span></div>`);
-    if (m.locked) $('.mode-controls', row).prepend(info('Manager mode is locked on', m.reason || ''));
+    const m = r.manager || {}; const sync = r.sync || {}; const svc = r.service || {};
+    const row = el(`<div class="form-row"><div class="form-label"><strong>Manager mode</strong><small>The library and version manager: tagging game folders, versions against the latest release, and tagging downloads with their game and kind.</small>${m.locked ? `<small class="locked-reason">${visibleStatus('Kept on while Sync with droidtop is on', 'neutral', '🔒')}</small>` : ''}</div><span class="mode-controls"><button class="toggle" data-manager-mode aria-label="Manager mode"><span></span></button></span></div>`);
+    if (m.locked) $('.mode-controls', row).prepend(modeInfo('Manager mode is kept on', m.reason || ''));
     const sw = $('[data-manager-mode]', row);
     bindSwitch(sw, !!m.on, async (on, node) => {
       const r2 = await act('set_manager_mode', [on], on ? 'Manager mode on' : 'Manager mode off', { what: 'Changing manager mode' });
       if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); }
       renderModes(host);
     });
-    if (m.locked) { sw.disabled = true; sw.dataset.reason = 'Locked on by Sync with droidtop.'; }
+    if (m.locked) { sw.disabled = true; sw.dataset.reason = 'Kept on while Sync with droidtop is on.'; }
     h.appendChild(row);
+    h.appendChild(linkRow('Sync with droidtop', `${!sync.available ? 'Not available' : sync.on ? 'On' : 'Off'}. Pairing, what each device gets, and security screens are on the Devices page.`, 'devices'));
+    if (svc.available || svc.on) h.appendChild(linkRow('Service mode', `${svc.on ? 'On' : 'Off'}. It is on the Devices page.`, 'devices'));
     if (state.shell === 'handheld') hhKeepDisabledReachable();
   }, { what: 'Modes' });
 }
@@ -543,9 +663,10 @@ function renderDownloads() {
     const ds = Array.isArray(list) ? list : [];
     if (!ds.length) { host.appendChild(stateBlock({ title: 'No downloader plugins', body: 'A downloader plugin adds a card here.' })); return; }
     ds.forEach((d) => {
-      const watching = watcher && d.enabled;
+      // Only the downloader that started the watch is watching (Droidtop/tracker#538 retest D4).
+      const watching = !!watcher && d.enabled && watcher.plugin === d.id;
       const card = el(`<div class="card"><div class="card-head"><div class="card-icon">${esc(d.display_name.slice(0, 2).toUpperCase())}</div><div><strong>${esc(d.display_name)}</strong><small>${esc(d.headless ? 'Can fetch without a window' : 'Opens its own window; Pythia watches the folder')}</small></div></div><div class="card-body"><p>${esc(watching ? `Watching ${watcher.folder}${watcher.program ? ` while ${fileName(watcher.program)} runs` : ''}.` : d.enabled ? 'Not watching a folder right now.' : 'Turned off in Settings > Downloaders.')}</p></div><div class="card-foot">${watching ? routineStatus('Watching') : d.enabled ? visibleStatus('Idle', 'neutral', '–') : visibleStatus('Turned off', 'neutral', '–')}<span class="spacer"></span><button class="btn small" data-watch>${watching ? 'Stop' : 'Watch a folder'}</button></div></div>`);
-      $('[data-watch]', card).onclick = () => (watching ? stopWatching() : watchFolder());
+      $('[data-watch]', card).onclick = () => (watching ? stopWatching() : watchFolder(d.id));
       host.appendChild(card);
     });
   }, { what: 'Downloaders' });
@@ -649,20 +770,22 @@ async function mergeInto(c, keepId, foldId) {
 }
 
 // ---- Systems & sync --------------------------------------------------------------------
-function renderSystems() {
-  renderHandhelds();
-  const q = state.view === 'systems' ? state.search.toLowerCase() : '';
+function renderShared() {
+  const q = state.view === 'shared' ? state.search.toLowerCase() : '';
+  $('#syncFolderPath').textContent = model.info?.sync_folder || '';
+  loadInto($('#transferSettings'), 'get_transfer_settings', [], () => {}, { what: 'Game transfer' });
+  loadInto($('#storageRoles'), 'get_storage_roles', [], () => {}, { what: 'Storage roles' });
   const list = systems.filter((s) => !q || s.name.toLowerCase().includes(q));
-  $('#systemsSummary').textContent = model.ready ? `${fmt.n(systems.length, 'system')} in the synced folder` : '';
+  $('#systemsSummary').textContent = model.ready ? `Computers that keep their records in one library folder · ${fmt.n(systems.length, 'computer')} so far` : '';
   const n = $('#systemsNotice'); n.innerHTML = '';
-  if (model.info) n.appendChild(notice({ tone: 'info', placement: 'page', title: 'Systems come from the synced folder', body: 'Point your sync tool at the library folder on each computer.', details: `Library folder: ${model.info.sync_folder}\nHandhelds pair with this computer below. Copying versions between computers is not built yet; "Add system" says so.` }));
-  $('#systemCards').innerHTML = list.length ? list.map((s) => `<article class="card"><div class="card-head"><div class="card-icon">${esc(s.icon)}</div><div><strong>${esc(s.name)}</strong><small class="mono">${esc(s.id)}</small></div></div><div class="card-body"><div class="stats-grid" style="grid-template-columns:1fr 1fr;margin-bottom:0"><div class="stat"><div class="label">Tracked</div><div class="value">${esc(s.games)}</div></div><div class="stat"><div class="label">Installed</div><div class="value">${esc(s.installed)}</div></div></div>${s.mine && model.app ? `<p style="margin-top:10px">${esc(model.app.platform)} · Pythia ${esc(model.app.version)}</p>` : ''}</div><div class="card-foot">${s.mine ? routineStatus('This computer') : routineStatus('Synced record', 'neutral', 'i')}<span class="spacer"></span><button class="btn small" data-system-games="${esc(s.id)}">Games</button></div></article>`).join('') : '';
+  if (model.info && systems.length < 2) n.appendChild(notice({ tone: 'info', placement: 'page', title: 'Share this library with another computer', body: 'Point a sync tool (Syncthing, a network drive, a cloud folder) at the library folder below on each computer. Each computer then shows here, with the games it has.', details: 'Handhelds do not use this folder: they pair on the Devices page.' }));
+  $('#systemCards').innerHTML = list.length ? list.map((s) => `<article class="card"><div class="card-head"><div class="card-icon">${esc(s.icon)}</div><div><strong>${esc(s.name)}</strong><small>${s.mine ? esc(model.app ? `${model.app.platform} · Pythia ${model.app.version}` : 'This computer') : 'Another computer'}</small></div></div><div class="card-body"><div class="stats-grid" style="grid-template-columns:1fr 1fr;margin-bottom:0"><div class="stat"><div class="label">Tracked</div><div class="value">${esc(s.games)}</div></div><div class="stat"><div class="label">Installed</div><div class="value">${esc(s.installed)}</div></div></div></div><div class="card-foot"><span class="spacer"></span><button class="btn small" data-system-games="${esc(s.id)}">Games</button></div></article>`).join('') : '';
   $$('[data-system-games]').forEach((b) => (b.onclick = () => { state.search = ''; navigate('library'); $('#globalSearch').value = systemName(b.dataset.systemGames); state.search = systemName(b.dataset.systemGames); renderLibrary(); }));
   const head = $('#crossSystemHead'); const rows = $('#crossSystemRows'); const st = $('#crossSystemState'); st.innerHTML = '';
   const cross = games.filter((g) => g.systemIds.length > 1);
   $('#crossSystemCount').textContent = model.ready ? fmt.n(cross.length, 'game on more than one system', 'games on more than one system') : '';
   if (!model.ready) { head.innerHTML = ''; rows.innerHTML = ''; st.appendChild(stateBlock({ kind: 'loading' })); return; }
-  if (!cross.length) { head.innerHTML = ''; rows.innerHTML = ''; st.appendChild(stateBlock({ title: systems.length > 1 ? 'No game is on two systems yet' : 'Only this computer so far', body: 'When another computer writes to the synced folder, games known to both are compared here.' })); return; }
+  if (!cross.length) { head.innerHTML = ''; rows.innerHTML = ''; st.appendChild(stateBlock({ title: systems.length > 1 ? 'No game is on two computers yet' : 'Only this computer so far', body: 'When another computer writes to the library folder, games known to both are compared here.' })); return; }
   head.innerHTML = `<tr><th>Game</th>${systems.map((s) => `<th>${esc(s.name)}</th>`).join('')}</tr>`;
   rows.innerHTML = cross.map((g) => `<tr><td class="primary-cell"><strong>${esc(g.name)}</strong><small>${esc(g.engine)}</small></td>${systems.map((s) => { const e = g.entries.find((x) => x.system_uuid === s.id); if (!e) return '<td>—</td>'; const v = (e.versions || []).map((x) => (x.version && x.version !== e.canonical_name ? x.version : null)).filter(Boolean); const inst = (e.versions || []).some((x) => (x.variants || []).some((y) => y.path)); return `<td>${inst ? `<span class="state-pill ok">${esc(v.join(', ') || 'installed')}</span>` : '<span class="state-pill info">known</span>'}</td>`; }).join('')}</tr>`).join('');
 }
@@ -672,6 +795,7 @@ function renderSystems() {
 let pairPoll = null;
 // Whether this build starts Pythia's own games for a handheld (get_agent_status.host_launch).
 let hostLaunch = false;
+function renderDevices() { renderHandhelds(); }
 function stopPairPoll() { if (pairPoll) { clearInterval(pairPoll); pairPoll = null; } }
 function renderHandhelds() {
   const agentHost = $('#agentState'); const host = $('#handheldState');
@@ -679,26 +803,51 @@ function renderHandhelds() {
   // The handhelds list waits for the status, so its "Start games" words match this build.
   const status = loadInto(agentHost, 'get_agent_status', [], (st, h) => {
     const s = st.serving || {};
+    hostLaunch = !!st.host_launch;
+    // Sync off: one notice with its switch (renderAgentTakeover), and no serving line or addresses that do not apply.
+    const modes = refreshModes().then(() => {
+      if (!model.modes) return;
+      const rows = el('<div class="device-modes"></div>');
+      rows.appendChild(syncModeRow(model.modes, renderHandhelds));
+      if ((model.modes.service || {}).available || (model.modes.service || {}).on) rows.appendChild(serviceModeRow(model.modes, renderHandhelds));
+      h.prepend(rows);
+    });
+    if (!(st.agent || {}).pythia_serves) { renderAgentTakeover(h, st.agent || {}); return modes; }
     const line = s.state === 'serving' ? `${routineStatus('Serving')} Handhelds reach this computer as ${esc(st.identity?.name || '')}.`
       : s.state === 'stopped' ? visibleStatus(s.reason || 'Not serving handhelds', 'pending')
       : visibleStatus('Not serving handhelds yet', 'neutral', '–');
     h.appendChild(el(`<p>${line}</p>`));
     if ((st.places || []).length) h.appendChild(el(`<p><small>Addresses: ${(st.places || []).map((p) => `<span class="mono">${esc(p.address)}</span> (${esc(p.label)})`).join(' · ')}</small></p>`));
-    hostLaunch = !!st.host_launch;
     renderAgentTakeover(h, st.agent || {});
   }, { what: 'This computer as a droidtop agent' });
-  const startGamesText = () => (hostLaunch ? "Start games: that handheld may start this computer's games: Steam games for Steam Link (Steam must be running here), and the games Pythia tracks through their launcher, for windowcast to stream." : "Start games: that handheld may start this computer's Steam games, to stream them with Steam Link; Steam must be running here.");
+  const startGamesText = () => (hostLaunch ? "Start games: it may start a game on this computer and play it there: the game runs here and only its windows are streamed to it through windowcast (the games Pythia tracks), or through Steam Link for Steam games (Steam must be running here)." : "Start games: it may start this computer's Steam games and play them through Steam Link; the game runs here, and Steam must be running here.");
   status.then(() => loadInto(host, 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
-    $('#handheldSummary').textContent = fmt.n(devices.length, 'paired handheld');
-    if (!devices.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'On the handheld: Settings > Computers > Pair a computer, then "Pair a handheld" here.' })); return; }
-    const table = el(`<table class="table"><thead><tr><th>Handheld</th><th>Last seen</th><th>Saves win</th><th>Start games</th><th></th></tr></thead><tbody>${devices.map((d) => `<tr><td class="primary-cell"><strong>${esc(d.name)}</strong><small class="mono">${esc(d.id.slice(0, 16))}</small></td><td>${d.last_seen_ms ? esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString())) : 'Never'}<small>${esc(d.last_address || '')}</small></td><td><button class="toggle" data-handheld-primary="${esc(d.id)}" aria-label="Its saves win when both changed"><span></span></button></td><td><button class="toggle" data-handheld-launch="${esc(d.id)}" aria-label="It may start games here"><span></span></button></td><td><button class="btn small" data-handheld-forget="${esc(d.id)}">Forget…</button></td></tr>`).join('')}</tbody></table>`);
-    h.appendChild(table);
-    h.appendChild(el(`<p><small>Saves win: when a game's saves changed on both sides, that handheld's copy is used here and this computer's is kept under Save backups (off: the newest wins). ${startGamesText()}</small></p>`));
+    $('#handheldSummary').textContent = fmt.n(devices.length, 'paired device');
+    $('#devicesCount').textContent = devices.length || '';
+    if (!devices.length) { h.appendChild(stateBlock({ glyph: '▭', title: 'Pair your handheld', body: 'On the handheld, open droidtop > Settings > Computers > Pair a computer. Then choose Pair a device here: both screens show one code to compare. Another computer running Pythia pairs the same way.', actions: [{ label: 'Pair a device', primary: true, run: () => pairDevice() }] })); return; }
+    const kindName = (d) => (d.kind === 'computer' ? 'Computer' : 'Handheld');
+    // What this computer offers each device (droidtop-agent DESIGN section 20): a handheld starts with
+    // its library and saves, a computer with nothing. "Saves win" is a handheld's only.
+    const offered = (d) => d.offered || { library: d.kind !== 'computer', saves: d.kind !== 'computer' };
+    const swRow = (attr, id, label, small) => `<div class="form-row"><div class="form-label"><strong>${esc(label)}</strong><small>${small}</small></div><button class="toggle" ${attr}="${esc(id)}" aria-label="${esc(label)}"><span></span></button></div>`;
+    const seen = (d) => (d.last_seen_ms ? `seen ${fmt.ago(new Date(d.last_seen_ms).toISOString())}` : 'not seen yet');
     devices.forEach((d) => {
-      bindSwitch($(`[data-handheld-primary="${d.id}"]`, table), !!d.primary, async (on, node) => { const r2 = await act('set_primary_handheld', [on ? d.id : ''], on ? `${d.name}'s saves win` : 'The newest saves win', { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } else renderHandhelds(); });
-      bindSwitch($(`[data-handheld-launch="${d.id}"]`, table), !!d.launch, async (on, node) => { const r2 = await act('set_handheld_launch', [d.id, on], on ? `${d.name} may start games here` : `${d.name} may no longer start games here`, { what: 'Changing it' }); if (!ok(r2)) { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); } });
-      $(`[data-handheld-forget="${d.id}"]`, table).onclick = async () => { if (await confirmDanger({ title: `Forget ${d.name}?`, body: 'It can no longer sync with this computer until you pair it again.', recommendation: 'We recommend Cancel.', proceed: 'Forget' })) await act('forget_handheld', [d.id], `Forgot ${d.name}`, { what: 'Forgetting it' }); };
+      const card = el(`<article class="device"><div class="device-head"><div class="card-icon">${d.kind === 'computer' ? 'PC' : '▭'}</div><div class="device-name"><strong>${esc(d.name)}</strong><small>${kindName(d)} · ${esc(seen(d))}</small></div><div class="inline-actions"><button class="btn small" data-device-games>Its games</button><button class="btn small" data-device-syncs>What syncs</button><button class="btn small ghost" data-device-more aria-haspopup="menu">More…</button></div></div><div class="device-switches">${swRow('data-offer-library', d.id, 'Share this library with it', 'It sees this computer’s games and can copy one when asked there.')}${swRow('data-offer-saves', d.id, 'Share saves', 'Saves are kept in step both ways. Needs the library.')}${d.kind === 'computer' ? '' : swRow('data-handheld-primary', d.id, 'Its saves win', 'When saves changed on both sides, this handheld’s copy is used and this computer’s goes to Save backups. Off: the newest wins.')}${swRow('data-handheld-launch', d.id, 'Let it start games here', esc(startGamesText().replace(/^Start games: /, '')))}</div></article>`);
+      h.appendChild(card);
+      $('[data-device-syncs]', card).onclick = () => showDeviceSyncs(d);
+      $('[data-device-games]', card).onclick = () => showOfferedGames(d);
+      const forget = async () => { if (await confirmDanger({ title: `Forget ${d.name}?`, body: 'It can no longer sync with this computer until you pair it again.', recommendation: 'We recommend Cancel.', proceed: 'Forget' })) await act('forget_handheld', [d.id], `Forgot ${d.name}`, { what: 'Forgetting it' }); };
+      const details = () => infoSheet({ title: d.name, details: [`${kindName(d)}`, `Device ID: ${d.id}`, `Last seen: ${d.last_seen_ms ? fmt.dateTime(new Date(d.last_seen_ms).toISOString()) : 'never'}`, d.last_address ? `Last address: ${d.last_address}` : ''].filter(Boolean).join('\n') });
+      const more = $('[data-device-more]', card);
+      more.onclick = () => menu(more, [{ label: 'Details', run: details }, { label: 'Forget…', run: forget }], { returnTo: more });
+      const offer = offered(d);
+      const flip = (node, on) => { node.classList.toggle('on', !on); node.setAttribute('aria-checked', String(!on)); };
+      const offerSwitch = (what, word) => bindSwitch($(`[data-offer-${what}]`, card), !!offer[what], async (on, node) => { const r2 = await act('set_device_offer', [d.id, what, on], on ? `Sharing ${word} with ${d.name}` : `No longer sharing ${word} with ${d.name}`, { what: 'Changing it' }); if (!ok(r2)) flip(node, on); else renderHandhelds(); });
+      offerSwitch('library', 'this library');
+      offerSwitch('saves', 'saves');
+      if (d.kind !== 'computer') bindSwitch($('[data-handheld-primary]', card), !!d.primary, async (on, node) => { const r2 = await act('set_primary_handheld', [on ? d.id : ''], on ? `${d.name}'s saves win` : 'The newest saves win', { what: 'Changing it' }); if (!ok(r2)) flip(node, on); else renderHandhelds(); });
+      bindSwitch($('[data-handheld-launch]', card), !!d.launch, async (on, node) => { const r2 = await act('set_handheld_launch', [d.id, on], on ? `${d.name} may start games here` : `${d.name} may no longer start games here`, { what: 'Changing it' }); if (!ok(r2)) flip(node, on); });
     });
   }, { what: 'Handhelds' }));
   renderHandheldGames();
@@ -708,10 +857,7 @@ function renderHandhelds() {
 function renderAgentTakeover(h, a) {
   const running = a.running || [];
   if (!a.pythia_serves) {
-    h.appendChild(el(`<p>${visibleStatus('droidtop-agent serves your handhelds, not Pythia. Pythia takes in its pairings and library.', 'neutral', '–')}</p>`));
-    const b = el('<p><button class="btn small">Serve from Pythia again</button></p>');
-    b.querySelector('button').onclick = async () => { const r = await act('serve_from_pythia_again', [], 'Pythia serves your handhelds from its next start, and turns droidtop-agent off then', { what: 'Serving from Pythia' }); if (ok(r)) renderHandhelds(); };
-    h.appendChild(b);
+    h.appendChild(el(`<p><small>You can pair a device while this is off; it syncs with this computer once it is on.</small></p>`));
     return;
   }
   if (running.length) {
@@ -752,7 +898,7 @@ async function pairHandheld() {
 }
 // One pairing-code panel for both shells: `host` is where it draws, `showing()` whether its page is still open,
 // `paired()` redraws that page's handheld list.
-async function showPairCode(host = $('#pairShowing'), showing = () => state.view === 'systems', paired = renderHandhelds) {
+async function showPairCode(host = $('#pairShowing'), showing = () => state.view === 'devices', paired = renderHandhelds) {
   if (!host) return;
   stopPairPoll();
   const r = await call('show_pairing_code');
@@ -771,29 +917,155 @@ async function showPairCode(host = $('#pairShowing'), showing = () => state.view
     else if (s.state === 'failed') { $('#pairOutcome', box).innerHTML = visibleStatus(s.error || 'Pairing stopped', 'critical'); }
   }, 1500);
 }
+// ---- Pair a device: one code on both screens (docs/SPEC.md 7.1-7.5; UX review AG5) -------------
+// While the panel is open this computer can be picked (droidtop's Pair a computer, or another Pythia's "Pair with
+// another computer"), and only then. Both screens then show one code; the person says whether they match on both.
+const PAIR_NETWORK = 'To pair, Pythia talks to the handheld or the other computer over your home network: it listens on TCP and UDP port 47610 and TCP 47612 while you pair. Your system may ask whether Pythia may use the network: allow it on private networks.';
+let pairCompare = null;
+function stopPairCompare() { if (pairCompare) { clearInterval(pairCompare); pairCompare = null; } }
+async function pairDevice(host = $('#pairShowing'), showing = () => state.view === 'devices', paired = renderHandhelds) {
+  if (!host) return;
+  stopPairPoll(); stopPairCompare();
+  // Pairing a handheld is mostly for Sync with droidtop: offered here once, so the first pairing also turns it on.
+  if (!model.modes) await refreshModes();
+  const sync = model.modes?.sync;
+  if (sync?.available && !sync.on && (await confirm({ title: 'Turn on Sync with droidtop too?', body: `A paired device syncs with this computer only while Sync with droidtop is on. ${SYNC_CONSENT}`, cancel: 'Pair only', proceed: 'Turn on and pair' }))) {
+    await act('serve_from_pythia_again', [], 'Sync with droidtop on', { what: 'Turning on Sync with droidtop' });
+    await refreshModes();
+  }
+  const told = await call('pairing_network_explained');
+  if (ok(told) && !told.explained) {
+    if (!(await confirm({ title: 'Pairing uses your network', body: PAIR_NETWORK, proceed: 'Continue' }))) return;
+    await call('mark_pairing_network_explained');
+  }
+  const r = await call('start_pair_offer');
+  host.innerHTML = '';
+  if (!ok(r)) { host.appendChild(fromResult(r, { what: 'Pairing' })); return; }
+  const box = el('<div class="panel" style="margin-bottom:13px"><div class="panel-body" data-pair-body></div></div>');
+  host.appendChild(box);
+  const body = $('[data-pair-body]', box);
+  const close = async () => { stopPairCompare(); await call('stop_pair_offer'); host.innerHTML = ''; };
+  // mode: waiting (offering), finding (this screen looks for computers), code (both screens compare), done.
+  let waitedFrom = 0; let answering = false; let mode = 'waiting'; let drawnLate = null;
+  const fallbacks = () => '<button class="btn small" data-pair-type>Type a code instead</button> <button class="btn small" data-pair-show>Show a code instead</button>';
+  const wire = () => {
+    $('[data-pair-stop]', body)?.addEventListener('click', close);
+    $('[data-pair-type]', body)?.addEventListener('click', async () => { await close(); pairHandheld(); });
+    $('[data-pair-show]', body)?.addEventListener('click', async () => { await close(); showPairCode(host, showing, paired); });
+    $('[data-pair-wait]', body)?.addEventListener('click', () => { waitedFrom = null; drawnLate = null; });
+    $('[data-pair-find]', body)?.addEventListener('click', () => { mode = 'finding'; findComputers(body, wire, showing); });
+  };
+  const drawWaiting = (seconds) => {
+    const late = waitedFrom !== null && seconds - (waitedFrom || 0) >= 60;
+    const left = Math.max(0, 60 - (seconds - (waitedFrom || 0)));
+    if (drawnLate === late) { const secs = $('[data-pair-secs]', body); if (secs) secs.textContent = `(${left} s)`; return; }
+    drawnLate = late;
+    body.innerHTML = late
+      ? `<p>${visibleStatus('Nothing has picked this computer yet', 'pending')}</p><p>Check that the handheld is on the same network as this computer, and that droidtop is open on Settings > Computers > Pair a computer.</p><p><button class="btn small" data-pair-wait>Keep waiting</button> ${fallbacks()} <button class="btn small ghost" data-pair-stop>Stop</button></p>`
+      : `<p><strong>Waiting for a handheld or computer…</strong> <small data-pair-secs>(${left} s)</small></p><p>On the handheld: droidtop > Settings > Computers > Pair a computer, and pick <strong>Pythia on ${esc(r.name || 'this computer')}</strong>. On another computer: Pythia > Devices > Pair a device > Pair with another computer.</p><p><button class="btn small" data-pair-find>Pair with another computer</button> ${fallbacks()} <button class="btn small ghost" data-pair-stop>Stop</button></p>`;
+    wire();
+  };
+  const drawCode = (code, name) => {
+    mode = 'code';
+    body.innerHTML = `<p>${name ? `Pairing with <strong>${esc(name)}</strong>. ` : ''}Does the other screen show this code?</p><p><strong class="mono" style="font-size:2.4rem;letter-spacing:0.12em">${esc(code.slice(0, 3))} ${esc(code.slice(3))}</strong></p><p><button class="btn primary" data-pair-same>Same code</button> <button class="btn" data-pair-differ>They don't match</button></p><p id="pairAnswer"></p>`;
+    const answer = async (same) => {
+      answering = true;
+      $$('button', body).forEach((b) => (b.disabled = true));
+      $('#pairAnswer', body).innerHTML = visibleStatus(same ? 'Waiting for the other device to answer…' : 'Telling the other device…', 'neutral', '…');
+      const a = await call('confirm_pairing', same);
+      mode = 'done'; stopPairCompare(); await call('stop_pair_offer');
+      if (ok(a)) { host.innerHTML = ''; flash(`Paired with ${a.paired}`); paired(); return; }
+      // The crates' words nest ("Nothing was paired: pairing failed: ..."); the page says it once.
+      const why = String(a.message || '').replace(/^Nothing was paired: /, '').replace(/^pairing failed: /, '').replace(/; nothing was paired$/, '');
+      body.innerHTML = `<p>${visibleStatus(same ? `Not paired: ${why}. Nothing was saved on either device.` : 'Not paired: the codes did not match. Nothing was saved on either device.', 'critical')}</p><p><button class="btn small" data-pair-again>Try again</button> ${fallbacks()}</p>`;
+      $('[data-pair-again]', body).onclick = () => pairDevice(host, showing, paired);
+      wire();
+    };
+    $('[data-pair-same]', body).onclick = () => answer(true);
+    $('[data-pair-differ]', body).onclick = () => answer(false);
+  };
+  let shown = '';
+  const tick = async () => {
+    if (!showing()) { close(); return; }
+    if (answering) return;
+    const st = await call('pair_compare_status');
+    if (!ok(st)) return;
+    if (st.state === 'offering') { if (mode !== 'waiting') return; if (waitedFrom === null) waitedFrom = st.seconds; drawWaiting(st.seconds); shown = 'offering'; }
+    else if (st.state === 'comparing' && shown !== `code:${st.code}`) { shown = `code:${st.code}`; drawCode(st.code, st.name); }
+    else if (st.state === 'failed' && shown !== 'failed' && mode !== 'done') { shown = 'failed'; mode = 'done'; stopPairCompare(); body.innerHTML = `<p>${visibleStatus(`Not paired: ${st.error}`, 'critical')}</p><p><button class="btn small" data-pair-again>Try again</button> ${fallbacks()}</p>`; $('[data-pair-again]', body).onclick = () => pairDevice(host, showing, paired); wire(); }
+  };
+  pairCompare = setInterval(tick, 1000);
+  tick();
+  // Picking another computer: this screen shows the code at once.
+  async function findComputers(target, rewire, still) {
+    target.innerHTML = `<p>${visibleStatus('Looking for computers on this network…', 'neutral', '…')}</p>`;
+    const f = await call('find_computers');
+    if (!still()) return;
+    const list = ok(f) ? f.computers || [] : [];
+    if (!list.length) {
+      target.innerHTML = `<p>${visibleStatus(ok(f) ? 'No computer is offering to pair on this network.' : f.message, 'pending')}</p><p>On the other computer, open Pythia's Devices page and choose Pair a device. It must be on the same network.</p><p><button class="btn small" data-pair-find>Look again</button> <button class="btn small ghost" data-pair-stop>Stop</button></p>`;
+      rewire(); return;
+    }
+    target.innerHTML = `<p>Pick the computer to pair with:</p><p>${list.map((c, i) => `<button class="btn small" data-pick="${i}">${esc(c.program === 'pythia' ? `Pythia on ${c.name}` : c.name)}</button>`).join(' ')}</p><p><button class="btn small ghost" data-pair-stop>Stop</button></p>`;
+    $$('[data-pick]', target).forEach((b) => (b.onclick = async () => {
+      answering = true;
+      target.innerHTML = `<p>${visibleStatus('Connecting…', 'neutral', '…')}</p>`;
+      const p = await call('pick_computer', list[Number(b.dataset.pick)]);
+      if (!ok(p)) { answering = false; mode = 'finding'; target.innerHTML = `<p>${visibleStatus(`Not paired: ${p.message}`, 'critical')}</p><p><button class="btn small" data-pair-find>Look again</button> <button class="btn small ghost" data-pair-stop>Stop</button></p>`; rewire(); return; }
+      answering = false; shown = `code:${p.code}`; drawCode(p.code, p.name);
+    }));
+    rewire();
+  }
+}
+// What a paired device offers this computer (droidtop-agent DESIGN section 20): its games, each to copy
+// here or to play there. The device decides what it answers; reaching it can take a few seconds.
+async function showOfferedGames(d) {
+  const r = await call('device_offered', d.id);
+  if (!ok(r)) { flash(r.message || 'Not available', 'caution'); return; }
+  const what = [r.offered?.library && 'its library', r.offered?.saves && 'its saves'].filter(Boolean);
+  const games = r.games || [];
+  const said = what.length ? `${esc(r.name || d.name)} offers this computer ${what.join(' and ')}.` : `${esc(r.name || d.name)} offers this computer nothing. It can offer its library on its own Devices page.`;
+  const size = (n) => (n ? `${(n / (1024 * 1024 * 1024)).toFixed(1)} GiB` : '');
+  const node = el(`<div><p>${said}</p>${games.length ? `<table class="table"><thead><tr><th>Game</th><th>Version</th><th>Size</th><th></th></tr></thead><tbody>${games.map((g, i) => `<tr><td class="primary-cell"><strong>${esc(g.title)}</strong>${g.accepted ? '<small>Copied here before</small>' : ''}</td><td>${esc(g.version || '')}</td><td>${size(g.size)}</td><td><button class="btn small" data-offered-copy="${i}">Copy here</button>${r.offered?.launch ? ` <button class="btn small" data-offered-play="${i}">Play there</button>` : ''}</td></tr>`).join('')}</tbody></table><p><small>Copy here puts the game in this computer's first game folder as a new folder and adds it to the library; nothing already here is changed. Play there starts it on ${esc(r.name || d.name)}, if it lets this computer, and only the game's windows are streamed here.</small></p>` : ''}</div>`);
+  $$('[data-offered-copy]', node).forEach((b) => (b.onclick = async () => { const g = games[Number(b.dataset.offeredCopy)]; b.disabled = true; await act('accept_offered_game', [d.id, g.key, g.title], `Copying ${g.title}; it shows under Activity`, { what: 'Copying it' }); }));
+  $$('[data-offered-play]', node).forEach((b) => (b.onclick = async () => { const g = games[Number(b.dataset.offeredPlay)]; b.disabled = true; const r2 = await call('play_on_device', d.id, g.key, g.title); flash(r2.message || (ok(r2) ? 'Started there.' : 'It did not start.'), ok(r2) ? 'info' : 'caution'); b.disabled = false; }));
+  infoSheet({ title: `On ${r.name || d.name}`, node, wide: true });
+}
+// What syncs with a paired device (UX review AG6), from the backend's sync model; game files never sync.
+async function showDeviceSyncs(d) {
+  const r = await call('device_syncs', d.id);
+  if (!ok(r)) { flash(r.message || 'Not available', 'caution'); return; }
+  const node = el(`<div><table class="table"><tbody>${(r.rows || []).map((row) => `<tr><td><strong>${esc(row.what)}</strong></td><td>${row.syncs ? routineStatus('Syncs') : visibleStatus('Does not sync', 'neutral', '–')}</td><td><small>${esc(row.detail)}</small></td></tr>`).join('')}</tbody></table></div>`);
+  infoSheet({ title: `What syncs with ${r.name || d.name}`, node, wide: true });
+}
 function updateSystems(raw) {
   const by = new Map();
   (raw || []).forEach((r) => (r.entries || []).forEach((e) => { const uuid = e.system_uuid; if (!uuid) return; const s = by.get(uuid) || { games: 0, installed: 0 }; s.games++; if ((e.versions || []).some((v) => (v.variants || []).some((x) => x.path))) s.installed++; by.set(uuid, s); }));
   if (model.mySystem && !by.has(model.mySystem)) by.set(model.mySystem, { games: 0, installed: 0 });
   systems = [...by.entries()].map(([uuid, s]) => ({ id: uuid, icon: uuid === model.mySystem ? 'PC' : uuid.slice(0, 2).toUpperCase(), name: systemName(uuid), games: s.games, installed: s.installed, mine: uuid === model.mySystem })).sort((a, b) => (a.mine ? -1 : b.mine ? 1 : a.name.localeCompare(b.name)));
-  if (state.view === 'systems') renderSystems();
+  if (state.view === 'shared') renderShared();
 }
 
 // ---- Launcher entries and Save backups: wired, honest, not built yet ----------------------
 // What each launcher on this computer lists (backend get_launcher_entries, from droidtop's scanner), against the library.
+function renderSources() {
+  loadInto($('#libraryFolders'), 'get_library_folders', [], (r, host) => { (r.folders || []).forEach((f) => host.appendChild(el(`<div class="account-row"><div class="card-icon">F</div><div><strong>${esc(f.path)}</strong></div></div>`))); if (!(r.folders || []).length) host.appendChild(stateBlock({ title: 'No game folder yet', body: 'Add a folder that holds games, or scan one that holds many.' })); }, { what: 'Game folders', actions: [{ label: 'Scan a folder', primary: true, run: scanLibrary }] });
+  loadInto($('#scanSettings'), 'get_scan_settings', [], () => {}, { what: 'Scan settings' });
+  renderCapabilityList($('#view-sources [data-capability-list="library"]'), 'library');
+  renderLauncher();
+}
 function renderLauncher() {
-  $('#launcherSummary').textContent = ''; $('#launcherRows').innerHTML = ''; $('#launcherCount').textContent = '';
-  const q = state.view === 'launcher' ? state.search.toLowerCase() : '';
+  $('#launcherSummary').textContent = ''; $('#launcherRows').innerHTML = '';
+  const q = state.view === 'sources' ? state.search.toLowerCase() : '';
   loadInto($('#launcherState'), 'get_launcher_entries', [], (r) => {
     const entries = r.entries || [];
     const shown = entries.filter((e) => !q || [e.game, e.manager, e.folder].join(' ').toLowerCase().includes(q));
     const untracked = entries.filter((e) => e.state === 'untracked').length;
-    $('#launcherSummary').textContent = `${fmt.n(entries.length, 'game')} in this computer's launchers · ${fmt.n(untracked, 'game')} not in the library`;
-    $('#launcherCount').textContent = shown.length === entries.length ? '' : `${shown.length} shown`;
+    $('#launcherSummary').textContent = `${fmt.n(entries.length, 'game')} · ${fmt.n(untracked, 'game')} not in the library${shown.length === entries.length ? '' : ` · ${shown.length} shown`}`;
     const stateCell = (e) => (e.state === 'tracked' ? `${routineStatus('In library')} In library`
-      : e.state === 'drifted' ? `<span class="state-pill critical">Drifted</span><small class="mono">Library: ${esc(e.library_folder || '')}</small>`
+      : e.state === 'drifted' ? `<span class="state-pill pending">Folder moved</span><small class="mono">Library: ${esc(e.library_folder || '')}</small>`
       : '<span class="state-pill info">Not in library</span>');
-    $('#launcherRows').innerHTML = shown.map((e, i) => `<tr><td class="primary-cell"><strong>${esc(e.game)}</strong><small class="mono">${esc(e.folder)}</small></td><td>${esc(r.system || '')}</td><td>${esc(e.manager)}</td><td>${stateCell(e)}</td><td>${e.state === 'untracked' ? `<button class="btn small" data-record-entry="${i}">Record</button>` : ''}</td></tr>`).join('');
+    $('#launcherRows').innerHTML = shown.map((e, i) => `<tr><td class="primary-cell"><strong>${esc(e.game)}</strong><small class="mono">${esc(e.folder)}</small></td><td>${esc(e.manager)}</td><td>${stateCell(e)}</td><td>${e.state === 'untracked' ? `<button class="btn small" data-record-entry="${i}">Record</button>` : ''}</td></tr>`).join('');
     $$('[data-record-entry]', $('#launcherRows')).forEach((b) => (b.onclick = async () => {
       const e = shown[Number(b.dataset.recordEntry)]; b.disabled = true;
       const r2 = await act('record_launcher_entry', [e.folder, e.key], `Recorded ${e.game}`, { what: `Recording ${e.game}` });
@@ -846,42 +1118,65 @@ function renderJobs() {
 // ---- Settings ------------------------------------------------------------------------------
 function renderSettings() { renderSettingsSearch(); renderSettingsPane(state.settingsPane); }
 function renderSettingsSearch() { const q = state.search.toLowerCase(); $$('.form-row', $('#view-settings')).forEach((r) => r.classList.toggle('hidden', !!q && !r.innerText.toLowerCase().includes(q))); }
-function openSettingsPane(name) { state.settingsPane = name; const btn = $$('[data-settings]').find((b) => b.dataset.settings === name); if (btn) { $$('[data-settings]').forEach((x) => x.classList.toggle('active', x === btn)); $$('.settings-pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === name)); } if (state.view !== 'settings') navigate('settings'); else renderSettingsPane(name); }
+// Settings pages that became pages of their own, or one Plugins page, in the UI round.
+const MOVED_PANES = { library: ['sources'], sync: ['shared'], sources: ['plugins', 'library'], downloaders: ['plugins', 'downloader'], metadata: ['plugins', 'metadata'], managers: ['plugins', 'manager'], engines: ['plugins', 'engine'], mods: ['plugins', 'mod'], patchers: ['plugins', 'patcher'] };
+function openSettingsPane(name) {
+  const moved = MOVED_PANES[name];
+  if (moved && moved.length === 1) { navigate(moved[0]); return; }
+  if (moved) { name = moved[0]; state.pluginKind = moved[1]; }
+  state.settingsPane = name; const btn = $$('[data-settings]').find((b) => b.dataset.settings === name); if (btn) { $$('[data-settings]').forEach((x) => x.classList.toggle('active', x === btn)); $$('.settings-pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === name)); } if (state.view !== 'settings') navigate('settings'); else renderSettingsPane(name); }
 function renderSettingsPane(name) {
   const info = model.info || {}; const app = model.app || {};
   if (name === 'general') renderModes($('#modesState'));
   if (name === 'general') { $('#appDataPath').textContent = info.app_data_folder || '';  }
-  if (name === 'library') { loadInto($('#libraryFolders'), 'get_library_folders', [], (r, host) => { (r.folders || []).forEach((f) => host.appendChild(el(`<div class="account-row"><div class="card-icon">F</div><div><strong>${esc(f.path)}</strong></div></div>`))); if (!(r.folders || []).length) host.appendChild(stateBlock({ title: 'No folders tracked' })); }, { what: 'Tracked folders', actions: [{ label: 'Scan a folder', primary: true, run: scanLibrary }] }); loadInto($('#scanSettings'), 'get_scan_settings', [], () => {}, { what: 'Scan settings' }); }
-  if (['sources', 'downloaders', 'metadata', 'managers', 'engines', 'mods', 'patchers'].includes(name)) {
-    const cat = { sources: 'library', downloaders: 'downloader', metadata: 'metadata', managers: 'manager', engines: 'engine', mods: 'mod', patchers: 'patcher' }[name];
-    renderCapabilityList($(`[data-capability-list="${cat}"]`), cat);
-    if (name === 'downloaders') loadInto($('#toolsState'), 'get_tools', [], (r, host) => { if (!(r.tools || []).length) host.appendChild(stateBlock({ title: 'No tools downloaded' })); }, { what: 'Downloaded tools' });
-  }
-  if (name === 'plugins') { renderPlugins(); loadInto($('#pluginRepos'), 'get_plugin_repositories', [], (r, host) => { if (!(r.repositories || []).length) host.appendChild(stateBlock({ title: 'No repositories added' })); }, { what: 'Plugin repositories' }); }
-  if (name === 'sync') { $('#syncFolderPath').textContent = info.sync_folder || ''; $('#systemIdField').value = info.system_uuid || ''; loadInto($('#transferSettings'), 'get_transfer_settings', [], () => {}, { what: 'Game transfer' }); loadInto($('#storageRoles'), 'get_storage_roles', [], () => {}, { what: 'Storage roles' }); }
-  if (name === 'advanced') { $('#dbPath').textContent = info.app_data_folder || ''; $('#schemaVersion').innerHTML = app.schema_version ? `${routineStatus('Up to date')}v${esc(app.schema_version)}` : ''; $('#logLevelSelect').value = model.config?.log_level === 'debug' ? 'debug' : 'info'; $('#consoleHint').textContent = model.config?.error_console ? 'On for this run. Ctrl+Shift+E toggles it.' : 'Off. Start Pythia with --error-console, or set error_console = True in pythia.conf.'; }
+  if (name === 'plugins') { renderPlugins(!state.search); loadInto($('#pluginRepos'), 'get_plugin_repositories', [], (r, host) => { if (!(r.repositories || []).length) host.appendChild(stateBlock({ title: 'No repositories added' })); }, { what: 'Plugin repositories' }); }
+  if (name === 'advanced') { $('#systemIdField').value = info.system_uuid || ''; $('#dbPath').textContent = info.app_data_folder || ''; $('#schemaVersion').innerHTML = app.schema_version ? `${routineStatus('Up to date')}v${esc(app.schema_version)}` : ''; $('#logLevelSelect').value = model.config?.log_level === 'debug' ? 'debug' : 'info'; $('#consoleHint').textContent = model.config?.error_console ? 'On for this run. Ctrl+Shift+E toggles it.' : 'Off. Start Pythia with --error-console, or set error_console = True in pythia.conf.'; }
+}
+// Settings shows what can be set (UI review 2026-10-23, U4): a section whose slot answers "not built yet",
+// or a plugin kind with no plugin, is hidden, and so is a page left with nothing. The slots stay, so a
+// section comes back on its own once it is built or a plugin of that kind is installed.
+async function trimSettings() {
+  const view = $('#view-settings');
+  const hide = (node) => node?.closest('.form-section')?.classList.add('hidden');
+  const unbuilt = [['get_library_folders', '#libraryFolders'], ['get_scan_settings', '#scanSettings'], ['get_transfer_settings', '#transferSettings'], ['get_storage_roles', '#storageRoles']];
+  await Promise.all(unbuilt.map(([slot, sel]) => call(slot).then((r) => { if (r?.status === 'unavailable') hide($(sel)); })));
+  // A panel left with only hidden sections goes too (Game sources' folders while they are not built).
+  $$('.panel').forEach((panel) => { const secs = $$('.form-section', panel); if (secs.length && secs.every((x) => x.classList.contains('hidden'))) panel.classList.add('hidden'); });
+  call('get_tools').then((r) => { if (r?.status === 'unavailable') $$('[data-action="tools"]').forEach((b) => b.classList.add('hidden')); });
+  $$('.settings-pane', view).forEach((pane) => {
+    const empty = $$('.form-section', pane).every((sec) => sec.classList.contains('hidden'));
+    const btn = $$('[data-settings]', view).find((b) => b.dataset.settings === pane.dataset.pane);
+    if (btn) btn.classList.toggle('hidden', empty);
+  });
+}
+// What one plugin's kind says about it now: a store's account, a launcher's presence here, an engine tool.
+function capabilityState(category, p) {
+  const s = p.state || {}; let status, extra = '', sub = '';
+  if (s.error) status = visibleStatus('Check failed', 'critical');
+  else if (s.unknown) status = visibleStatus('Not reported', 'neutral', '–');
+  else if (category === 'library') { status = s.has_account ? (s.connected ? routineStatus('Connected') : visibleStatus('Not connected', 'neutral', '–')) : ''; if (s.has_account) extra = `<button class="btn small" data-account="${esc(p.id)}">Account</button>`; }
+  else if (category === 'manager') { status = s.available ? routineStatus('Installed here') : visibleStatus('Not on this computer', 'neutral', '–'); sub = `Opens games from ${(s.sources || []).map((k) => kindName(k) || k).join(', ') || 'any source'}`; }
+  else if (category === 'engine') { status = s.installed ? routineStatus('Ready') : visibleStatus('Tool missing', 'pending'); sub = s.tool_version ? `Tool ${s.tool_version}` : ''; }
+  else if (category === 'downloader') { status = s.watching ? routineStatus('Watching') : routineStatus('Idle', 'neutral', '–'); sub = s.watching ? `Watching ${s.watching}` : ''; extra = `<button class="btn small" data-watch-config>${s.watching ? 'Stop' : 'Watch a folder'}</button>`; }
+  else status = p.enabled ? routineStatus('Ready') : visibleStatus('Turned off', 'neutral', '–');
+  if (!p.enabled) status = visibleStatus('Turned off', 'neutral', '–');
+  return { status, extra, sub: s.error || sub };
+}
+function capabilityRow(category, p, redraw) {
+  const { status, extra, sub } = capabilityState(category, p);
+  const row = el(`<div class="account-row"><div class="card-icon">${esc(p.display_name.slice(0, 2).toUpperCase())}</div><div><strong>${esc(p.display_name)}</strong>${sub ? `<small>${esc(sub)}</small>` : ''}</div><div class="row-status">${status}${extra}<button class="btn small ghost" data-plugin-details="${esc(p.id)}">Details</button><button class="toggle" aria-label="Turn on ${esc(p.display_name)}"><span></span></button></div></div>`);
+  bindSwitch($('.toggle', row), p.enabled, (on) => act('set_plugin_enabled', [p.id, on], on ? `${p.display_name} turned on` : `${p.display_name} turned off`, { what: 'Turning the plugin' }).then((res) => { if (ok(res)) refreshPlugins().then(redraw); }), `Turn on ${p.display_name}`);
+  $('[data-account]', row)?.addEventListener('click', () => accountDialog(p.id));
+  $('[data-watch-config]', row)?.addEventListener('click', () => ((p.state || {}).watching ? stopWatching() : watchFolder(p.id)));
+  $('[data-plugin-details]', row).onclick = () => pluginDetails(p.id);
+  return row;
 }
 function renderCapabilityList(host, category) {
   if (!host) return;
   loadInto(host, 'get_capabilities', [category], (r, h) => {
     const list = r.plugins || [];
     if (!list.length) { h.appendChild(stateBlock({ title: `No ${CATEGORY_NAMES[category].toLowerCase()} plugins`, body: 'A plugin of this kind adds a row here.' })); return; }
-    list.forEach((p) => {
-      const s = p.state || {}; let status, extra = '', sub = '';
-      if (s.error) status = visibleStatus('Check failed', 'critical');
-      else if (s.unknown) status = visibleStatus('Not reported', 'neutral', '–');
-      else if (category === 'library') { status = s.has_account ? (s.connected ? routineStatus('Connected') : visibleStatus('Not connected', 'pending')) : routineStatus('Folder detection only', 'neutral', 'i'); if (s.has_account) extra = `<button class="btn small" data-account="${esc(p.id)}">Account</button>`; }
-      else if (category === 'manager') { status = s.available ? routineStatus('Installed here') : visibleStatus('Not found on this computer', 'pending'); sub = `Opens games from ${(s.sources || []).map((k) => kindName(k) || k).join(', ') || 'any source'}`; }
-      else if (category === 'engine') { status = s.installed ? routineStatus('Ready') : visibleStatus('Tool missing', 'pending'); sub = s.tool_version ? `Tool ${s.tool_version}` : ''; }
-      else if (category === 'downloader') { status = s.watching ? routineStatus('Watching') : routineStatus('Idle', 'neutral', '–'); sub = s.watching ? `Watching ${s.watching}` : ''; extra = `<button class="btn small" data-watch-config>${s.watching ? 'Stop' : 'Watch a folder'}</button>`; }
-      else status = p.enabled ? routineStatus('Ready') : visibleStatus('Turned off', 'neutral', '–');
-      if (!p.enabled) status = visibleStatus('Turned off', 'neutral', '–');
-      const row = el(`<div class="account-row"><div class="card-icon">${esc(p.display_name.slice(0, 2).toUpperCase())}</div><div><strong>${esc(p.display_name)}</strong>${sub || s.error ? `<small>${esc(s.error || sub)}</small>` : ''}</div><div class="row-status">${status}<button class="toggle" aria-label="Enable ${esc(p.display_name)}"><span></span></button>${extra}</div></div>`);
-      bindSwitch($('.toggle', row), p.enabled, (on) => act('set_plugin_enabled', [p.id, on], on ? `${p.display_name} turned on` : `${p.display_name} turned off`, { what: 'Turning the plugin' }).then((res) => { if (ok(res)) { refreshPlugins().then(() => renderCapabilityList(host, category)); } }), `Enable ${p.display_name}`);
-      $('[data-account]', row)?.addEventListener('click', () => accountDialog(p.id));
-      $('[data-watch-config]', row)?.addEventListener('click', () => (s.watching ? stopWatching() : watchFolder()));
-      h.appendChild(row);
-    });
+    list.forEach((p) => h.appendChild(capabilityRow(category, p, () => renderCapabilityList(host, category))));
   }, { what: `${CATEGORY_NAMES[category]} plugins` });
 }
 async function accountDialog(pluginId) {
@@ -893,16 +1188,58 @@ async function accountDialog(pluginId) {
   if (a.connected) { const b = el('<button class="btn primary" style="margin-top:10px">Sync owned games now</button>'); b.onclick = () => { pythia.sync_account(a.id); flash('Syncing'); navigate('activity'); }; body.appendChild(b); }
   infoSheet({ title: `${a.display_name} account`, node: body });
 }
-function renderPlugins() {
+// One Plugins page (UI round): every plugin once, by kind, with its kind's own state; a filter by kind and the
+// page's search. Engine detectors are many and alike, so "All" folds them into one row that opens.
+const PLUGIN_KINDS = ['library', 'downloader', 'metadata', 'manager', 'engine', 'mod', 'patcher', 'source'];
+const PLUGIN_KIND_NAMES = { library: 'Stores', downloader: 'Downloaders', metadata: 'Metadata', manager: 'Launchers', engine: 'Engine detection', mod: 'Mods', patcher: 'Patchers', source: 'Remote sources' };
+function pluginDetails(id) {
+  const p = plugins.find((x) => x.id === id); if (!p) return;
+  const a = model.accounts.find((x) => x.id === p.id);
+  infoSheet({ title: p.name, details: [`Id: ${p.id}`, `Version: ${p.version}`, `Origin: ${p.origin}`, `Adds: ${p.kind}`, p.origin !== 'Built-in' ? 'Unofficial: it came from outside Pythia and runs with the same access as Pythia.' : 'Official: built into Pythia.', a ? `Account: ${a.connected ? 'connected' : 'not connected'} (${a.fields.map((f) => f.label).join(', ')})` : ''].filter(Boolean).join('\n') });
+}
+async function renderPlugins(fresh = false) {
+  const st = $('#pluginsState'); const list = $('#pluginList'); const filter = $('#pluginFilter');
+  if (!st || !list) return;
+  if (!model.ready) { list.innerHTML = ''; st.replaceChildren(stateBlock({ kind: 'loading' })); return; }
+  if (fresh || !model.capabilities) {
+    if (!model.capabilities) st.replaceChildren(stateBlock({ kind: 'loading' }));
+    const answers = await Promise.all(PLUGIN_KINDS.map((k) => call('get_capabilities', k).then((r) => [k, ok(r) ? r.plugins || [] : []])));
+    model.capabilities = Object.fromEntries(answers);
+  }
+  st.innerHTML = '';
+  const caps = model.capabilities;
+  const kinds = PLUGIN_KINDS.filter((k) => (caps[k] || []).length);
+  if (state.pluginKind && !kinds.includes(state.pluginKind)) state.pluginKind = '';
+  const kind = state.pluginKind || '';
+  filter.innerHTML = ['', ...kinds].map((k) => `<button class="chip${k === kind ? ' active' : ''}" data-plugin-kind="${k}" aria-pressed="${k === kind}">${esc(k ? PLUGIN_KIND_NAMES[k] : 'All')} <small>${k ? caps[k].length : plugins.length}</small></button>`).join('');
+  $$('[data-plugin-kind]', filter).forEach((b) => (b.onclick = () => { state.pluginKind = b.dataset.pluginKind; renderPlugins(); }));
   const q = state.view === 'settings' ? state.search.toLowerCase() : '';
-  const st = $('#pluginsState'); st.innerHTML = '';
-  if (!model.ready) { $('#pluginCards').innerHTML = ''; st.appendChild(stateBlock({ kind: 'loading' })); return; }
-  const list = plugins.filter((p) => !q || [p.name, p.kind, p.desc, p.state, p.origin, p.version].join(' ').toLowerCase().includes(q));
-  $('#pluginCards').innerHTML = list.map((p) => `<article class="card"><div class="card-head"><div class="card-icon">${esc(p.icon)}</div><div><strong>${esc(p.name)}</strong><small>${esc(p.kind)} · ${esc(p.origin === 'Built-in' ? 'Official' : 'Unofficial')} · ${esc(p.version)}</small></div><button class="toggle" data-plugin="${esc(p.id)}" style="margin-left:auto" aria-label="${p.enabled ? 'Disable' : 'Enable'} ${esc(p.name)}"><span></span></button></div>${p.desc ? `<div class="card-body"><p>${esc(p.desc)}</p></div>` : ''}<div class="card-foot">${!p.enabled ? visibleStatus('Turned off', 'neutral', '–') : routineStatus('On')}<span class="spacer"></span><button class="btn small" data-plugin-details="${esc(p.id)}">Details</button></div></article>`).join('');
+  const matches = (p) => !q || [p.display_name, p.id, PLUGIN_KIND_NAMES[kindOf(p.id)] || ''].join(' ').toLowerCase().includes(q);
+  // A plugin's first kind is where it is listed under All; its other kinds list it again when picked.
+  const kindOf = (id) => kinds.find((k) => caps[k].some((x) => x.id === id));
+  list.innerHTML = '';
+  const redraw = () => renderPlugins(true);
+  if (kind) {
+    caps[kind].filter(matches).forEach((p) => list.appendChild(capabilityRow(kind, p, redraw)));
+  } else {
+    const seen = new Set();
+    kinds.forEach((k) => {
+      const mine = caps[k].filter((p) => !seen.has(p.id) && matches(p));
+      mine.forEach((p) => seen.add(p.id));
+      if (!mine.length) return;
+      if (k === 'engine' && !q) {
+        const ready = mine.filter((p) => p.enabled && (p.state || {}).installed !== false).length;
+        const fold = el(`<details class="plugin-fold"><summary class="account-row"><div class="card-icon">EN</div><div><strong>Engine detection</strong><small>${esc(fmt.n(mine.length, 'detector'))} · ${ready} ready</small></div><div class="row-status"><span class="btn small ghost">Show</span></div></summary></details>`);
+        mine.forEach((p) => fold.appendChild(capabilityRow(k, p, redraw)));
+        list.appendChild(fold);
+        return;
+      }
+      list.appendChild(el(`<h4 class="plugin-kind">${esc(PLUGIN_KIND_NAMES[k])}</h4>`));
+      mine.forEach((p) => list.appendChild(capabilityRow(k, p, redraw)));
+    });
+  }
   if (!plugins.length) st.appendChild(stateBlock({ title: 'No plugins found', body: 'Built-in plugins ship with Pythia; drop-in folders and Python packages add more.' }));
-  else if (!list.length) st.appendChild(stateBlock({ title: 'No plugins match' }));
-  $$('[data-plugin]').forEach((t) => { const p = plugins.find((x) => x.id === t.dataset.plugin); bindSwitch(t, p.enabled, (on) => act('set_plugin_enabled', [p.id, on], on ? `${p.name} turned on` : `${p.name} turned off`, { what: 'Turning the plugin' }).then((r) => { if (ok(r)) refreshPlugins(); else renderPlugins(); })); });
-  $$('[data-plugin-details]').forEach((b) => (b.onclick = () => { const p = plugins.find((x) => x.id === b.dataset.pluginDetails); const a = model.accounts.find((x) => x.id === p.id); infoSheet({ title: p.name, details: [`Id: ${p.id}`, `Version: ${p.version}`, `Origin: ${p.origin}`, `Adds: ${p.kind}`, p.origin !== 'Built-in' ? 'Unofficial: it came from outside Pythia and runs with the same access as Pythia.' : 'Official: built into Pythia.', a ? `Account: ${a.connected ? 'connected' : 'not connected'} (${a.fields.map((f) => f.label).join(', ')})` : ''].filter(Boolean).join('\n') }); }));
+  else if (!list.children.length) st.appendChild(stateBlock({ title: 'No plugins match' }));
 }
 
 // ---- Look, Review, Add (UX review A16) -------------------------------------------------------
@@ -1014,12 +1351,13 @@ async function importSource() {
   const id = await prompt({ title: 'Import from source', kind: 'select', options: connected.map((a) => ({ value: a.id, label: a.display_name })), value: connected[0].id, save: 'Import' });
   if (id) { pythia.sync_account(id); flash('Importing'); navigate('activity'); }
 }
-async function watchFolder() {
+async function watchFolder(pluginId = '') {
   const folder = await prompt({ title: 'Watch a download folder', hint: pathHint('C:\\Users\\you\\Downloads', '~/Downloads'), kind: 'path', check: checkPath('folder'), save: 'Next', pick: { label: 'Browse', run: pickFolder('Folder to watch') } });
   if (!folder || !folder.trim()) return;
   const program = await prompt({ title: 'Program to run while watching', body: 'Leave empty to only watch the folder.', hint: pathHint('C:\\Tools\\F95Checker.exe', '~/Applications/F95Checker'), kind: 'path', check: checkPath('program'), save: 'Watch', pick: { label: 'Browse', run: (done) => call('pick_file', 'Program to run').then((v) => done(typeof v === 'string' ? v : '')) } });
   if (program === null) return;
-  pythia.start_watch(program.trim(), folder.trim()); flash('Watching'); navigate('downloads');
+  if (pluginId) pythia.start_watch_for(pluginId, program.trim(), folder.trim()); else pythia.start_watch(program.trim(), folder.trim());
+  flash('Watching'); navigate('downloads');
 }
 async function exportDiagnostics() {
   const dir = await prompt({ title: 'Export diagnostics', body: 'The log file plus app, system and plugin facts. No credentials.', hint: pathHint('C:\\Users\\you\\Desktop', '~/Desktop'), kind: 'path', check: checkPath('writable'), save: 'Export', pick: { label: 'Browse', run: pickFolder('Folder for the diagnostics') } });
@@ -1035,6 +1373,7 @@ async function action(a) {
   if (a === 'rebuild-cache') act('rebuild_index', [], 'Index rebuilt', { what: 'Rebuilding the index' });
   if (a === 'add-system') { const r = await call('get_transfer_settings'); infoSheet({ title: 'Add a system', details: r.message || 'Point your sync tool at the library folder on the other computer; it appears here once it writes a record.' }); }
   if (a === 'reload-launcher') renderLauncher();
+  if (a === 'tools') menuAction('tools');
   if (a === 'backup-now') {
     flash('Backing up saves…');
     const r = await call('back_up_saves_now');
@@ -1048,6 +1387,7 @@ async function action(a) {
   }
   if (a === 'pair-handheld') pairHandheld();
   if (a === 'show-pair-code') showPairCode();
+  if (a === 'pair-device') pairDevice();
   if (a === 'clear-jobs') act('clear_finished_jobs', [], 'Cleared', { what: 'Clearing' });
   if (a === 'export-diagnostics') exportDiagnostics();
   if (a === 'install-plugin') infoSheet({ title: 'Install a plugin', details: `Drop a plugin folder (with its manifest) into the plugins folder under ${model.info?.app_data_folder || 'the app data folder'}, or pip-install a package that declares a pythia.plugins entry point, then restart Pythia. Plugins from outside Pythia are marked Unofficial.` });
@@ -1156,7 +1496,7 @@ function hhReviewLines(review) {
   return [
     line('decisions', review.decisions.length, fmt.n(review.decisions.length, 'scan decision'), 'Folders that may be a game you already have', '?'),
     line('duplicates', review.clusters.length, fmt.n(review.clusters.length, 'possible duplicate'), review.clusters.slice(0, 3).map((c) => c.name).join(', '), '⇄'),
-    line('unidentified', review.unidentified.length, `${review.unidentified.length} not identified`, review.unidentified.slice(0, 3).map((g) => g.name).join(', '), '!', 'critical'),
+    line('unidentified', review.unidentified.length, `${review.unidentified.length} not identified`, review.unidentified.slice(0, 3).map((g) => g.name).join(', '), '?', 'neutral'),
     line('updates', review.updates.length, fmt.n(review.updates.length, 'update') + ' seen', review.updates.slice(0, 3).map((g) => g.name).join(', '), '↻'),
     line('downloads', review.downloads.length, fmt.n(review.downloads.length, 'new download'), review.downloads.slice(0, 3).map((d) => fileName(d.path)).join(', '), '⇩'),
   ].filter(Boolean);
@@ -1186,7 +1526,7 @@ function renderHHAttention(q = '') {
     return;
   }
   const list = games_(section === 'updates' ? review.updates : review.unidentified);
-  host.innerHTML = `<div class="hh-toolbar">${back}<span class="spacer"></span><span>${list.length} items</span></div><div class="hh-issue-list">${list.map((g) => `<button class="hh-issue ${section === 'updates' ? 'pending' : 'critical'}" data-hh-decision="${g.id}"><span class="symbol">${section === 'updates' ? '↻' : '!'}</span><span><strong>${esc(g.name)}</strong><small>${esc(section === 'updates' ? `${g.updates.map((u) => u.version || 'Newer version').join(', ')} seen · installed ${versionText(g)}` : `Not identified · ${g.source}`)}</small></span><span class="go">›</span></button>`).join('')}</div>`;
+  host.innerHTML = `<div class="hh-toolbar">${back}<span class="spacer"></span><span>${list.length} items</span></div><div class="hh-issue-list">${list.map((g) => `<button class="hh-issue ${section === 'updates' ? 'pending' : 'neutral'}" data-hh-decision="${g.id}"><span class="symbol">${section === 'updates' ? '↻' : '?'}</span><span><strong>${esc(g.name)}</strong><small>${esc(section === 'updates' ? `${g.updates.map((u) => u.version || 'Newer version').join(', ')} seen · installed ${versionText(g)}` : `Not identified · ${g.source}`)}</small></span><span class="go">›</span></button>`).join('')}</div>`;
   if (!list.length) host.appendChild(stateBlock({ glyph: '✓', title: section === 'updates' ? 'No updates seen' : 'Every game is identified' }));
 }
 function renderHHDownloads() {
@@ -1196,14 +1536,19 @@ function renderHHDownloads() {
 }
 function renderHHSystems() {
   const host = $('#hhContent');
-  host.innerHTML = `<div class="hh-system-grid">${systems.map((s) => `<article class="hh-system"><h2>${esc(s.name)}</h2><p>${esc(s.mine && model.app ? model.app.platform : 'Synced record')} · ${fmt.n(s.games, 'game')}</p><div class="line"><span>Installed</span><b>${s.installed}</b></div><div class="line"><span>Record</span><b style="color:var(--positive)">${s.mine ? 'This computer' : 'Synced'}</b></div></article>`).join('')}</div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Handhelds</h2><span class="spacer"></span><button class="hh-action" data-hh-pair>Pair a handheld</button><button class="hh-action" data-hh-pair-show>Show a code</button></div><div class="hh-panel-body"><div id="hhPairShowing"></div><div class="hh-summary-list" id="hhHandhelds"></div></div></section><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Library folder</h2><span class="spacer"></span><small>Shared by every system</small></div><div class="hh-panel-body"><div class="hh-setting"><strong class="mono" style="font-size:0.75rem;word-break:break-all">${esc(model.info?.sync_folder || '')}</strong><small>Copying versions between devices is not built yet.</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div></div></section>`;
+  host.innerHTML = `<div class="hh-system-grid">${systems.map((s) => `<article class="hh-system"><h2>${esc(s.name)}</h2><p>${esc(s.mine && model.app ? model.app.platform : 'Synced record')} · ${fmt.n(s.games, 'game')}</p><div class="line"><span>Installed</span><b>${s.installed}</b></div><div class="line"><span>Record</span><b style="color:var(--positive)">${s.mine ? 'This computer' : 'Synced'}</b></div></article>`).join('')}</div><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Paired devices</h2><span class="spacer"></span><button class="hh-action primary" data-hh-pair-device>Pair a device</button><button class="hh-action" data-hh-pair>Type a code</button><button class="hh-action" data-hh-pair-show>Show a code</button></div><div class="hh-panel-body"><div id="hhPairShowing"></div><div class="hh-summary-list" id="hhHandhelds"></div></div></section><section class="hh-panel" style="margin-top:10px"><div class="hh-panel-head"><h2>Library folder</h2><span class="spacer"></span><small>Shared by every system</small></div><div class="hh-panel-body"><div class="hh-setting"><strong class="mono" style="font-size:0.75rem;word-break:break-all">${esc(model.info?.sync_folder || '')}</strong><small>Copying versions between devices is not built yet.</small><button class="hh-action" data-open-path="sync_folder">Open folder</button></div></div></section>`;
   if (!systems.length) host.prepend(stateBlock({ kind: model.ready ? 'empty' : 'loading', title: 'No systems yet' }));
   $('[data-hh-pair]', host).onclick = pairHandheld;
+  $('[data-hh-pair-device]', host).onclick = () => pairDevice($('#hhPairShowing', host), () => state.shell === 'handheld' && state.hhPage === 'systems', renderHandheld);
   $('[data-hh-pair-show]', host).onclick = () => showPairCode($('#hhPairShowing', host), () => state.shell === 'handheld' && state.hhPage === 'systems', renderHandheld);
   loadInto($('#hhHandhelds', host), 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
-    if (!devices.length) { h.appendChild(stateBlock({ title: 'No handheld is paired', body: 'On the handheld: Settings > Computers > Pair a computer.' })); return; }
-    devices.forEach((d) => h.appendChild(el(`<div class="hh-summary" style="cursor:default"><span class="art art-a">${esc(initials(d.name))}</span><span><strong>${esc(d.name)}</strong><small>${d.last_seen_ms ? `Seen ${esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString()))}` : 'Not seen yet'}${d.primary ? ' · its saves win' : ''}</small></span>${routineStatus('Paired')}</div>`)));
+    if (!devices.length) { h.appendChild(stateBlock({ title: 'No device is paired', body: 'A droidtop handheld: on it open Settings > Computers > Pair a computer, then choose Type a code here and type the code it shows. Another computer running Pythia: choose Pair a device on both.' })); return; }
+    devices.forEach((d) => {
+      const row = el(`<button class="hh-summary" type="button"><span class="art art-a">${esc(initials(d.name))}</span><span><strong>${esc(d.name)}</strong><small>${d.kind === 'computer' ? 'Computer' : 'Handheld'} · ${d.last_seen_ms ? `Seen ${esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString()))}` : 'Not seen yet'}${d.primary ? ' · its saves win' : ''} · A: what syncs</small></span>${routineStatus('Paired')}</button>`);
+      row.onclick = () => showDeviceSyncs(d);
+      h.appendChild(row);
+    });
   }, { what: 'Handhelds' });
 }
 function renderHHSettings() {
@@ -1272,7 +1617,7 @@ function renderHHDecision(g) {
   if (g.path) choices.push({ k: 'open', title: 'Open the folder', sub: 'See what is inside.' });
   choices.push({ k: 'remind', title: 'Remind me later', sub: 'Keep it in Review.' });
   choices.push({ k: 'remove', title: 'Remove from library', sub: 'Files stay on disk.' });
-  $('#hhContent').innerHTML = `<section class="hh-decision"><div class="hh-decision-head"><div class="hh-decision-art art-${g.art}">${esc(initials(g.name))}</div><div><div class="hh-state ${g.status}">${esc(g.statusText)}</div><h1>${esc(g.name)}</h1><p>${esc(g.status === 'critical' ? 'No engine plugin recognised this folder, so Pythia cannot say what it needs to run.' : g.updates.length ? 'A newer version than the installed one was seen.' : 'A scan found a folder that may be a game you already have.')}</p><div class="hh-facts"><div class="hh-fact"><small>Installed</small><strong>${esc(versionText(g))}</strong></div><div class="hh-fact"><small>Observed</small><strong>${esc(g.updates[0]?.version || g.statusText)}</strong></div><div class="hh-fact"><small>Systems</small><strong>${g.systems.length}</strong></div></div></div></div><div class="hh-choice-grid">${choices.map((c) => `<button class="hh-choice ${c.primary ? 'primary' : ''}" data-hh-choice="${c.k}"><strong>${esc(c.title)}</strong><small>${esc(c.sub)}</small></button>`).join('')}</div></section>`;
+  $('#hhContent').innerHTML = `<section class="hh-decision"><div class="hh-decision-head"><div class="hh-decision-art art-${g.art}">${esc(initials(g.name))}</div><div><div class="hh-state ${g.status}">${esc(g.statusText)}</div><h1>${esc(g.name)}</h1><p>${esc(g.unidentified ? 'No engine plugin recognised this folder, so Pythia cannot say what it needs to run.' : g.updates.length ? 'A newer version than the installed one was seen.' : 'A scan found a folder that may be a game you already have.')}</p><div class="hh-facts"><div class="hh-fact"><small>Installed</small><strong>${esc(versionText(g))}</strong></div><div class="hh-fact"><small>Observed</small><strong>${esc(g.updates[0]?.version || g.statusText)}</strong></div><div class="hh-fact"><small>Systems</small><strong>${g.systems.length}</strong></div></div></div></div><div class="hh-choice-grid">${choices.map((c) => `<button class="hh-choice ${c.primary ? 'primary' : ''}" data-hh-choice="${c.k}"><strong>${esc(c.title)}</strong><small>${esc(c.sub)}</small></button>`).join('')}</div></section>`;
 }
 function renderHHPlan(g) {
   if (!g) { navigateHandheld('attention', false); return; }
@@ -1312,7 +1657,7 @@ function renderHHLauncher() {
   const host = $('#hhContent'); host.innerHTML = '<div id="hhLauncherList"></div>';
   loadInto($('#hhLauncherList', host), 'get_launcher_entries', [], (r, h) => {
     const entries = r.entries || [];
-    const label = { tracked: routineStatus('In library'), drifted: '<span class="state-pill critical">Drifted</span>', untracked: '<span class="state-pill info">Not in library</span>' };
+    const label = { tracked: routineStatus('In library'), drifted: '<span class="state-pill pending">Folder moved</span>', untracked: '<span class="state-pill info">Not in library</span>' };
     h.innerHTML = hhList(entries.map((e, i) => hhRow({ art: '▶', title: e.game, sub: `${e.manager} · ${e.folder}`, status: label[e.state] || '', actions: e.state === 'untracked' ? `<button class="hh-action" data-hh-record="${i}">Record</button>` : '' })));
     $$('[data-hh-record]', h).forEach((btn) => (btn.onclick = async () => { const e = entries[Number(btn.dataset.hhRecord)]; btn.disabled = true; const r2 = await act('record_launcher_entry', [e.folder, e.key], `Recorded ${e.game}`, { what: `Recording ${e.game}` }); if (ok(r2)) renderHHLauncher(); else btn.disabled = false; }));
     if (!entries.length) h.appendChild(stateBlock({ title: 'No launcher lists a game here', body: 'Games Steam, Epic, GOG, Amazon, itch, Battle.net, Lutris, Bottles or Minigalaxy have installed show here.' }));
@@ -1370,12 +1715,7 @@ function rescanHH(g) { if (!g || !g.path) return; pythia.start_onboard(g.path); 
 // menu. Focus moves within a zone and crosses only at its edge; each zone remembers its place on each page.
 const hhVisible = (x) => x.offsetParent !== null && getComputedStyle(x).visibility !== 'hidden';
 function hhFocusables(root) { return root ? $$('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]', root).filter(hhVisible) : []; }
-function hhNearest(items, from, direction) {
-  const r = from.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-  let best = null, bestScore = Infinity;
-  for (const x of items) { if (x === from) continue; const q = x.getBoundingClientRect(), xx = q.left + q.width / 2, y = q.top + q.height / 2, dx = xx - cx, dy = y - cy; const sameRow = q.top < r.bottom - 2 && q.bottom > r.top + 2; const valid = direction === 'left' ? dx < 0 && sameRow : direction === 'right' ? dx > 0 && sameRow : direction === 'up' ? dy < 0 && Math.abs(dy) >= Math.abs(dx) * .35 : dy > 0 && Math.abs(dy) >= Math.abs(dx) * .35; if (!valid) continue; const primary = direction === 'left' || direction === 'right' ? Math.abs(dx) : Math.abs(dy), cross = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx), score = primary + cross * 2.2; if (score < bestScore) { best = x; bestScore = score; } }
-  return best;
-}
+const hhNearest = (items, from, direction) => window.PythiaPad.nearest(items, from, direction);
 function hhFocus(node) { if (!node) return false; node.focus(); node.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true; }
 function hhZoneOf(node) {
   if (!node || !node.closest) return null;
@@ -1425,9 +1765,11 @@ function moveHandheldFocus(direction) {
   const items = hhZoneItems(zone);
   const next = items.includes(current) ? hhNearest(items, current, direction) : items[0];
   if (next) { hhFocus(next); return; }
+  // Up and Down cross to the nearest item in that direction, so Up from the first row reaches the page's own
+  // toolbar before the top bar (retest B1); Left and Right land on the zone's remembered place.
   if (direction === 'left' && zone !== 'rail') hhEnterZone('rail');
-  else if (zone === 'content' && direction === 'up') hhEnterZone('strip');
-  else if (zone === 'strip' && direction === 'down') hhEnterZone('content') || hhEnterZone('rail');
+  else if (zone === 'content' && direction === 'up') hhFocus(hhNearest(hhZoneItems('strip'), current, 'up')) || hhEnterZone('strip');
+  else if (zone === 'strip' && direction === 'down') hhFocus(hhNearest(hhZoneItems('content'), current, 'down')) || hhEnterZone('content') || hhEnterZone('rail');
   else if (zone === 'rail' && direction === 'right') hhEnterZone('content') || hhEnterZone('strip');
 }
 // After a page is drawn: focus stays where it is if that is still in the shell; else it returns to the
@@ -1578,13 +1920,13 @@ function renderChrome() {
   const review = model.ready ? reviewQueue().affected : 0;
   set('#allCount', games.length); set('#reviewCount', review); set('#activityCount', running);
   $('#reviewCount')?.setAttribute('aria-label', review ? `${fmt.n(review, 'game')} to review` : '');
-  const jc = $('#jobsCount'); jc.textContent = running ? String(running) : ''; jc.classList.toggle('hidden', !running);
+  
   $('#sidebarProgress').classList.toggle('hidden', !running);
   const mine = games.filter((g) => g.mine && g.installed).length;
   $('#sidebarSystemText').innerHTML = model.ready ? `${esc(model.app?.platform || '')}<br>${esc(fmt.n(mine, 'install'))} here` : 'Connecting to Pythia…';
   const nSystems = new Set(games.flatMap((g) => g.systemIds)).size || 1;
-  $('#statusRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(nSystems, 'system')}` : '';
-  $('#statusSyncLabel').textContent = !pythia ? 'Not connected' : nSystems > 1 ? `Synced across ${nSystems} systems` : 'This system only';
+  $('#statusRight').textContent = model.ready ? `${fmt.n(games.length, 'game')} · ${fmt.n(games.filter((g) => g.installed).length, 'installed here', 'installed here')}` : '';
+  $('#statusSyncLabel').textContent = !pythia ? 'Not connected' : nSystems > 1 ? `Library shared by ${nSystems} computers` : 'Library on this computer only';
   // The top bar never claims success (UX review A1): it says when Pythia is not connected or jobs failed,
   // and otherwise only when the library was last read, without a check mark.
   const ind = $('#syncIndicator');
@@ -1614,7 +1956,7 @@ function refreshGames() {
   games = model.raw.map(adaptGame);
   model.gamesAt = new Date().toISOString();
   populateFilterOptions(); updateSystems(model.raw); renderChrome();
-  if (state.shell === 'handheld') renderHandheld(); else if (['library', 'systems', 'reconcile'].includes(state.view)) renderCurrent();
+  if (state.shell === 'handheld') renderHandheld(); else if (['library', 'shared', 'reconcile'].includes(state.view)) renderCurrent();
 }
 function populateFilterOptions() {
   const fill = (sel, values, allLabel) => { const current = sel.value; sel.innerHTML = `<option value="all">${allLabel}</option>` + values.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join(''); sel.value = values.includes(current) ? current : 'all'; };
@@ -1636,10 +1978,11 @@ function connect() {
     call('get_look').then((r) => { if (ok(r) || r.status) model.look = r; });
     call('get_folder_vocabulary').then((r) => { if (ok(r)) { model.vocab = r; renderCurrent(); } });
     call('describe_store_links').then((r) => { if (ok(r)) model.stores = r; });
+    trimSettings();
     startShell();
     call('start_pad').then((r) => { model.pad = r; if (ok(r) && !r.available) ErrorConsole.reportWeb('warn', r.reason || 'Controllers are not read', 'start_pad'); });
     pythia.modesChanged.connect(() => refreshModes().then(() => renderCurrent()));
-    pythia.handheldsChanged.connect(() => { if (state.view === 'systems') renderHandhelds(); if (state.shell === 'handheld' && state.hhPage === 'systems') renderHandheld(); });
+    pythia.handheldsChanged.connect(() => { if (state.view === 'devices') renderHandhelds(); if (state.shell === 'handheld' && state.hhPage === 'systems') renderHandheld(); });
     pythia.pairingFinished.connect((r) => flash(r.status === 'ok' ? `Paired with ${r.paired}` : `Not paired: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'));
     pythia.logLine.connect(() => { if (state.view === 'activity') renderJobs(); });
     pythia.uiLog.connect((e) => { model.events.push(e); if (model.events.length > 500) model.events.shift(); if (state.view === 'activity') renderJobs(); });
@@ -1715,8 +2058,8 @@ function setup() {
   $('#engineFilter').onchange = (e) => { state.engine = e.target.value; renderLibrary(); };
   $('#sortSelect').onchange = (e) => { state.sort = e.target.value; renderLibrary(); };
   $('#clearFilters').onclick = () => { state.source = 'all'; state.engine = 'all'; state.filterStatus = 'all'; state.search = ''; $('#globalSearch').value = ''; $('#sourceFilter').value = 'all'; $('#engineFilter').value = 'all'; renderLibrary(); };
+  $$('[data-library-shelf]').forEach((b) => (b.onclick = () => setLibraryShelf(b.dataset.libraryShelf)));
   $$('[data-library-mode]').forEach((b) => (b.onclick = () => { state.libraryMode = b.dataset.libraryMode; localStorage.setItem('pythia-desktop-library', state.libraryMode); $('#desktopLibrarySelect').value = state.libraryMode; renderLibrary(); }));
-  $$('[data-density]').forEach((b) => (b.onclick = () => { state.density = b.dataset.density; prefs.set('density', state.density); applyInterface(); }));
   $$('[data-settings]').forEach((b) => (b.onclick = () => openSettingsPane(b.dataset.settings)));
   $('#themeButton').onclick = (e) => { e.stopPropagation(); toggleThemePopover(); };
   $$('[data-theme-choice]').forEach((b) => (b.onclick = () => { applyTheme(b.dataset.themeChoice); toggleThemePopover(false); flash(`Theme: ${b.textContent.trim()}`, 'info', { private: true }); }));
@@ -1749,8 +2092,9 @@ function setup() {
   $$('[data-menu]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); toggleMenu(b.dataset.menu); }));
   $$('[data-menu-action]').forEach((b) => (b.onclick = () => menuAction(b.dataset.menuAction)));
   $$('[data-menu-nav]').forEach((b) => (b.onclick = () => { if (b.dataset.filter) state.filterStatus = b.dataset.filter; navigate(b.dataset.menuNav); closeAllMenus(); }));
-  $$('[data-menu-density]').forEach((b) => (b.onclick = () => { $$('[data-density]').find((x) => x.dataset.density === b.dataset.menuDensity)?.click(); closeAllMenus(); }));
+  $$('[data-menu-density]').forEach((b) => (b.onclick = () => { state.density = b.dataset.menuDensity; prefs.set('density', state.density); applyInterface(); closeAllMenus(); }));
   $$('[data-menu-theme]').forEach((b) => (b.onclick = () => { applyTheme(b.dataset.menuTheme); closeAllMenus(); }));
+  $$('[data-nav-link]').forEach((b) => (b.onclick = () => navigate(b.dataset.navLink)));
   $$('[data-settings-nav]').forEach((b) => (b.onclick = () => { openSettingsPane(b.dataset.settingsNav); closeAllMenus(); }));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllMenus(); });
   renderChrome(); renderLibrary();

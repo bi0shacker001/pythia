@@ -39,3 +39,20 @@ test('pairs marked not the same do not join clusters', () => {
   const a = rec('a', 'X', ['1']); const b = rec('b', 'X', ['2']);
   assert.equal(R.clusters(pairsOf([a, b]), () => true).length, 0);
 });
+
+test('alike names never chain unrelated games through a common word (Droidtop/tracker#538 retest B2)', () => {
+  const game = rec('g', 'Game', ['1.0']), alpha = rec('a', 'Alpha Game', ['1.0']), beta = rec('b', 'Beta Game', ['1.0']);
+  const odd = rec('o', 'Odd Game', ['1.0']), thing = rec('t', 'Beta Thing', ['1.0']);
+  const alike = [[game, alpha], [game, beta], [game, odd], [beta, thing], [alpha, beta]].map(([a, b]) => ({ a, b, reason: 'name', score: 0.67 }));
+  const out = R.clusters(alike);
+  assert.equal(out.length, 5);
+  for (const c of out) assert.equal(c.members.length, 2);
+  assert.ok(!out.some((c) => c.moves.includes(';')));
+});
+
+test('the same name joins a cluster; an alike name beside it stays its own suggestion', () => {
+  const g1 = rec('g1', 'Goodbye Eternity', ['0.5']), g2 = rec('g2', 'GoodbyeEternity', ['0.6']), other = rec('h', 'Goodbye Eternal', ['1.0']);
+  const out = R.clusters([{ a: g1, b: g2, reason: 'name', score: 0.97 }, { a: g1, b: other, reason: 'name', score: 0.8 }, { a: g2, b: other, reason: 'name', score: 0.78 }]);
+  assert.equal(out.length, 2);
+  assert.deepEqual(out.map((c) => c.members.map((m) => m.game_id).sort()).sort(), [['g1', 'g2'], ['g1', 'h']]);
+});

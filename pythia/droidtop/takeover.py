@@ -8,9 +8,11 @@ Pythia always takes in what the agent has newer, and writes back into the
 agent's folder while the agent is not running, so turning it back on finds
 the same pairings, library and save copies.
 
-"Serve handhelds from Pythia" is Pythia's setting ``droidtop_serve`` (on by
-default). Turning the agent back on turns it off: from the next start Pythia
-leaves the agent alone and only takes in its state.
+"Sync with droidtop" is Pythia's setting ``droidtop_serve`` (see serves()
+for its first value; docs/SPEC.md 1.7). While it is on Pythia listens on
+the network, announces this computer and takes droidtop-agent's place;
+while it is off Pythia does none of that and never writes droidtop-agent's
+folder.
 """
 
 import threading
@@ -23,8 +25,30 @@ SERVE_SETTING = "droidtop_serve"
 
 
 def serves() -> bool:
-    """Whether Pythia serves the handhelds itself (its setting)."""
-    return settings.read_bool_setting(SERVE_SETTING, True)
+    """Whether Pythia serves the handhelds itself: Sync with droidtop.
+
+    Pythia is a game library manager first and is not necessarily used with
+    droidtop (owner, 2026-10-16). Until the person sets it, the switch is on
+    only where droidtop is already in use: droidtop-agent has its files here,
+    runs, or starts at sign-in (docs/SPEC.md 1.7). That first answer is kept
+    as the setting, so Pythia's own later writes into the agent's folder do
+    not change it."""
+    text = settings.read_setting(SERVE_SETTING, "").casefold()
+    if text in ("true", "false"):
+        return text == "true"
+    on = droidtop_in_use()
+    settings.write_setting(SERVE_SETTING, on)
+    return on
+
+
+def droidtop_in_use() -> bool:
+    """droidtop-agent is on this computer: it has its files, runs, or starts
+    at sign-in. Looks only; never writes the agent's folder."""
+    agent = submodule("agent")
+    if agent.folders().get("exists"):
+        return True
+    st = agent.status()
+    return bool(st["running"] or st["starts_at_sign_in"] or st["turned_off"])
 
 
 def status() -> dict:
@@ -60,19 +84,22 @@ def take_over() -> dict:
 
 
 def turn_agent_back_on() -> dict:
-    """Puts the agent's start at sign-in back as it was and turns Pythia's
-    own serving off from its next start; this Pythia keeps serving until it
-    quits. Writes Pythia's state into the agent's folder first."""
+    """Turns Sync with droidtop off. When Pythia had taken droidtop-agent's
+    place, puts the agent's start at sign-in back as it was, with Pythia's
+    state written into its folder first; otherwise the agent's folder is not
+    touched. This Pythia keeps serving until it quits."""
     agent = submodule("agent")
-    synced = agent.sync(write_back=True)
     settings.write_setting(SERVE_SETTING, False)
+    if not agent.status().get("turned_off"):
+        return {"entries": [], "sync": None}
+    synced = agent.sync(write_back=True)
     done = agent.turn_on()
     return {"entries": done["entries"], "sync": synced}
 
 
 def serve_from_pythia_again() -> None:
-    """Pythia serves the handhelds again from its next start (and turns the
-    agent off then)."""
+    """Sync with droidtop on: the person's consent (docs/SPEC.md 1.7). The
+    caller starts serving now (pythia.droidtop.service.start_in_background)."""
     settings.write_setting(SERVE_SETTING, True)
 
 

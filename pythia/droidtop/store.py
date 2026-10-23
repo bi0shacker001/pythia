@@ -12,10 +12,17 @@ def identity() -> dict:
     return submodule("store").identity()
 
 
+def settings() -> dict:
+    """The agent's settings, as droidtop-agent keeps them (``approved``
+    plugin adapters, ``syncthing``, ``launch_devices``...)."""
+    return submodule("store").settings()
+
+
 def devices() -> list[dict]:
     """The paired handhelds: ``id``, ``name``, ``last_seen_ms``,
-    ``last_address``, ``trusted``, ``primary`` (its saves win here) and
-    ``launch`` (it may start games here)."""
+    ``last_address``, ``trusted``, ``primary`` (its saves win here),
+    ``launch`` (it may start games here) and ``offered`` (what this computer
+    offers it: ``library``, ``saves``)."""
     return submodule("store").devices()
 
 
@@ -34,6 +41,13 @@ def set_launch(device_id: str, allowed: bool) -> None:
     submodule("store").set_launch(device_id, allowed)
 
 
+def set_offer(device_id: str, library: bool | None = None, saves: bool | None = None) -> None:
+    """What this computer offers a paired device: its library, its saves, or
+    both (None leaves one as it is). Saves need the library, so offering
+    saves offers it too and withdrawing it withdraws them."""
+    submodule("store").set_offer(device_id, library=library, saves=saves)
+
+
 def library() -> dict[str, Any]:
     """The library every paired device shares, by game key."""
     return submodule("store").library()
@@ -46,6 +60,8 @@ def games_by_device(library: dict[str, Any], devices: list[dict]) -> list[dict]:
     synced yet has none."""
     out = []
     for device in devices:
+        if device.get("kind") == "computer":  # a paired computer is no handheld
+            continue
         games = []
         for key, record in library.items():
             install = ((record.get("installs") or {}).get(device["id"]) or {}).get("install") or {}

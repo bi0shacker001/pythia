@@ -58,6 +58,12 @@ class ScannedGamesTest(TestCase):
         gone = self.entry(versions=[{"version": "1", "variants": [{"path": os.path.join(self.dir.name, "gone")}]}])
         self.assertEqual(library.scanned_games([self.entry(system_uuid="other"), gone], "me"), [])
 
+    def test_the_engine_pythia_identified_goes_with_the_game(self):
+        renpy = self.entry(versions=[{"version": "1", "variants": [{"path": self.new, "source": {"kind": "renpy"}}]}])
+        store = self.entry(versions=[{"version": "1", "variants": [{"path": self.new, "source": {"kind": "steam"}}]}])
+        self.assertEqual(library.scanned_games([renpy], "me")[0]["engine"], "renpy")
+        self.assertNotIn("engine", library.scanned_games([store], "me")[0])
+
     def test_a_version_that_repeats_the_title_is_no_version(self):
         e = self.entry(versions=[{"version": "Eternum", "variants": [{"path": self.new}]}])
         (game,) = library.scanned_games([e], "me")
@@ -187,6 +193,13 @@ class GamesByDeviceTest(TestCase):
         )
         self.assertEqual(win4, {"id": "win4", "name": "Win 4", "games": []})
 
+    def test_a_paired_computer_is_not_listed_as_a_handheld(self):
+        devices = [
+            {"id": "pc2", "name": "Other PC", "kind": "computer"},
+            {"id": "rp5", "name": "Retroid", "kind": "handheld"},
+        ]
+        self.assertEqual([d["id"] for d in store.games_by_device({}, devices)], ["rp5"])
+
 
 class AgentEventsTest(TestCase):
     def test_events_since_the_last_seen(self):
@@ -263,21 +276,114 @@ class TakeoverTest(TestCase):
         fake.agent.sync.assert_called_once_with(write_back=False)
         self.assertEqual(taken["still_running"], still)
 
-    def test_turning_the_agent_back_on_writes_back_first_and_stops_serving_from_pythia(self):
+    def test_turning_sync_off_after_a_takeover_writes_back_and_turns_the_agent_on(self):
+        fake = self.agent()
+        fake.agent.status.return_value["turned_off"] = {"since": 1, "entries": ["desktop"]}
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(takeover.settings, "write_setting") as write,
+        ):
+            done = takeover.turn_agent_back_on()
+        self.assertEqual([c[0] for c in fake.agent.method_calls], ["status", "sync", "turn_on"])
+        fake.agent.sync.assert_called_once_with(write_back=True)
+        write.assert_called_once_with(takeover.SERVE_SETTING, False)
+        self.assertEqual(done["entries"], ["desktop"])
+
+    def test_turning_sync_off_without_a_takeover_leaves_the_agents_folder_alone(self):
+        """Droidtop/tracker#538 retest B3: droidtop-agent's folder is written only after Pythia took its place."""
         fake = self.agent()
         with (
             mock.patch.object(native, "_module", fake),
             mock.patch.object(takeover.settings, "write_setting") as write,
         ):
             done = takeover.turn_agent_back_on()
-        self.assertEqual([c[0] for c in fake.agent.method_calls], ["sync", "turn_on"])
-        fake.agent.sync.assert_called_once_with(write_back=True)
+        fake.agent.sync.assert_not_called()
+        fake.agent.turn_on.assert_not_called()
         write.assert_called_once_with(takeover.SERVE_SETTING, False)
-        self.assertEqual(done["entries"], ["desktop"])
+        self.assertEqual(done["entries"], [])
 
-    def test_pythia_serves_unless_told_not_to(self):
-        with mock.patch.object(takeover.settings, "read_bool_setting", side_effect=lambda key, default: default):
-            self.assertTrue(takeover.serves())
+    def first_answer(self, fake):
+        written = {}
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(takeover.settings, "read_setting", return_value=""),
+            mock.patch.object(takeover.settings, "write_setting", side_effect=written.__setitem__),
+        ):
+            return takeover.serves(), written
+
+    def test_sync_is_off_on_a_computer_without_droidtop(self):
+        """Pythia is not necessarily used with droidtop (docs/SPEC.md 1.7)."""
+        fake = self.agent()
+        fake.agent.folders.return_value = {"exists": False}
+        on, written = self.first_answer(fake)
+        self.assertFalse(on)
+        self.assertEqual(written, {takeover.SERVE_SETTING: False})
+        fake.agent.sync.assert_not_called()
+
+    def test_sync_is_on_where_droidtop_agent_already_is(self):
+        for exists, starts in ((True, False), (False, True)):
+            fake = self.agent(starts=starts)
+            fake.agent.folders.return_value = {"exists": exists}
+            on, written = self.first_answer(fake)
+            self.assertTrue(on)
+            self.assertEqual(written, {takeover.SERVE_SETTING: True})
+
+    def test_the_persons_choice_stands(self):
+        fake = self.agent(starts=True)
+        fake.agent.folders.return_value = {"exists": True}
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(takeover.settings, "read_setting", return_value="False"),
+        ):
+            self.assertFalse(takeover.serves())
+        fake.agent.folders.assert_not_called()
+
+    def test_with_sync_off_the_start_touches_nothing(self):
+        """With Sync with droidtop off nothing listens, announces or syncs with droidtop-agent (docs/SPEC.md 1.7)."""
+        fake = self.agent()
+        fake.service.serving.return_value = {"state": "off"}
+        threads = []
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(service, "available", return_value=True),
+            mock.patch.object(takeover, "serves", return_value=False),
+            mock.patch.object(
+                service.threading, "Thread", side_effect=lambda target, **kw: threads.append(target) or mock.Mock()
+            ),
+        ):
+            service.start_in_background()
+            threads[0]()
+        fake.agent.sync.assert_not_called()
+        fake.agent.turn_off.assert_not_called()
+        fake.service.serve.assert_not_called()
+
+    def test_with_sync_on_the_agents_state_comes_in_before_anything_is_served(self):
+        """Owner, 2026-10-16: "pythia imports the droidtop agent context when it takes the agent role, too, so
+        data shouldn't be lost"."""
+        fake = self.agent(running=[{"pid": 7, "name": "droidtop-agent"}], starts=True)
+        fake.service.serving.return_value = {"state": "off"}
+        order = []
+        fake.agent.turn_off.side_effect = lambda **kw: order.append("turn_off") or {
+            "entries": ["desktop"],
+            "still_running": [],
+        }
+        fake.agent.sync.side_effect = lambda **kw: order.append("sync") or {"imported": ["devices.json"]}
+        threads = []
+        with (
+            mock.patch.object(native, "_module", fake),
+            mock.patch.object(service, "available", return_value=True),
+            mock.patch.object(takeover, "serves", return_value=True),
+            mock.patch.object(launch, "register", side_effect=lambda: order.append("register")),
+            mock.patch.object(service, "serve", side_effect=lambda: order.append("serve")),
+            mock.patch.object(store, "identity", return_value={"name": "PC"}),
+            mock.patch.object(
+                service.threading, "Thread", side_effect=lambda target, **kw: threads.append(target) or mock.Mock()
+            ),
+        ):
+            service.start_in_background()
+            threads[0]()
+        self.assertEqual(order, ["turn_off", "sync", "register", "serve"])
+        fake.agent.sync.assert_called_once_with(write_back=True)
 
 
 class HandheldLaunchTest(TestCase):
@@ -352,3 +458,54 @@ class HandheldLaunchTest(TestCase):
         with mock.patch.object(native, "_module", fake2):
             self.assertTrue(launch.register())
         fake2.service.set_launcher.assert_called_once_with(launcher=launch.launch_for_handheld)
+
+
+class ProfileFoldersTest(TestCase):
+    """Droidtop/tracker#538 retest B3: with APPDATA and LOCALAPPDATA moved, the native side
+    looks for droidtop-agent's folders there, never in the profile the system names."""
+
+    def test_the_agent_folders_follow_the_overridden_profile(self):
+        if os.name != "nt" or not native.available():
+            self.skipTest("Windows with Pythia's native module only")
+        from pythia import _native  # noqa: PLC0415
+
+        with tempfile.TemporaryDirectory() as tmp:
+            roaming, local = os.path.join(tmp, "Roaming"), os.path.join(tmp, "Local")
+            with mock.patch.dict(os.environ, {"APPDATA": roaming, "LOCALAPPDATA": local}):
+                os.environ.pop("DROIDTOP_AGENT_HOME", None)
+                found = _native.agent.folders()
+        self.assertEqual(Path(found["config"]), Path(roaming) / "droidtop-agent")
+        self.assertEqual(Path(found["data"]), Path(local) / "droidtop-agent")
+
+
+class PlainPathTest(TestCase):
+    """Windows paths from the native side without the \\\\?\\ prefix (Droidtop/tracker#538 retest S1, S2)."""
+
+    def test_the_extended_length_prefix_is_dropped(self):
+        self.assertEqual(native.plain_path("\\\\?\\G:\\games\\Tiny"), "G:\\games\\Tiny")
+        self.assertEqual(native.plain_path("\\\\?\\UNC\\nas\\games"), "\\\\nas\\games")
+        self.assertEqual(native.plain_path("/home/me/games"), "/home/me/games")
+        self.assertIsNone(native.plain_path(None))
+
+    def test_save_copies_and_launcher_folders_are_plain(self):
+        from pythia import store_installs
+        from pythia.droidtop import saves
+
+        fake = mock.Mock()
+        fake.saves.copies.return_value = [
+            {"key": "k", "dir": "\\\\?\\G:\\keep\\k", "copies": [{"path": "\\\\?\\G:\\keep\\k\\1"}]}
+        ]
+        fake.scan.scan_with.return_value = {
+            "games": [
+                {
+                    "base": "\\\\?\\" + tempfile.gettempdir(),
+                    "game": {"key": "steam:1", "title": "T", "install": {"installed": True}},
+                }
+            ]
+        }
+        with mock.patch.object(native, "_module", fake):
+            kept = saves.copies()
+            found = store_installs.find()
+        self.assertEqual(kept[0]["dir"], "G:\\keep\\k")
+        self.assertEqual(kept[0]["copies"][0]["path"], "G:\\keep\\k\\1")
+        self.assertEqual(found[0]["folder"], tempfile.gettempdir())

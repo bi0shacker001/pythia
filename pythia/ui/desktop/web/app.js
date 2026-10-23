@@ -706,19 +706,21 @@ function renderHandhelds() {
   // The handhelds list waits for the status, so its "Start games" words match this build.
   const status = loadInto(agentHost, 'get_agent_status', [], (st, h) => {
     const s = st.serving || {};
+    hostLaunch = !!st.host_launch;
+    // Sync off: one notice with its switch (renderAgentTakeover), and no serving line or addresses that do not apply.
+    if (!(st.agent || {}).pythia_serves) { renderAgentTakeover(h, st.agent || {}); return; }
     const line = s.state === 'serving' ? `${routineStatus('Serving')} Handhelds reach this computer as ${esc(st.identity?.name || '')}.`
       : s.state === 'stopped' ? visibleStatus(s.reason || 'Not serving handhelds', 'pending')
       : visibleStatus('Not serving handhelds yet', 'neutral', '–');
     h.appendChild(el(`<p>${line}</p>`));
     if ((st.places || []).length) h.appendChild(el(`<p><small>Addresses: ${(st.places || []).map((p) => `<span class="mono">${esc(p.address)}</span> (${esc(p.label)})`).join(' · ')}</small></p>`));
-    hostLaunch = !!st.host_launch;
     renderAgentTakeover(h, st.agent || {});
   }, { what: 'This computer as a droidtop agent' });
   const startGamesText = () => (hostLaunch ? "Start games: that device may start a game on this computer and play it there: the game runs here and only its windows are streamed to it through windowcast (the games Pythia tracks), or through Steam Link for Steam games (Steam must be running here)." : "Start games: that device may start this computer's Steam games and play them through Steam Link; the game runs here, and Steam must be running here.");
   status.then(() => loadInto(host, 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
     $('#handheldSummary').textContent = fmt.n(devices.length, 'paired device');
-    if (!devices.length) { h.appendChild(stateBlock({ title: 'No device is paired', body: 'Choose "Pair a device", then on the handheld: droidtop > Settings > Computers > Pair a computer.' })); return; }
+    if (!devices.length) { h.appendChild(stateBlock({ title: 'No device is paired', body: 'A droidtop handheld: on it open Settings > Computers > Pair a computer, then choose "Type a handheld\'s code" here and type the code it shows. Another computer running Pythia: choose "Pair a device" on both.' })); return; }
     const kindName = (d) => (d.kind === 'computer' ? 'Computer' : 'Handheld');
     // What this computer offers each device (droidtop-agent DESIGN section 20): a handheld starts with
     // its library and saves, a computer with nothing. "Saves win" is a handheld's only.
@@ -746,8 +748,8 @@ function renderHandhelds() {
 function renderAgentTakeover(h, a) {
   const running = a.running || [];
   if (!a.pythia_serves) {
-    h.appendChild(el(`<p>${visibleStatus('Sync with droidtop is off: Pythia does not serve your handhelds or use the network for them.', 'neutral', '–')}</p>`));
-    const b = el('<p><button class="btn small">Turn on Sync with droidtop…</button></p>');
+    h.appendChild(el(`<p>${visibleStatus('Sync with droidtop is off. You can pair a device now, but it syncs with this computer only once this is on: Pythia then serves your paired devices on this network.', 'neutral', '–')}</p>`));
+    const b = el('<p><button class="btn small primary">Turn on Sync with droidtop…</button></p>');
     b.querySelector('button').onclick = async () => {
       if (!(await confirm({ title: 'Turn on Sync with droidtop?', body: SYNC_CONSENT, proceed: 'Turn on' }))) return;
       const r = await act('serve_from_pythia_again', [], 'Sync with droidtop on', { what: 'Turning on Sync with droidtop' });
@@ -1016,6 +1018,21 @@ function renderSettingsPane(name) {
   if (name === 'plugins') { renderPlugins(); loadInto($('#pluginRepos'), 'get_plugin_repositories', [], (r, host) => { if (!(r.repositories || []).length) host.appendChild(stateBlock({ title: 'No repositories added' })); }, { what: 'Plugin repositories' }); }
   if (name === 'sync') { $('#syncFolderPath').textContent = info.sync_folder || ''; $('#systemIdField').value = info.system_uuid || ''; loadInto($('#transferSettings'), 'get_transfer_settings', [], () => {}, { what: 'Game transfer' }); loadInto($('#storageRoles'), 'get_storage_roles', [], () => {}, { what: 'Storage roles' }); }
   if (name === 'advanced') { $('#dbPath').textContent = info.app_data_folder || ''; $('#schemaVersion').innerHTML = app.schema_version ? `${routineStatus('Up to date')}v${esc(app.schema_version)}` : ''; $('#logLevelSelect').value = model.config?.log_level === 'debug' ? 'debug' : 'info'; $('#consoleHint').textContent = model.config?.error_console ? 'On for this run. Ctrl+Shift+E toggles it.' : 'Off. Start Pythia with --error-console, or set error_console = True in pythia.conf.'; }
+}
+// Settings shows what can be set (UI review 2026-10-23, U4): a section whose slot answers "not built yet",
+// or a plugin kind with no plugin, is hidden, and so is a page left with nothing. The slots stay, so a
+// section comes back on its own once it is built or a plugin of that kind is installed.
+async function trimSettings() {
+  const view = $('#view-settings');
+  const hide = (node) => node?.closest('.form-section')?.classList.add('hidden');
+  const unbuilt = [['get_library_folders', '#libraryFolders'], ['get_scan_settings', '#scanSettings'], ['get_transfer_settings', '#transferSettings'], ['get_storage_roles', '#storageRoles']];
+  await Promise.all(unbuilt.map(([slot, sel]) => call(slot).then((r) => { if (r?.status === 'unavailable') hide($(sel, view)); })));
+  await Promise.all($$('[data-capability-list]', view).map((host) => call('get_capabilities', host.dataset.capabilityList).then((r) => { if (ok(r) && !(r.plugins || []).length) hide(host); })));
+  $$('.settings-pane', view).forEach((pane) => {
+    const empty = $$('.form-section', pane).every((sec) => sec.classList.contains('hidden'));
+    const btn = $$('[data-settings]', view).find((b) => b.dataset.settings === pane.dataset.pane);
+    if (btn) btn.classList.toggle('hidden', empty);
+  });
 }
 function renderCapabilityList(host, category) {
   if (!host) return;
@@ -1361,7 +1378,7 @@ function renderHHSystems() {
   $('[data-hh-pair-show]', host).onclick = () => showPairCode($('#hhPairShowing', host), () => state.shell === 'handheld' && state.hhPage === 'systems', renderHandheld);
   loadInto($('#hhHandhelds', host), 'get_handhelds', [], (r, h) => {
     const devices = r.devices || [];
-    if (!devices.length) { h.appendChild(stateBlock({ title: 'No device is paired', body: 'Choose Pair a device, then on the handheld: droidtop > Settings > Computers > Pair a computer.' })); return; }
+    if (!devices.length) { h.appendChild(stateBlock({ title: 'No device is paired', body: 'A droidtop handheld: on it open Settings > Computers > Pair a computer, then choose Type a code here and type the code it shows. Another computer running Pythia: choose Pair a device on both.' })); return; }
     devices.forEach((d) => {
       const row = el(`<button class="hh-summary" type="button"><span class="art art-a">${esc(initials(d.name))}</span><span><strong>${esc(d.name)}</strong><small>${d.kind === 'computer' ? 'Computer' : 'Handheld'} · ${d.last_seen_ms ? `Seen ${esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString()))}` : 'Not seen yet'}${d.primary ? ' · its saves win' : ''} · A: what syncs</small></span>${routineStatus('Paired')}</button>`);
       row.onclick = () => showDeviceSyncs(d);
@@ -1796,6 +1813,7 @@ function connect() {
     call('get_look').then((r) => { if (ok(r) || r.status) model.look = r; });
     call('get_folder_vocabulary').then((r) => { if (ok(r)) { model.vocab = r; renderCurrent(); } });
     call('describe_store_links').then((r) => { if (ok(r)) model.stores = r; });
+    trimSettings();
     startShell();
     call('start_pad').then((r) => { model.pad = r; if (ok(r) && !r.available) ErrorConsole.reportWeb('warn', r.reason || 'Controllers are not read', 'start_pad'); });
     pythia.modesChanged.connect(() => refreshModes().then(() => renderCurrent()));

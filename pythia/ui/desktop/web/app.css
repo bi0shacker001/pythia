@@ -336,3 +336,4 @@ body:has(#libraryShelves:not(.hidden)) #view-library .presentation-switch,body:h
 .run-choice:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 .run-choice strong{display:block;font-size:0.75rem;word-break:break-all}.run-choice small{display:block;color:var(--text-tertiary);font-size:0.6875rem}
 .run-via{display:grid;gap:6px;margin-top:10px}.run-via .field{width:100%}
+.connect-steps{display:grid;gap:10px;padding-left:20px;margin:10px 0}.connect-steps li span{color:var(--text-secondary);font-size:0.8125rem}

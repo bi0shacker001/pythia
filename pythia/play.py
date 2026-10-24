@@ -26,7 +26,14 @@ STORE_PAGES = {
     "gog": "https://www.gog.com/game/{id}",
     "dlsite": "https://www.dlsite.com/maniax/work/=/product_id/{id}.html",
 }
-NO_INSTALL = "Pythia does not install games yet. Install it with its store or launcher, then add its folder."
+NO_INSTALL = "Pythia knows no store to install it from. Install it with its store or launcher, then add its folder."
+# Each store's own installer, by its link (Droidtop/tracker#630): the store downloads and installs the
+# game, and "Find store games" then adds it here. The person's account and DRM stay the store's.
+INSTALL_LINKS = {
+    "steam": ("Steam", "steam://install/{id}"),
+    "gog": ("GOG Galaxy", "goggalaxy://openGameView/{id}"),
+    "egs": ("the Epic Games Launcher", "com.epicgames.launcher://apps/{id}?action=install&silent=false"),
+}
 NO_UPDATE = "Pythia records updates but does not download them yet."
 NO_RUNNER = "Nothing starts it here yet: choose how it runs."
 NO_EPIC = "Epic's games start in Epic's launcher: More > Open in Epic Games Store."
@@ -114,6 +121,26 @@ def launch_of(own: dict | None) -> tuple[dict | None, dict | None]:
     return variant, folder_launch.pick(variant["path"], (own or {}).get("canonical_name") or "")
 
 
+def install_state(entries: list[dict]) -> dict:
+    """Install for a game not on this computer: through the first store it is
+    owned on (else known on) that has an installer link."""
+    owned = {o.get("platform") for e in entries for o in e.get("ownership") or []}
+    stores = sorted(INSTALL_LINKS, key=lambda store: (store not in owned, list(INSTALL_LINKS).index(store)))
+    for store in stores:
+        ids = _ids(entries, store)
+        if ids:
+            name, link = INSTALL_LINKS[store]
+            return {
+                "action": "install",
+                "enabled": True,
+                "via": store,
+                "store": name,
+                "url": link.format(id=ids[0]),
+                "reason": None,
+            }
+    return {"action": "install", "enabled": False, "via": None, "reason": NO_INSTALL}
+
+
 def state(game_id: str, entries: list[dict] | None = None) -> dict:
     """``primary`` (``action`` play or install, ``enabled``, ``via`` steam or
     runner, ``reason`` when disabled), ``update`` (``available``, ``version``,
@@ -134,7 +161,7 @@ def state(game_id: str, entries: list[dict] | None = None) -> dict:
     }
     steam = _ids(entries, "steam")
     if not installed:
-        primary = {"action": "install", "enabled": False, "via": None, "reason": NO_INSTALL}
+        primary = install_state(entries)
     elif steam and _steam_here():
         primary = {"action": "play", "enabled": True, "via": "steam", "reason": None}
     elif any(v.get("runner") for v in _variants(own or {})):
@@ -151,7 +178,11 @@ def state(game_id: str, entries: list[dict] | None = None) -> dict:
         elif launch:
             primary = {"action": "play", "enabled": True, "via": "folder", "reason": None, "launch": launch}
         else:
-            reason = folder_launch.why_not(variant["path"], own.get("canonical_name") or "") if variant else NO_RUNNER
+            reason = (
+                folder_launch.why_not(variant["path"], (own or {}).get("canonical_name") or "")
+                if variant
+                else NO_RUNNER
+            )
             primary = {"action": "play", "enabled": False, "via": None, "reason": reason}
         primary["choose"] = variant is not None
     return {"status": "ok", "primary": primary, "update": update, "store_url": store_page(entries)}
@@ -166,6 +197,9 @@ def play(game_id: str, entries: list[dict] | None = None) -> dict:
     if current.get("status") != "ok":
         return current
     primary = current["primary"]
+    if primary["action"] == "install" and primary["enabled"]:
+        logger.info("Installing %s through %s", entries[0].get("canonical_name") or game_id, primary["store"])
+        return {"status": "ok", "via": primary["via"], "url": primary["url"], "install": True}
     if primary["action"] != "play" or not primary["enabled"]:
         return {"status": "error", "message": primary.get("reason") or "It cannot start here"}
     name = entries[0].get("canonical_name") or game_id
@@ -195,7 +229,7 @@ def _play_folder(game_id: str, name: str) -> dict:
 
     own = _own(game_id)
     variant, launch = launch_of(own)
-    if not variant or not launch:
+    if own is None or not variant or not launch:
         return {"status": "error", "message": NO_RUNNER}
     try:
         folder_launch.start(variant["path"], launch, game_id)
@@ -221,7 +255,7 @@ def launch_choices(game_id: str) -> dict:
     return {
         "status": "ok",
         "folder": variant["path"],
-        "candidates": folder_launch.candidates(variant["path"], own.get("canonical_name") or ""),
+        "candidates": folder_launch.candidates(variant["path"], (own or {}).get("canonical_name") or ""),
         "current": launch,
         "chose": bool(variant.get("launch")),
         "vias": vias,

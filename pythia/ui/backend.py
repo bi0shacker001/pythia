@@ -1042,8 +1042,8 @@ class Backend(QObject):
             try:
                 if category == "library":
                     item["state"] = {
-                        "has_account": bool(p.credential_fields),
-                        "connected": p.is_connected() if p.credential_fields else None,
+                        "has_account": bool(p.credential_fields or p.browser_connect),
+                        "connected": p.is_connected() if (p.credential_fields or p.browser_connect) else None,
                     }
                 elif category == "manager":
                     item["state"] = {"available": bool(p.is_available(ctx)), "sources": list(p.compatible_sources)}
@@ -1096,12 +1096,48 @@ class Backend(QObject):
                     "fields": [
                         {"key": f["key"], "label": f["label"], "secret": bool(f.get("secret"))}
                         for f in p.credential_fields
+                        if not p.browser_connect
                     ],
+                    "browser": p.browser_connect,
                 }
                 for p in library_plugins.all_plugins()
-                if p.credential_fields
+                if p.credential_fields or p.browser_connect
             ]
         )
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def open_account_login(self, plugin_id: str):
+        """Opens a store's own sign-in page in the person's browser (GOG, Epic;
+        Droidtop/tracker#630): they sign in there, then paste back what it shows."""
+        from PySide6.QtGui import QDesktopServices
+
+        from pythia.plugins import library as library_plugins
+
+        plugin = next((p for p in library_plugins.all_plugins() if p.id == plugin_id and p.browser_connect), None)
+        if plugin is None:
+            return {"status": "error", "message": f"{plugin_id} does not sign in through a browser."}
+        if not QDesktopServices.openUrl(QUrl(plugin.browser_login_url())):
+            return {"status": "error", "message": "The browser did not open.", "url": plugin.browser_login_url()}
+        return {"status": "ok", "url": plugin.browser_login_url()}
+
+    @Slot(str, str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def finish_account_connect(self, plugin_id: str, pasted: str):
+        """Finishes a store's browser sign-in with what the person pasted."""
+        from pythia.plugins import library as library_plugins
+
+        plugin = next((p for p in library_plugins.all_plugins() if p.id == plugin_id and p.browser_connect), None)
+        if plugin is None:
+            return {"status": "error", "message": f"{plugin_id} does not sign in through a browser."}
+        if not plugin.connect_with(pasted):
+            return {
+                "status": "error",
+                "message": f"That was not what {plugin.display_name}'s page shows after signing in, "
+                f"or {plugin.display_name} refused it. Paste {plugin.browser_connect['paste']}.",
+            }
+        return {"status": "ok"}
 
     @Slot(str, str, str, result="QVariant")
     @_guarded
@@ -1318,7 +1354,10 @@ class Backend(QObject):
         result = play.play(game_id, self._entries_of(game_id))
         if result.get("status") == "ok" and result.get("url"):
             if not QDesktopServices.openUrl(QUrl(result["url"])):
-                return {"status": "error", "message": "Steam did not open. Is it installed?"}
+                store = {"steam": "Steam", "gog": "GOG Galaxy", "egs": "The Epic Games Launcher"}.get(
+                    result.get("via") or "", "Its launcher"
+                )
+                return {"status": "error", "message": f"{store} did not open. Is it installed?"}
         if result.get("status") == "ok":
             self._record("info", "pythia", f"Started {game_id} ({result.get('via')})", "play_game")
         if result.get("via") == "folder":

@@ -572,3 +572,31 @@ so Syncthing carrying either makes the whole game Syncthing's. The Saves
 tab says "Synced by Syncthing (folder <label>)". Ren'Py's two places are
 known by the engine's rule, with no Ludusavi manifest (droidtop-agent
 `saves::engines`).
+
+### 8.8 Play for a game added from a folder (Droidtop/tracker#629)
+
+A folder game has no Lutris runner. Play starts its own program, picked
+from its folder (`pythia/folder_launch.py`): on Windows its `.exe`,
+natively; elsewhere a native build first (`.sh`, `.x86_64`, an ELF file),
+else the `.exe` through Wine when Wine is installed, each game in a Wine
+prefix of its own under Pythia's data folder. Installers, crash reporters,
+redistributables and engine tools are never picked; a program named for the
+game comes first. "Choose how it runs…" beside Play lists the programs and,
+off Windows, natively or through Wine; the choice is this computer's, kept on
+its record of the folder. Play notes when the game was played (Continue
+playing). An Epic game is sent to Epic's launcher, which its games need. A
+handheld's Play there starts a folder game the same way, after its store's
+launcher when it has one. Downloading a Wine or Proton build for the person
+is not built: without Wine, Play says to install the system's wine package.
+
+### 8.9 Owned games and Install (Droidtop/tracker#630)
+
+The library's **Owned** view lists the games owned in a connected store and
+not installed here. Install hands the game to its store's own installer, by
+the store's link (`steam://install/<id>`, GOG Galaxy's
+`goggalaxy://openGameView/<id>`, Epic's `com.epicgames.launcher://apps/<id>`),
+the store it is owned on first; the person's account, the download and DRM
+stay the store's. Once it is installed, Find store games adds it. GOG and Epic
+connect in the app: the store's sign-in page opens in the browser, and the
+person pastes back what it shows (GOG's address bar, Epic's page text);
+Pythia then lists what they own there.

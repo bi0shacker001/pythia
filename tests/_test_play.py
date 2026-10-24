@@ -76,3 +76,34 @@ class PlayTest(TestCase):
         off = {"status": "ok", "primary": {"action": "install", "enabled": False, "reason": play.NO_INSTALL}}
         with mock.patch.object(play, "state", return_value=off):
             self.assertEqual(play.play("g1"), {"status": "error", "message": play.NO_INSTALL})
+
+
+class InstallTest(TestCase):
+    """Install hands the game to its store's own installer (Droidtop/tracker#630)."""
+
+    def entries(self, ids=(), owned=()):
+        e = entry(ids=ids)
+        e["versions"] = []
+        e["ownership"] = [{"platform": p} for p in owned]
+        return [e]
+
+    def test_the_store_it_is_owned_on_installs_it(self):
+        primary = play.install_state(self.entries(ids=[("steam", "440"), ("gog", "1207658924")], owned=["gog"]))
+        self.assertEqual((primary["enabled"], primary["via"]), (True, "gog"))
+        self.assertEqual(primary["url"], "goggalaxy://openGameView/1207658924")
+        primary = play.install_state(self.entries(ids=[("egs", "Fortnite")]))
+        self.assertEqual(primary["url"], "com.epicgames.launcher://apps/Fortnite?action=install&silent=false")
+
+    def test_without_a_store_it_stays_disabled_with_why(self):
+        primary = play.install_state(self.entries(ids=[("f95", "1")]))
+        self.assertEqual((primary["enabled"], primary["reason"]), (False, play.NO_INSTALL))
+
+    def test_install_answers_the_stores_link(self):
+        entries = self.entries(ids=[("steam", "440")])
+        with (
+            mock.patch.object(play.datadir, "list_all_entries", return_value=entries),
+            mock.patch.object(play, "get_system_uuid", return_value="me"),
+        ):
+            self.assertEqual(
+                play.play("g1"), {"status": "ok", "via": "steam", "url": "steam://install/440", "install": True}
+            )

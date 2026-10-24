@@ -144,6 +144,15 @@ class GogPlugin(LibraryPlugin, MetadataPlugin):
     version = "1.0.0"
     author = "pythia"
     credential_fields = [{"key": "refresh_token", "label": "Connected (via gog-connect)", "secret": True}]
+    browser_connect = {
+        "paste": "the address in your browser's address bar after you sign in (the page itself may look blank)"
+    }
+
+    def browser_login_url(self) -> str:
+        return login_url()
+
+    def connect_with(self, pasted: str) -> bool:
+        return connect_from_redirect_url(pasted.strip())
 
     def is_connected(self) -> bool:
         return bool(self.get_credential("refresh_token"))

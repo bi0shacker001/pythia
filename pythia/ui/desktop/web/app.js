@@ -222,7 +222,7 @@ function filteredGames() {
   const q = PythiaQuery.parse(state.search);
   const list = games.filter((g) => {
     const matches = PythiaQuery.matches(g, q);
-    const shelf = state.libraryShelf === 'favourites' ? g.favourite : state.libraryShelf === 'installed' ? g.installed : state.libraryShelf === 'attention' ? g.status !== 'ok' : true;
+    const shelf = state.libraryShelf === 'owned' ? !g.installed && g.ownedOn.length > 0 : state.libraryShelf === 'favourites' ? g.favourite : state.libraryShelf === 'installed' ? g.installed : state.libraryShelf === 'attention' ? g.status !== 'ok' : true;
     return matches && shelf && (state.filterStatus === 'all' || (state.filterStatus === 'pending' ? g.status !== 'ok' : g.status === state.filterStatus)) && (state.source === 'all' || g.source === state.source) && (state.engine === 'all' || g.engine === state.engine);
   });
   const rank = { critical: 0, pending: 1, neutral: 2, ok: 3 };
@@ -281,7 +281,8 @@ function renderLibrary() {
   $$('[data-library-mode]').forEach((b) => b.classList.toggle('active', b.dataset.libraryMode === state.libraryMode));
   if (!model.ready) { host.innerHTML = ''; host.appendChild(stateBlock({ kind: 'loading' })); $('#gameDetail').innerHTML = ''; return; }
   if (!games.length) { host.innerHTML = ''; host.appendChild(stateBlock({ glyph: '▦', title: 'No games yet', body: 'Add a game folder or scan a library folder; Pythia records what it finds and never moves files.', actions: [{ label: 'Add folder', primary: true, run: addFolder }, { label: 'Scan library', run: scanLibrary }] })); $('#gameDetail').innerHTML = ''; return; }
-  if (!list.length) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Nothing matches', body: 'Try fewer filters or another search.', actions: [{ label: 'Clear filters', run: () => $('#clearFilters').click() }] })); }
+  if (!list.length && state.libraryShelf === 'owned' && !state.search) { host.innerHTML = ''; host.appendChild(stateBlock({ glyph: '⌂', title: 'No owned games to install', body: 'Connect Steam, GOG or Epic under Game sources: the games you own there and have not installed show here, each with Install.', actions: [{ label: 'Open Game sources', primary: true, run: () => navigate('sources') }] })); }
+  else if (!list.length) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Nothing matches', body: 'Try fewer filters or another search.', actions: [{ label: 'Clear filters', run: () => $('#clearFilters').click() }] })); }
   else drawGameList(host, list);
   renderDetail(games.find((g) => g.id === state.selected) || list[0]);
 }
@@ -462,7 +463,7 @@ function fillPrimarySlot(g, slot, cls) {
     if (!ok(r)) { slot.innerHTML = `<button class="${cls}" type="button" disabled data-reason="${esc(r.message || '')}">Play</button>`; return; }
     const p = r.primary; model.storeUrls[g.id] = r.store_url || null;
     const label = p.action === 'install' ? 'Install' : 'Play';
-    slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}${p.enabled && p.via === 'folder' && p.launch?.via === 'wine' ? ' <span class="reason">· Wine</span>' : ''}</button>`;
+    slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}${p.enabled && p.via === 'folder' && p.launch?.via === 'wine' ? ' <span class="reason">· Wine</span>' : ''}${p.enabled && p.action === 'install' ? ` <span class="reason">· ${esc(p.store)}</span>` : ''}</button>`;
     const b = $('button', slot);
     if (!p.enabled) { b.title = ''; slot.insertAdjacentElement('beforeend', el(`<small class="slot-reason">${esc(p.reason || '')}</small>`)); }
     // A folder game (Droidtop/tracker#629): what Play starts is Pythia's pick, which the person can change.
@@ -471,9 +472,16 @@ function fillPrimarySlot(g, slot, cls) {
       choose.onclick = () => chooseLaunch(g, () => fillPrimarySlot(g, slot, cls));
       slot.appendChild(choose);
     }
-    const start = async () => { const r2 = await act('play_game', [g.id], null, { what: `Starting ${g.name}` }); if (ok(r2)) flash(`Started ${g.name}${r2.via === 'steam' ? ' in Steam' : ''}`); };
-    // Steam opens its own window: in the handheld shell that is a hand-off, asked first (UX review A3).
-    b.onclick = () => (p.via === 'steam' ? handOff({ kind: 'launcher', launcher: 'steam', title: `Play ${g.name} in Steam?`, body: 'Steam opens and starts it.', run: start }) : start());
+    const start = async () => {
+      const r2 = await act('play_game', [g.id], null, { what: p.action === 'install' ? `Installing ${g.name}` : `Starting ${g.name}` });
+      if (!ok(r2)) return;
+      // Installing is the store's (Droidtop/tracker#630): it downloads the game; Find store games then adds it here.
+      if (r2.install) flash(`${p.store} opens to install ${g.name}. Once it is installed, File > Find store games adds it here.`);
+      else flash(`Started ${g.name}${r2.via === 'steam' ? ' in Steam' : ''}`);
+    };
+    // A store's app opens its own window: in the handheld shell that is a hand-off, asked first (UX review A3).
+    if (p.action === 'install') b.onclick = () => handOff({ kind: 'launcher', launcher: p.via, title: `Install ${g.name} with ${p.store}?`, body: `${p.store} opens and installs it with your account there.`, run: start });
+    else b.onclick = () => (p.via === 'steam' ? handOff({ kind: 'launcher', launcher: 'steam', title: `Play ${g.name} in Steam?`, body: 'Steam opens and starts it.', run: start }) : start());
     if (state.shell === 'handheld') hhKeepDisabledReachable();
   });
 }
@@ -1215,7 +1223,19 @@ async function accountDialog(pluginId) {
   const a = model.accounts.find((x) => x.id === pluginId);
   if (!a) { infoSheet({ title: 'No account for this source', details: 'This source has no account fields.' }); return; }
   const body = el(`<div></div>`);
-  body.appendChild(el(`<p>${esc(a.connected ? 'Connected. Keys are kept in the library folder; every synced computer can read them.' : 'Enter each field to connect. Keys are kept in the library folder; every synced computer can read them.')}</p>`));
+  // A store that signs in on its own page (GOG, Epic; Droidtop/tracker#630): two steps, both here.
+  if (a.browser) {
+    body.appendChild(el(`<p>${esc(a.connected ? `Connected to ${a.display_name}. Sign in again to use another account.` : `Connect ${a.display_name} so Pythia can list the games you own there.`)}</p>`));
+    const steps = el(`<ol class="connect-steps"><li><button class="btn small" type="button" data-open-login>Sign in to ${esc(a.display_name)} in your browser</button></li><li><span>Copy ${esc(a.browser.paste)}, then </span><button class="btn small primary" type="button" data-paste-login>Paste it here…</button></li></ol>`);
+    $('[data-open-login]', steps).onclick = async () => { const r = await call('open_account_login', a.id); if (!ok(r)) infoSheet({ title: 'Open this page in your browser', details: r.url || r.message }); };
+    $('[data-paste-login]', steps).onclick = async () => {
+      const v = await prompt({ title: `Finish connecting ${a.display_name}`, body: `Paste ${a.browser.paste}.`, hint: a.id.endsWith('egs') ? '{"authorizationCode": ...}' : 'https://embed.gog.com/on_login_success?...&code=...', save: 'Connect' });
+      if (v === null || !v.trim()) return;
+      const r = await act('finish_account_connect', [a.id, v.trim()], `${a.display_name} connected`, { what: `Connecting ${a.display_name}` });
+      if (ok(r)) { await refreshPlugins(); pythia.sync_account(a.id); flash(`Listing the games you own on ${a.display_name}`); $('.scrim')?.querySelector('[data-cancel],[data-proceed]')?.click(); }
+    };
+    body.appendChild(steps);
+  } else body.appendChild(el(`<p>${esc(a.connected ? 'Connected. Keys are kept in the library folder; every synced computer can read them.' : 'Enter each field to connect. Keys are kept in the library folder; every synced computer can read them.')}</p>`));
   a.fields.forEach((f) => { const row = el(`<div class="form-row" style="grid-template-columns:1fr auto"><div class="form-label"><strong>${esc(f.label)}</strong><small>${f.secret ? 'Secret' : ''}</small></div><button class="btn small">${a.connected ? 'Change' : 'Enter'}</button></div>`); $('button', row).onclick = async () => { const v = await prompt({ title: `${a.display_name}: ${f.label}`, hint: f.secret ? 'Paste the key' : f.label }); if (v !== null && v.trim()) { const r = await act('set_account_credential', [a.id, f.key, v.trim()], null, { what: 'Saving' }); if (ok(r)) { flash('Saved', 'info', { private: true }); refreshPlugins(); } } }; body.appendChild(row); });
   if (a.connected) { const b = el('<button class="btn primary" style="margin-top:10px">Sync owned games now</button>'); b.onclick = () => { pythia.sync_account(a.id); flash('Syncing'); navigate('activity'); }; body.appendChild(b); }
   infoSheet({ title: `${a.display_name} account`, node: body });

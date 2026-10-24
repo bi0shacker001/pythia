@@ -462,14 +462,42 @@ function fillPrimarySlot(g, slot, cls) {
     if (!ok(r)) { slot.innerHTML = `<button class="${cls}" type="button" disabled data-reason="${esc(r.message || '')}">Play</button>`; return; }
     const p = r.primary; model.storeUrls[g.id] = r.store_url || null;
     const label = p.action === 'install' ? 'Install' : 'Play';
-    slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}</button>`;
+    slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}${p.enabled && p.via === 'folder' && p.launch?.via === 'wine' ? ' <span class="reason">· Wine</span>' : ''}</button>`;
     const b = $('button', slot);
     if (!p.enabled) { b.title = ''; slot.insertAdjacentElement('beforeend', el(`<small class="slot-reason">${esc(p.reason || '')}</small>`)); }
+    // A folder game (Droidtop/tracker#629): what Play starts is Pythia's pick, which the person can change.
+    if (p.choose) {
+      const choose = el(`<button class="btn small ghost choose-run" type="button">Choose how it runs…</button>`);
+      choose.onclick = () => chooseLaunch(g, () => fillPrimarySlot(g, slot, cls));
+      slot.appendChild(choose);
+    }
     const start = async () => { const r2 = await act('play_game', [g.id], null, { what: `Starting ${g.name}` }); if (ok(r2)) flash(`Started ${g.name}${r2.via === 'steam' ? ' in Steam' : ''}`); };
     // Steam opens its own window: in the handheld shell that is a hand-off, asked first (UX review A3).
     b.onclick = () => (p.via === 'steam' ? handOff({ kind: 'launcher', launcher: 'steam', title: `Play ${g.name} in Steam?`, body: 'Steam opens and starts it.', run: start }) : start());
     if (state.shell === 'handheld') hhKeepDisabledReachable();
   });
+}
+// "Choose how it runs" (Droidtop/tracker#629): the programs in the game's folder, likeliest first, and on
+// Linux whether it runs natively or through Wine. The choice stays on this computer's record.
+async function chooseLaunch(g, redraw) {
+  const r = await call('get_launch_choices', g.id);
+  if (!ok(r)) { flash(r.message || 'Not available', 'caution'); return; }
+  const list = r.candidates || [];
+  const size = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(0)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const current = r.current || {};
+  const node = el(`<div><p><small class="mono" style="word-break:break-all">${esc(r.folder)}</small></p>${list.length ? `<div class="run-choices">${list.map((c, i) => `<label class="run-choice"><input type="radio" name="run-exe" value="${i}" ${c.exe === current.exe ? 'checked' : ''}><span><strong class="mono">${esc(c.exe)}</strong><small>${c.kind === 'windows' ? 'Windows program' : 'Linux program'} · ${size(c.size)}</small></span></label>`).join('')}</div>` : '<p>Pythia found no program in its folder.</p>'}${(r.vias || []).length > 1 ? `<div class="run-via"><div class="form-label"><strong>Run it</strong><small>${r.wine ? `Wine: ${esc(r.wine)}` : 'Wine is not installed: install your system\u2019s wine package to run Windows programs.'}</small></div><select class="field" data-run-via><option value="native">Natively</option><option value="wine" ${current.via === 'wine' ? 'selected' : ''} ${r.wine ? '' : 'disabled'}>Through Wine</option></select></div>` : ''}${r.chose ? '<p><button class="btn small ghost" type="button" data-run-reset>Use Pythia\u2019s pick again</button></p>' : ''}</div>`);
+  // A Windows program on Linux runs through Wine: picking one picks Wine too.
+  const via = $('[data-run-via]', node);
+  $$('input[name="run-exe"]', node).forEach((input) => (input.onchange = () => { if (via && list[Number(input.value)].kind === 'windows' && r.wine) via.value = 'wine'; if (via && list[Number(input.value)].kind === 'linux') via.value = 'native'; }));
+  $('[data-run-reset]', node)?.addEventListener('click', async () => { const r2 = await act('set_launch', [g.id, '', ''], 'Pythia picks what Play starts', { what: 'Changing it' }); if (ok(r2)) { $('.scrim')?.querySelector('[data-cancel]')?.click(); redraw(); } });
+  if (!list.length) { infoSheet({ title: `How ${g.name} runs`, node }); return; }
+  if (!(await confirm({ title: `How ${g.name} runs`, node, proceed: 'Use this' }))) return;
+  const picked = $('input[name="run-exe"]:checked', node);
+  if (!picked) return;
+  const chosen = list[Number(picked.value)];
+  const how = r.windows ? 'native' : via ? via.value : 'native';
+  const r2 = await act('set_launch', [g.id, chosen.exe, how], `Play starts ${chosen.exe}`, { what: 'Changing it' });
+  if (ok(r2)) redraw();
 }
 // Launchers that can show this game, asked for once the page is drawn; "Open in <launcher>" is in its menu.
 function loadManagers(g) {

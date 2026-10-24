@@ -1286,8 +1286,31 @@ class Backend(QObject):
 
     @Slot(str, result="QVariant")
     @_guarded
+    @_off_the_main_thread
+    def get_launch_choices(self, game_id: str):
+        """What "Choose how it runs" offers for a folder game: the programs in
+        its folder, what Play starts now, and the ways it can run here."""
+        from pythia import play
+
+        return play.launch_choices(game_id)
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    def set_launch(self, game_id: str, exe: str, via: str):
+        """Keeps what Play starts for a folder game; an empty exe goes back to
+        Pythia's own pick."""
+        from pythia import play
+
+        result = play.set_launch(game_id, exe, via)
+        if result.get("status") == "ok":
+            self.refresh_games()
+        return result
+
+    @Slot(str, result="QVariant")
+    @_guarded
     def play_game(self, game_id: str):
-        """Starts the game: through Steam (its steam:// link) or Pythia's runner."""
+        """Starts the game: through Steam (its steam:// link), Pythia's runner, or
+        a folder game's own program (natively, or through Wine)."""
         from PySide6.QtGui import QDesktopServices
 
         from pythia import play
@@ -1298,6 +1321,8 @@ class Backend(QObject):
                 return {"status": "error", "message": "Steam did not open. Is it installed?"}
         if result.get("status") == "ok":
             self._record("info", "pythia", f"Started {game_id} ({result.get('via')})", "play_game")
+        if result.get("via") == "folder":
+            self.refresh_games()  # its last-played time, for Continue playing
         return result
 
     # ---- launcher hand-off --------------------------------------------------

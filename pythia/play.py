@@ -184,6 +184,11 @@ def state(game_id: str, entries: list[dict] | None = None) -> dict:
                 else NO_RUNNER
             )
             primary = {"action": "play", "enabled": False, "via": None, "reason": reason}
+            # Without Wine, the fix is one button (Droidtop/tracker#629): Pythia sets it up.
+            from pythia import wine_setup  # noqa: PLC0415
+
+            if reason == folder_launch.NO_WINE and wine_setup.supported():
+                primary["fix"] = "wine"
         primary["choose"] = variant is not None
     return {"status": "ok", "primary": primary, "update": update, "store_url": store_page(entries)}
 

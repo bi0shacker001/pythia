@@ -466,6 +466,12 @@ function fillPrimarySlot(g, slot, cls) {
     slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}${p.enabled && p.via === 'folder' && p.launch?.via === 'wine' ? ' <span class="reason">· Wine</span>' : ''}${p.enabled && p.action === 'install' ? ` <span class="reason">· ${esc(p.store)}</span>` : ''}</button>`;
     const b = $('button', slot);
     if (!p.enabled) { b.title = ''; slot.insertAdjacentElement('beforeend', el(`<small class="slot-reason">${esc(p.reason || '')}</small>`)); }
+    // No Wine for a Windows game on Linux: Pythia sets it up with one button (Droidtop/tracker#629).
+    if (p.fix === 'wine') {
+      const fix = el('<button class="btn small primary" type="button">Set up Windows games…</button>');
+      fix.onclick = () => setUpWindowsGames();
+      slot.appendChild(fix);
+    }
     // A folder game (Droidtop/tracker#629): what Play starts is Pythia's pick, which the person can change.
     if (p.choose) {
       const choose = el(`<button class="btn small ghost choose-run" type="button">Choose how it runs…</button>`);
@@ -485,6 +491,22 @@ function fillPrimarySlot(g, slot, cls) {
     if (state.shell === 'handheld') hhKeepDisabledReachable();
   });
 }
+// Set up Windows games (Droidtop/tracker#629): a Wine build for Pythia's own use, fetched into its runners folder.
+async function setUpWindowsGames() {
+  if (!(await confirm({ title: 'Set up Windows games?', body: 'Pythia downloads a Wine build (Wine Staging from Kron4ek\u2019s Wine-Builds on GitHub, about 100 MB) and unpacks it into its own folder. Nothing is installed on the system. Windows games then play through it, each in a Wine prefix of its own.', proceed: 'Set up' }))) return;
+  pythia.set_up_windows_games();
+  flash('Setting up Windows games; it shows under Activity');
+}
+function renderWindowsGames(host) {
+  if (!host) return;
+  loadInto(host, 'get_wine_setup', [], (r, h) => {
+    if (r.windows) { h.appendChild(el('<div class="form-row"><div class="form-label"><strong>Windows games</strong><small>They run as they are on Windows; nothing to set up.</small></div></div>')); return; }
+    const using = r.builds[0] ? `Pythia\u2019s Wine: ${r.builds[0].name}` : r.system ? `The system\u2019s Wine: ${r.system}` : 'Not set up';
+    const row = el(`<div class="form-row"><div class="form-label"><strong>Windows games</strong><small>${esc(using)}.${r.supported ? '' : ' Pythia sets up Wine on Linux (x86-64) only; install your system\u2019s wine here.'}</small></div>${r.supported ? `<button class="btn" type="button">${r.builds.length ? 'Get the latest Wine' : 'Set up Windows games'}…</button>` : ''}</div>`);
+    $('button', row)?.addEventListener('click', setUpWindowsGames);
+    h.appendChild(row);
+  }, { what: 'Windows games' });
+}
 // "Choose how it runs" (Droidtop/tracker#629): the programs in the game's folder, likeliest first, and on
 // Linux whether it runs natively or through Wine. The choice stays on this computer's record.
 async function chooseLaunch(g, redraw) {
@@ -493,7 +515,7 @@ async function chooseLaunch(g, redraw) {
   const list = r.candidates || [];
   const size = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(0)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
   const current = r.current || {};
-  const node = el(`<div><p><small class="mono" style="word-break:break-all">${esc(r.folder)}</small></p>${list.length ? `<div class="run-choices">${list.map((c, i) => `<label class="run-choice"><input type="radio" name="run-exe" value="${i}" ${c.exe === current.exe ? 'checked' : ''}><span><strong class="mono">${esc(c.exe)}</strong><small>${c.kind === 'windows' ? 'Windows program' : 'Linux program'} · ${size(c.size)}</small></span></label>`).join('')}</div>` : '<p>Pythia found no program in its folder.</p>'}${(r.vias || []).length > 1 ? `<div class="run-via"><div class="form-label"><strong>Run it</strong><small>${r.wine ? `Wine: ${esc(r.wine)}` : 'Wine is not installed: install your system\u2019s wine package to run Windows programs.'}</small></div><select class="field" data-run-via><option value="native">Natively</option><option value="wine" ${current.via === 'wine' ? 'selected' : ''} ${r.wine ? '' : 'disabled'}>Through Wine</option></select></div>` : ''}${r.chose ? '<p><button class="btn small ghost" type="button" data-run-reset>Use Pythia\u2019s pick again</button></p>' : ''}</div>`);
+  const node = el(`<div><p><small class="mono" style="word-break:break-all">${esc(r.folder)}</small></p>${list.length ? `<div class="run-choices">${list.map((c, i) => `<label class="run-choice"><input type="radio" name="run-exe" value="${i}" ${c.exe === current.exe ? 'checked' : ''}><span><strong class="mono">${esc(c.exe)}</strong><small>${c.kind === 'windows' ? 'Windows program' : 'Linux program'} · ${size(c.size)}</small></span></label>`).join('')}</div>` : '<p>Pythia found no program in its folder.</p>'}${(r.vias || []).length > 1 ? `<div class="run-via"><div class="form-label"><strong>Run it</strong><small>${r.wine ? `Wine: ${esc(r.wine)}` : 'Wine is not set up: Settings > General > Windows games sets it up.'}</small></div><select class="field" data-run-via><option value="native">Natively</option><option value="wine" ${current.via === 'wine' ? 'selected' : ''} ${r.wine ? '' : 'disabled'}>Through Wine</option></select></div>` : ''}${r.chose ? '<p><button class="btn small ghost" type="button" data-run-reset>Use Pythia\u2019s pick again</button></p>' : ''}</div>`);
   // A Windows program on Linux runs through Wine: picking one picks Wine too.
   const via = $('[data-run-via]', node);
   $$('input[name="run-exe"]', node).forEach((input) => (input.onchange = () => { if (via && list[Number(input.value)].kind === 'windows' && r.wine) via.value = 'wine'; if (via && list[Number(input.value)].kind === 'linux') via.value = 'native'; }));
@@ -1167,7 +1189,7 @@ function openSettingsPane(name) {
   state.settingsPane = name; const btn = $$('[data-settings]').find((b) => b.dataset.settings === name); if (btn) { $$('[data-settings]').forEach((x) => x.classList.toggle('active', x === btn)); $$('.settings-pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === name)); } if (state.view !== 'settings') navigate('settings'); else renderSettingsPane(name); }
 function renderSettingsPane(name) {
   const info = model.info || {}; const app = model.app || {};
-  if (name === 'general') renderModes($('#modesState'));
+  if (name === 'general') { renderModes($('#modesState')); renderWindowsGames($('#windowsGames')); }
   if (name === 'general') { $('#appDataPath').textContent = info.app_data_folder || '';  }
   if (name === 'plugins') { renderPlugins(!state.search); loadInto($('#pluginRepos'), 'get_plugin_repositories', [], (r, host) => { if (!(r.repositories || []).length) host.appendChild(stateBlock({ title: 'No repositories added' })); }, { what: 'Plugin repositories' }); }
   if (name === 'advanced') { $('#systemIdField').value = info.system_uuid || ''; $('#dbPath').textContent = info.app_data_folder || ''; $('#schemaVersion').innerHTML = app.schema_version ? `${routineStatus('Up to date')}v${esc(app.schema_version)}` : ''; $('#logLevelSelect').value = model.config?.log_level === 'debug' ? 'debug' : 'info'; $('#consoleHint').textContent = model.config?.error_console ? 'On for this run. Ctrl+Shift+E toggles it.' : 'Off. Start Pythia with --error-console, or set error_console = True in pythia.conf.'; }

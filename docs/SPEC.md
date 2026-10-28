@@ -586,8 +586,16 @@ off Windows, natively or through Wine; the choice is this computer's, kept on
 its record of the folder. Play notes when the game was played (Continue
 playing). An Epic game is sent to Epic's launcher, which its games need. A
 handheld's Play there starts a folder game the same way, after its store's
-launcher when it has one. Downloading a Wine or Proton build for the person
-is not built: without Wine, Play says to install the system's wine package.
+launcher when it has one.
+
+**Set up Windows games** (Linux, x86-64): when a Windows game has no Wine,
+Play offers it, and Settings > General > Windows games keeps it (and gets the
+latest). Pythia fetches the latest Wine Staging build from Kron4ek's
+Wine-Builds on GitHub, checks its size, refuses an archive that would write
+outside its folder, and unpacks it into its own runners folder; nothing is
+installed on the system. Play then uses the newest build Pythia set up, else
+the system's `wine`. It is a job on the Activity page with its progress.
+DXVK and VKD3D (Direct3D through Vulkan) are not set up yet.
 
 ### 8.9 Owned games and Install (Droidtop/tracker#630)
 

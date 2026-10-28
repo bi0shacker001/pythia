@@ -1320,6 +1320,54 @@ class Backend(QObject):
 
         return play.state(game_id, self._entries_of(game_id))
 
+    @Slot(result="QVariant")
+    @_guarded
+    def get_wine_setup(self):
+        """Windows games on Linux (Droidtop/tracker#629): whether Pythia sets up
+        Wine here, the builds it set up (newest first), and the system's Wine."""
+        import shutil
+
+        from pythia import folder_launch, wine_setup
+
+        return {
+            "status": "ok",
+            "supported": wine_setup.supported(),
+            "windows": folder_launch.on_windows(),
+            "builds": wine_setup.builds(),
+            "system": shutil.which("wine") or shutil.which("wine64"),
+            "using": folder_launch.wine(),
+        }
+
+    @Slot()
+    def set_up_windows_games(self):
+        """Fetches and unpacks the latest Wine build into Pythia's runners
+        folder, as a job on the Activity page."""
+        job = self._job_start("wine", "Set up Windows games", "Wine build")
+        threading.Thread(target=self._wine_setup_worker, args=(job,), daemon=True).start()
+
+    def _wine_setup_worker(self, job: str):
+        from pythia import wine_setup
+
+        last = [-1]
+
+        def progress(done: int, total: int):
+            step = done * 10 // total if total else -1
+            if step != last[0]:
+                last[0] = step
+                self._job_log(
+                    job, f"Downloaded {done // 2**20} of {total // 2**20} MB" if total else f"{done // 2**20} MB"
+                )
+
+        try:
+            build = wine_setup.latest()
+            self._job_log(job, f"Wine {build['version']} ({build['name']}), {build['size'] // 2**20} MB")
+            done = wine_setup.install(progress, build)
+        except wine_setup.SetupError as ex:
+            self._job_finish(job, str(ex), ok=False)
+            return
+        self._job_finish(job, f"Windows games are set up: {done['name']}")
+        self.refresh_games()
+
     @Slot(str, result="QVariant")
     @_guarded
     @_off_the_main_thread

@@ -59,6 +59,7 @@ NOT_THE_GAME = (
 # How deep a folder is looked into for the game's program.
 MAX_DEPTH = 2
 LINUX_SUFFIXES = (".sh", ".x86_64", ".x86", ".appimage")
+NO_WINE = "It is a Windows game and Wine is not set up: choose Set up Windows games, or install your system's wine."
 
 
 def on_windows() -> bool:
@@ -66,9 +67,15 @@ def on_windows() -> bool:
 
 
 def wine() -> str | None:
-    """The Wine program on this computer, or None. Never on Windows."""
+    """The Wine program Play uses, or None: the newest build Pythia set up
+    ("Set up Windows games", pythia.wine_setup), else the system's. Never on Windows."""
     if on_windows():
         return None
+    from pythia import wine_setup  # noqa: PLC0415
+
+    own = wine_setup.builds()
+    if own:
+        return own[0]["wine"]
     return shutil.which("wine") or shutil.which("wine64")
 
 
@@ -148,7 +155,7 @@ def why_not(folder: str, title: str = "") -> str:
     if not found:
         return "Pythia found no program to start in its folder. Choose how it runs."
     if not on_windows() and all(c["kind"] == "windows" for c in found):
-        return "It is a Windows game and Wine is not installed: install your system's wine package, then Play."
+        return NO_WINE
     return "Nothing in its folder starts on this system. Choose how it runs."
 
 
@@ -166,7 +173,7 @@ def command(folder: str, launch: dict, game_id: str) -> tuple[list[str], dict]:
     if launch.get("via") == "wine":
         program = wine()
         if not program:
-            raise RuntimeError("Wine is not installed: install your system's wine package.")
+            raise RuntimeError(NO_WINE)
         prefix = prefix_for(game_id)
         prefix.mkdir(parents=True, exist_ok=True)
         env["WINEPREFIX"] = str(prefix)

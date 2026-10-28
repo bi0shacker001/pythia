@@ -59,7 +59,7 @@ class CandidatesTest(TestCase):
                 self.assertEqual(folder_launch.pick(str(self.root), "Game"), {"exe": "Game.exe", "via": "wine"})
             with mock.patch.object(folder_launch, "wine", return_value=None):
                 self.assertIsNone(folder_launch.pick(str(self.root), "Game"))
-                self.assertIn("Wine is not installed", folder_launch.why_not(str(self.root), "Game"))
+                self.assertEqual(folder_launch.why_not(str(self.root), "Game"), folder_launch.NO_WINE)
 
     def test_wine_runs_each_game_in_a_prefix_of_its_own(self):
         make(self.root, {"Game.exe": b"MZ"})

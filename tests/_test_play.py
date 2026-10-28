@@ -88,6 +88,10 @@ class InstallTest(TestCase):
         return [e]
 
     def test_the_store_it_is_owned_on_installs_it(self):
+        with mock.patch("sys.platform", "win32"):
+            self._owned_store()
+
+    def _owned_store(self):
         primary = play.install_state(self.entries(ids=[("steam", "440"), ("gog", "1207658924")], owned=["gog"]))
         self.assertEqual((primary["enabled"], primary["via"]), (True, "gog"))
         self.assertEqual(primary["url"], "goggalaxy://openGameView/1207658924")
@@ -107,3 +111,10 @@ class InstallTest(TestCase):
             self.assertEqual(
                 play.play("g1"), {"status": "ok", "via": "steam", "url": "steam://install/440", "install": True}
             )
+
+    def test_on_linux_gog_and_epic_say_what_works_instead(self):
+        with mock.patch("sys.platform", "linux"):
+            primary = play.install_state(self.entries(ids=[("gog", "1"), ("egs", "Fortnite")], owned=["gog"]))
+            self.assertEqual((primary["enabled"], primary["reason"]), (False, play.NO_INSTALL_LINUX))
+            primary = play.install_state(self.entries(ids=[("gog", "1"), ("steam", "440")], owned=["gog"]))
+            self.assertEqual((primary["enabled"], primary["via"]), (True, "steam"))

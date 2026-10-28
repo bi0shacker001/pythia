@@ -604,7 +604,11 @@ not installed here. Install hands the game to its store's own installer, by
 the store's link (`steam://install/<id>`, GOG Galaxy's
 `goggalaxy://openGameView/<id>`, Epic's `com.epicgames.launcher://apps/<id>`),
 the store it is owned on first; the person's account, the download and DRM
-stay the store's. Once it is installed, Find store games adds it. GOG and Epic
+stay the store's. Once it is installed, Find store games adds it. On Linux,
+where GOG Galaxy and the Epic Games Launcher do not exist, only Steam's link
+is offered; a GOG or Epic game says it installs with GOG's offline installer
+or a launcher such as Heroic. Pythia downloading GOG and Epic games itself
+(gogdl, legendary) is the next step. GOG and Epic
 connect in the app: the store's sign-in page opens in the browser, and the
 person pastes back what it shows (GOG's address bar, Epic's page text);
 Pythia then lists what they own there.

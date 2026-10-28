@@ -29,6 +29,12 @@ STORE_PAGES = {
 NO_INSTALL = "Pythia knows no store to install it from. Install it with its store or launcher, then add its folder."
 # Each store's own installer, by its link (Droidtop/tracker#630): the store downloads and installs the
 # game, and "Find store games" then adds it here. The person's account and DRM stay the store's.
+# GOG Galaxy and the Epic Games Launcher exist on Windows (and macOS) only.
+WINDOWS_ONLY_INSTALLERS = ("gog", "egs")
+NO_INSTALL_LINUX = (
+    "On Linux Pythia installs Steam games through Steam. A GOG or Epic game installs with GOG's offline "
+    "installer (its store page) or a launcher such as Heroic; then Find store games or Add game folder adds it."
+)
 INSTALL_LINKS = {
     "steam": ("Steam", "steam://install/{id}"),
     "gog": ("GOG Galaxy", "goggalaxy://openGameView/{id}"),
@@ -124,9 +130,16 @@ def launch_of(own: dict | None) -> tuple[dict | None, dict | None]:
 def install_state(entries: list[dict]) -> dict:
     """Install for a game not on this computer: through the first store it is
     owned on (else known on) that has an installer link."""
+    import sys  # noqa: PLC0415
+
     owned = {o.get("platform") for e in entries for o in e.get("ownership") or []}
     stores = sorted(INSTALL_LINKS, key=lambda store: (store not in owned, list(INSTALL_LINKS).index(store)))
+    no_launcher = sys.platform.startswith("linux")
+    skipped = False
     for store in stores:
+        if no_launcher and store in WINDOWS_ONLY_INSTALLERS:
+            skipped = skipped or bool(_ids(entries, store))
+            continue
         ids = _ids(entries, store)
         if ids:
             name, link = INSTALL_LINKS[store]
@@ -138,7 +151,7 @@ def install_state(entries: list[dict]) -> dict:
                 "url": link.format(id=ids[0]),
                 "reason": None,
             }
-    return {"action": "install", "enabled": False, "via": None, "reason": NO_INSTALL}
+    return {"action": "install", "enabled": False, "via": None, "reason": NO_INSTALL_LINUX if skipped else NO_INSTALL}
 
 
 def state(game_id: str, entries: list[dict] | None = None) -> dict:

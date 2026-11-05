@@ -1,6 +1,8 @@
-"""The copies of games' saves kept on this computer (``pythia._native.saves``):
-when both a handheld and this computer changed a game's saves, the newest
-copy wins and the other is kept here, so nothing is lost."""
+"""The copies of games' saves kept on this computer (``pythia._native.saves``).
+
+Saves are synced through the agent core, whose rule is that nobody wins: when only one side changed since the last
+sync it is taken, deletions included; when both changed, nothing moves and the person chooses which set to keep.
+The set that is replaced is kept as that device's copy."""
 
 from pythia.droidtop.native import plain_path, submodule
 

@@ -466,10 +466,13 @@ on and pair", or "Pair only").
   when it was last seen, then labelled switches for what this computer
   offers it (droidtop-agent docs/DESIGN.md section 20): "Share this library
   with it" (it may see this computer's games and copy one when asked
-  there), "Share saves" (needs the library), "Its saves win" (handhelds
-  only) and "Let it start games here". A handheld starts with the library
-  and saves, a computer with nothing. "Its games" and "What syncs" are
-  beside the name; its ID and Forget are under More.
+  there), "Share saves" (needs the library) and "Let it start games
+  here". There is no "its saves win": for saves nobody wins, and when both
+  sides changed the handheld asks which copy to keep (owner, 2026-10-30,
+  Droidtop/tracker#814; droidtop-agent removed the primary device). A
+  handheld starts with the library and saves, a computer with nothing.
+  "Its games" and "What syncs" are beside the name; its ID and Forget are
+  under More.
 
 - **While Sync with droidtop is off** (UI review 2026-10-23, U6), Devices
   says once that a device can be paired now but syncs only once it is on,

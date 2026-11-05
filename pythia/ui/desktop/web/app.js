@@ -837,7 +837,7 @@ function renderHandhelds() {
     const swRow = (attr, id, label, small) => `<div class="form-row"><div class="form-label"><strong>${esc(label)}</strong><small>${small}</small></div><button class="toggle" ${attr}="${esc(id)}" aria-label="${esc(label)}"><span></span></button></div>`;
     const seen = (d) => (d.last_seen_ms ? `seen ${fmt.ago(new Date(d.last_seen_ms).toISOString())}` : 'not seen yet');
     devices.forEach((d) => {
-      const card = el(`<article class="device"><div class="device-head"><div class="card-icon">${d.kind === 'computer' ? 'PC' : '▭'}</div><div class="device-name"><strong>${esc(d.name)}</strong><small>${kindName(d)} · ${esc(seen(d))}</small></div><div class="inline-actions"><button class="btn small" data-device-games>Its games</button><button class="btn small" data-device-syncs>What syncs</button><button class="btn small ghost" data-device-more aria-haspopup="menu">More…</button></div></div><div class="device-switches">${swRow('data-offer-library', d.id, 'Share this library with it', 'It sees this computer’s games and can copy one when asked there.')}${swRow('data-offer-saves', d.id, 'Share saves', 'Saves are kept in step both ways. Needs the library.')}${d.kind === 'computer' ? '' : swRow('data-handheld-primary', d.id, 'Its saves win', 'When saves changed on both sides, this handheld’s copy is used and this computer’s goes to Save backups. Off: the newest wins.')}${swRow('data-handheld-launch', d.id, 'Let it start games here', esc(startGamesText().replace(/^Start games: /, '')))}</div></article>`);
+      const card = el(`<article class="device"><div class="device-head"><div class="card-icon">${d.kind === 'computer' ? 'PC' : '▭'}</div><div class="device-name"><strong>${esc(d.name)}</strong><small>${kindName(d)} · ${esc(seen(d))}</small></div><div class="inline-actions"><button class="btn small" data-device-games>Its games</button><button class="btn small" data-device-syncs>What syncs</button><button class="btn small ghost" data-device-more aria-haspopup="menu">More…</button></div></div><div class="device-switches">${swRow('data-offer-library', d.id, 'Share this library with it', 'It sees this computer’s games and can copy one when asked there.')}${swRow('data-offer-saves', d.id, 'Share saves', 'Saves are kept in step both ways. Needs the library.')}${swRow('data-handheld-launch', d.id, 'Let it start games here', esc(startGamesText().replace(/^Start games: /, '')))}</div></article>`);
       h.appendChild(card);
       $('[data-device-syncs]', card).onclick = () => showDeviceSyncs(d);
       $('[data-device-games]', card).onclick = () => showOfferedGames(d);
@@ -850,7 +850,6 @@ function renderHandhelds() {
       const offerSwitch = (what, word) => bindSwitch($(`[data-offer-${what}]`, card), !!offer[what], async (on, node) => { const r2 = await act('set_device_offer', [d.id, what, on], on ? `Sharing ${word} with ${d.name}` : `No longer sharing ${word} with ${d.name}`, { what: 'Changing it' }); if (!ok(r2)) flip(node, on); else renderHandhelds(); });
       offerSwitch('library', 'this library');
       offerSwitch('saves', 'saves');
-      if (d.kind !== 'computer') bindSwitch($('[data-handheld-primary]', card), !!d.primary, async (on, node) => { const r2 = await act('set_primary_handheld', [on ? d.id : ''], on ? `${d.name}'s saves win` : 'The newest saves win', { what: 'Changing it' }); if (!ok(r2)) flip(node, on); else renderHandhelds(); });
       bindSwitch($('[data-handheld-launch]', card), !!d.launch, async (on, node) => { const r2 = await act('set_handheld_launch', [d.id, on], on ? `${d.name} may start games here` : `${d.name} may no longer start games here`, { what: 'Changing it' }); if (!ok(r2)) flip(node, on); });
     });
   }, { what: 'Handhelds' }));
@@ -1553,7 +1552,7 @@ function renderHHSystems() {
     const devices = r.devices || [];
     if (!devices.length) { h.appendChild(stateBlock({ title: 'Pair your handheld', body: 'Choose Pair a device above, and on the handheld droidtop > Settings > Computers > Pair a computer. Another computer running Pythia pairs the same way.' })); return; }
     devices.forEach((d) => {
-      const row = el(`<button class="hh-summary" type="button"><span class="art art-a">${esc(initials(d.name))}</span><span><strong>${esc(d.name)}</strong><small>${d.kind === 'computer' ? 'Computer' : 'Handheld'} · ${d.last_seen_ms ? `Seen ${esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString()))}` : 'Not seen yet'}${d.primary ? ' · its saves win' : ''} · A: what syncs</small></span>${routineStatus('Paired')}</button>`);
+      const row = el(`<button class="hh-summary" type="button"><span class="art art-a">${esc(initials(d.name))}</span><span><strong>${esc(d.name)}</strong><small>${d.kind === 'computer' ? 'Computer' : 'Handheld'} · ${d.last_seen_ms ? `Seen ${esc(fmt.dateTime(new Date(d.last_seen_ms).toISOString()))}` : 'Not seen yet'} · A: what syncs</small></span>${routineStatus('Paired')}</button>`);
       row.onclick = () => showDeviceSyncs(d);
       h.appendChild(row);
     });

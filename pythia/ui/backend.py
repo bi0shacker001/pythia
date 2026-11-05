@@ -2064,20 +2064,6 @@ class Backend(QObject):
         self.handheldsChanged.emit()
         return {"status": "ok"}
 
-    @Slot(str, result="QVariant")
-    @_guarded
-    def set_primary_handheld(self, device_id: str):
-        """The handheld whose saves win here when both changed; "" for the newest copy."""
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("set_primary_handheld")
-        from pythia.droidtop import store
-
-        store.set_primary(device_id or None)
-        self.handheldsChanged.emit()
-        return {"status": "ok"}
-
     @Slot(str, bool, result="QVariant")
     @_guarded
     def set_handheld_launch(self, device_id: str, allowed: bool):

@@ -20,8 +20,7 @@ def settings() -> dict:
 
 def devices() -> list[dict]:
     """The paired handhelds: ``id``, ``name``, ``last_seen_ms``,
-    ``last_address``, ``trusted``, ``primary`` (its saves win here),
-    ``launch`` (it may start games here) and ``offered`` (what this computer
+    ``last_address``, ``trusted``, ``launch`` (it may start games here) and ``offered`` (what this computer
     offers it: ``library``, ``saves``)."""
     return submodule("store").devices()
 
@@ -29,11 +28,6 @@ def devices() -> list[dict]:
 def unpair(device_id: str) -> None:
     """Forgets a handheld (the start of its id is enough)."""
     submodule("store").unpair(device_id)
-
-
-def set_primary(device_id: str | None) -> None:
-    """The handheld whose saves win when both sides changed; None: the newest."""
-    submodule("store").set_primary(device_id)
 
 
 def set_launch(device_id: str, allowed: bool) -> None:

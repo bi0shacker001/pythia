@@ -17,13 +17,13 @@ crate-type = ["cdylib"]
 # crates/python: Embedder, configure, register; Droidtop/tracker#867), and what Pythia's own submodules use
 # directly: the shared libraries at the tags droidtop-agent pins, and droidtop-agent's service. Every pin
 # here must be droidtop-agent's at the same commit, so one copy of each crate is linked.
-droidtop-agent-python = { git = "https://github.com/Droidtop/droidtop-agent", rev = "217d1f05f57255b480a67536b3a0f4e21117fa4c" }
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "217d1f05f57255b480a67536b3a0f4e21117fa4c" }
-droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
-droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
+droidtop-agent-python = { git = "https://github.com/Droidtop/droidtop-agent", rev = "fa290d2b9dc4f083ececc2b284d8eda162d7d8eb" }
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "fa290d2b9dc4f083ececc2b284d8eda162d7d8eb" }
+droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.6" }
+droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.6" }
 # windowcast's host identity folder, the one droidtop-agent and windowcast share,
 # at the commit droidtop-agent pins.
-windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "cd1ed2371b1e793babf6703b5dcfab94d979f1c6" }
+windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "b5c9aa723c4d6173e9cc101ccfbffc27cf975b73" }
 # KDE Connect, both ways (Droidtop/tracker#645): lib-kdeconnect's device and its one
 # operation table, the same one droidtop's native library passes through. Pinned to the
 # commit on lib-kdeconnect's ci/kdeconnect-core-645 until it is tagged v0.1.0.

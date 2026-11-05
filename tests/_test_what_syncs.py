@@ -19,11 +19,11 @@ class WhatSyncsTest(TestCase):
 
     def test_a_handheld_follows_its_settings(self):
         r = rows(
-            {"kind": "handheld", "primary": True, "launch": False, "announced": {SYNCTHING: {"syncthing": "X"}}},
+            {"kind": "handheld", "launch": False, "announced": {SYNCTHING: {"syncthing": "X"}}},
             {"approved": {"f95": {}}, "syncthing": True},
         )
         self.assertTrue(r["Library"]["syncs"])
-        self.assertIn("this handheld's copy wins", r["Saves"]["detail"])
+        self.assertIn("nothing is overwritten", r["Saves"]["detail"])
         self.assertFalse(r["Starting games here"]["syncs"])
         self.assertTrue(r["Plugin data"]["syncs"])
         self.assertTrue(r["Syncthing folders"]["syncs"])

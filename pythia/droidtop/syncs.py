@@ -46,15 +46,10 @@ def what_syncs(device: dict, settings: dict) -> list[dict]:
     }
     if not offer["saves"]:
         saves_detail = "This computer does not offer it its saves. Turn on Saves for it on the Devices page."
-    elif kind == "handheld" and device.get("primary"):
-        saves_detail = (
-            "Game saves, where their location is known. When both changed, this handheld's copy wins (it is "
-            "the primary handheld); the other is kept as a copy on the Save backups page."
-        )
     else:
         saves_detail = (
-            "Game saves, where their location is known. When both changed, the newest copy wins; the other is "
-            "kept as a copy on the Save backups page."
+            "Game saves, where their location is known. When both changed, nothing is overwritten: the handheld "
+            "asks which copy to keep, and the copy it replaces is kept on the Save backups page."
         )
     launch = {
         "what": "Starting games here",

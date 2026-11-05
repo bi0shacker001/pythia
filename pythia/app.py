@@ -279,7 +279,7 @@ def _run_droidtop_command(args) -> int:
             if not devices:
                 print("No handheld is paired. On droidtop: Settings > Computers > Pair a computer.")
             for d in devices:
-                print(f"{d['id'][:16]}  {d['name']}{'  (primary)' if d.get('primary') else ''}")
+                print(f"{d['id'][:16]}  {d['name']}")
         elif args.droidtop_unpair:
             store.unpair(args.droidtop_unpair)
             print("Forgotten.")

@@ -48,6 +48,10 @@ def run(argv: list[str] | None = None) -> int:
     from pythia.droidtop import service
 
     service.start_in_background()
+    # This computer as a KDE Connect device, when the person turned it on (Droidtop/tracker#645).
+    from pythia.droidtop import kdeconnect  # noqa: PLC0415
+
+    kdeconnect.start_in_background()
 
     from pythia.ui import mode
 

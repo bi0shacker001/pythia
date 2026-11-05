@@ -35,13 +35,14 @@ use pyo3::prelude::*;
 use serde_json::json;
 
 mod agent;
+mod kdeconnect;
 mod pad;
 mod secure;
 mod takeover;
 
 pub(crate) static FOLDER: Mutex<Option<PathBuf>> = Mutex::new(None);
 // The bindings Pythia's module is built over, and what Pythia's own submodules use from them.
-pub(crate) use droidtop_agent_python::{agent, run, AgentError};
+pub(crate) use droidtop_agent_python::{agent, from_py, run, AgentError};
 use droidtop_agent_python::{submodule, Embedder};
 
 /// Who embeds droidtop-agent's bindings here: Pythia, over its own folder.
@@ -121,6 +122,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "agent", agent::fill)?;
     submodule(m, "pad", pad::fill)?;
     submodule(m, "secure_screen", secure::fill)?;
+    submodule(m, "kdeconnect", kdeconnect::fill)?;
     Ok(())
 }
 

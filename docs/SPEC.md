@@ -344,9 +344,13 @@ internally". Library home, owner: "lib-kdeconnect implements explicitly kde-conn
   is `DATA_DIR/droidtop/kdeconnect`: its own KDE Connect identity (the official apps need CN = device id and no SAN,
   so it is not the PeerId) and the paired devices.
 - One KDE Connect per computer: when the official app already runs here it holds UDP 1716, and `start` says so.
-- Not built yet: the Devices page's KDE Connect section (pair, accept with the code, ping, send a file), writing a
-  received clip to the clipboard, and typing what a paired phone types (uinput or libei on Linux, SendInput on
-  Windows). The calls they need exist.
+- What arrives reaches the front ends as the backend's `kdeconnectEvent` signal, on the GUI thread
+  (`Backend._on_kdeconnect`): a paired device's clip is put on the clipboard; this computer's clipboard goes to paired
+  devices when it changes (`QClipboard.dataChanged`, sent off the GUI thread; the library does not send back a clip
+  that just came); a pairing request (with its code), a received or failed file, a shared link or text, a
+  notification, a ping and a ring (with a beep) go to the event log.
+- Not built yet: the Devices page's KDE Connect section (pair, accept with the code, ping, send a file), and typing
+  what a paired phone types (uinput or libei on Linux, SendInput on Windows). The calls they need exist.
 
 ## 7. Pairing
 

@@ -166,6 +166,7 @@ class Backend(QObject):
     asyncResult = Signal("QVariant")  # a slow slot's answer: {"request": id, ...its result}
     lookChanged = Signal("QVariant")  # a Look's live counts, its proposals, or that it was added (pythia.look)
     padAction = Signal(str)  # a controller press, named (pythia.pad), only while Pythia has the focus
+    kdeconnectEvent = Signal("QVariant")  # one KDE Connect event (pythia.droidtop.kdeconnect), on the GUI thread
 
     def __init__(self, error_console: bool = False):
         super().__init__()
@@ -193,9 +194,75 @@ class Backend(QObject):
         logger.addHandler(self._log_handler)
         self.refresh_games()
         self._follow_agent_events()
+        self._follow_kdeconnect()
         # The handhelds' state changed (a pairing, a session): droidtop-agent's
         # folder gets it too while the agent is off (pythia.droidtop.takeover).
         self.handheldsChanged.connect(self._sync_with_agent)
+
+    # ---- KDE Connect (docs/SPEC.md 6.1, Droidtop/tracker#645) -----------------------------------------------
+    def _follow_kdeconnect(self):
+        """KDE Connect's events reach the GUI thread through kdeconnectEvent (a signal emitted from the follower's
+        thread is queued), where the clipboard is written and what happened goes to the event log. This computer's
+        clipboard goes to paired devices when it changes; the library does not send back a clip that just came."""
+        from PySide6.QtGui import QGuiApplication
+
+        from pythia.droidtop import kdeconnect
+
+        kdeconnect.on_event(self.kdeconnectEvent.emit)
+        self.kdeconnectEvent.connect(self._on_kdeconnect)
+        clipboard = QGuiApplication.clipboard()
+        if clipboard is not None:
+            clipboard.dataChanged.connect(self._send_clipboard)
+
+    def _send_clipboard(self):
+        from PySide6.QtGui import QGuiApplication
+
+        from pythia.droidtop import kdeconnect
+        from pythia.droidtop.native import AgentError
+
+        text = QGuiApplication.clipboard().text()
+        if not text or not kdeconnect.is_on():
+            return
+
+        def send():
+            try:
+                kdeconnect.call("clipboard_set", text=text)
+            except AgentError:
+                pass  # KDE Connect is not running
+
+        threading.Thread(target=send, name="kdeconnect-clipboard", daemon=True).start()
+
+    def _on_kdeconnect(self, event: dict):
+        from PySide6.QtGui import QGuiApplication
+
+        kind = event.get("event")
+        plugin = event.get("plugin") or {}
+        what = plugin.get("plugin")
+        if kind == "pair_request":
+            self._record(
+                "warn", "kdeconnect", f"{event.get('name')} asks to pair. Pair only if it shows {event.get('key')}"
+            )
+        elif kind == "paired":
+            self._record("info", "kdeconnect", "Paired a KDE Connect device")
+        elif what == "clipboard":
+            QGuiApplication.clipboard().setText(plugin.get("text", ""))
+        elif what == "file_received":
+            self._record("info", "kdeconnect", f"Received {plugin.get('name')} in {plugin.get('path')}")
+        elif what == "file_failed":
+            self._record("warn", "kdeconnect", f"Could not receive {plugin.get('name')}: {plugin.get('why')}")
+        elif what == "share_url":
+            self._record("info", "kdeconnect", f"Link from a paired device: {plugin.get('url')}")
+        elif what == "share_text":
+            self._record("info", "kdeconnect", f"Text from a paired device: {plugin.get('text')}")
+        elif what == "notification":
+            self._record(
+                "info", "kdeconnect", f"{plugin.get('app')}: {plugin.get('title')} {plugin.get('text')}".strip()
+            )
+        elif what == "ring":
+            self._record("warn", "kdeconnect", "A paired device is looking for this computer")
+            QGuiApplication.beep()
+        elif what == "ping":
+            self._record("info", "kdeconnect", plugin.get("message") or "Ping from a paired device")
 
     def _sync_with_agent(self):
         from pythia.droidtop import takeover

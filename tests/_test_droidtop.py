@@ -11,11 +11,20 @@ from pythia.droidtop import launch, library, native, scan, service, store, takeo
 
 
 class TitleKeyTest(TestCase):
-    def test_matches_the_agents_title_key(self):
-        # droidtop-agent core library::title_key's own example.
-        self.assertEqual(library.title_key("The Game: Deluxe!"), "title:the game deluxe")
-        self.assertEqual(library.title_key("the  game deluxe"), "title:the game deluxe")
-        self.assertEqual(library.title_key("Café Stella"), "title:café stella")
+    def test_is_the_lutris_slug_every_device_writes(self):
+        # Droidtop/tracker#870: games-scan's titles::slug and droidtop's TitleKeys.slug give the same.
+        self.assertEqual(library.title_key("Being a DIK"), "title2:being-a-dik")
+        self.assertEqual(library.title_key("The Game: Deluxe!"), "title2:the-game-deluxe")
+        self.assertEqual(library.title_key("the  game deluxe"), "title2:the-game-deluxe")
+        self.assertEqual(library.title_key("Café Stella"), "title2:cafe-stella")
+
+    def test_the_legacy_key_is_still_read(self):
+        # droidtop-agent core library::title_key's own example, the key before title2:.
+        self.assertEqual(library.legacy_title_key("The Game: Deluxe!"), "title:the game deluxe")
+        entry = {"canonical_name": "The Game: Deluxe!", "platform_ids": []}
+        self.assertEqual(library.keys_of(entry), {"title2:the-game-deluxe", "title:the game deluxe"})
+        steam = {"canonical_name": "X", "platform_ids": [{"platform": "steam", "id": "440"}]}
+        self.assertEqual(library.keys_of(steam), {"steam:440"})
 
 
 class ScannedGamesTest(TestCase):
@@ -44,7 +53,7 @@ class ScannedGamesTest(TestCase):
 
     def test_the_newest_install_with_a_folder_is_the_game(self):
         (game,) = library.scanned_games([self.entry()], "me")
-        self.assertEqual(game["key"], "title:eternum")
+        self.assertEqual(game["key"], "title2:eternum")
         self.assertEqual(game["install"]["version"], "0.9.5")
         self.assertEqual(game["base"], self.new)
         self.assertEqual(game["install"]["launcher"], "pythia")
@@ -398,7 +407,7 @@ class HandheldLaunchTest(TestCase):
             "versions": [{"version": None, "variants": [variant]}],
         }
 
-    def run_with(self, entries, key="title:tiny game"):
+    def run_with(self, entries, key="title2:tiny-game"):
         with (
             mock.patch.object(launch.datadir, "list_all_entries", return_value=entries),
             mock.patch.object(launch, "get_system_uuid", return_value="me"),

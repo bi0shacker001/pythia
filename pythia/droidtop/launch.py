@@ -10,7 +10,7 @@ Steam's comes here. Steam keys stay the agent's (Steam Link).
 This is an exception to Pythia's "never launches anything" boundary, made on
 purpose and recorded with it (``pythia.plugins``, 2026-10-16). A key is only
 looked up, never run: it names one of this computer's tracked games
-(``library.game_key``, the key Pythia hands the agent). The game then starts,
+(``library.keys_of``: the key Pythia hands the agent, or its legacy ``title:`` key). The game then starts,
 first way that applies:
 - a variant with a runner set up (Lutris's runners: linux, wine...) starts
   as ``pythia pythia:rungameid/<game id>`` would, in a Pythia process of its
@@ -25,7 +25,7 @@ import subprocess
 import sys
 
 from pythia import datadir
-from pythia.droidtop.library import game_key
+from pythia.droidtop.library import keys_of
 from pythia.droidtop.native import submodule
 from pythia.identity import get_system_uuid
 from pythia.util.log import logger
@@ -42,7 +42,7 @@ def launch_for_handheld(key: str, title: str = "") -> dict | None:
     if key.startswith("steam:"):
         return None
     uuid = get_system_uuid()
-    entries = [e for e in datadir.list_all_entries() if e.get("system_uuid") == uuid and game_key(e) == key]
+    entries = [e for e in datadir.list_all_entries() if e.get("system_uuid") == uuid and key in keys_of(e)]
     if not entries:
         return None
     name = title or entries[0].get("canonical_name") or key

@@ -9,7 +9,7 @@ like any other install, and their saves are found the same way.
 
 A game's key is the agent's (its DESIGN section 7): a store's id where
 Pythia knows one (`steam:<appid>`, `gog:<id>`, `itch:<id>`, `epic:<app
-name>`), else its title as `title:<words>`.
+name>`), else its title as `title2:<Lutris slug>` (`title_key`).
 """
 
 import os
@@ -19,6 +19,7 @@ from pythia import datadir
 from pythia.droidtop.native import AgentError, available, submodule
 from pythia.identity import get_system_uuid
 from pythia.util.log import logger
+from pythia.util.strings import slugify
 
 # Pythia's platform names for the stores whose ids are the agent's keys.
 STORE_KEYS = {"steam": "steam", "gog": "gog", "itch": "itch", "egs": "epic"}
@@ -29,8 +30,18 @@ NOT_ENGINES = {"unknown", "steam", "gog", "egs", "itch", "f95", "amazon", "dlsit
 
 
 def title_key(title: str) -> str:
-    """The agent's key for a game without a store id: its title in lower case
-    with only letters and digits (droidtop-agent core `library::title_key`)."""
+    """The key every device gives a game without a store id: `title2:` and the
+    title's Lutris slug, so "Being a DIK" is `title2:being-a-dik` (Droidtop/tracker#870;
+    the owner, 2026-11-05: "letters and digits only, but with space-to-hyphen
+    conversion. Lutris's standard"). droidtop-agent's games-scan (`titles::slug`)
+    and droidtop (`TitleKeys.slug`) are the same function as `slugify` here."""
+    return "title2:" + slugify(title)
+
+
+def legacy_title_key(title: str) -> str:
+    """The key before `title2:`: `title:` and the title's letters and digits,
+    lower case, joined by single spaces. The agent links what was stored under it
+    to the game's `title2:` key, so it is only read, never written."""
     words, word = [], []
     for ch in title.lower():
         if ch.isalnum():
@@ -49,6 +60,16 @@ def game_key(entry: dict) -> str:
         if store and pid.get("id"):
             return f"{store}:{pid['id']}"
     return title_key(entry.get("canonical_name") or "")
+
+
+def keys_of(entry: dict) -> set[str]:
+    """Every key the game may arrive under: `game_key`, and for a title-keyed
+    game its legacy `title:` key too, which a handheld that has not moved to
+    `title2:` still sends (as droidtop's `ComputerLibrary.keysOf`)."""
+    key = game_key(entry)
+    if key.startswith("title2:"):
+        return {key, legacy_title_key(entry.get("canonical_name") or "")}
+    return {key}
 
 
 def _newest_variant(entry: dict):

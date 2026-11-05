@@ -97,9 +97,8 @@ def supported() -> bool:
 
 def register() -> bool:
     """Hands launch_for_handheld to the agent's service; False (and Steam
-    games only, as before) when this build has no host launches yet
-    (native/'s "host-launch" feature, which needs droidtop-agent's
-    launch::Launcher)."""
+    games only) when the native module has no set_launcher, as builds before
+    droidtop-agent's bindings took it in did not (Droidtop/tracker#867)."""
     if not supported():
         logger.info("Handhelds can start only Steam games here: this build cannot start Pythia's own for them yet")
         return False

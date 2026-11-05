@@ -13,15 +13,14 @@ name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-# droidtop-agent's crates, used as they are: the protocol and channel the
-# handhelds speak (core) and the computer's side (store, pair, scan, saves,
-# service). Pinned by commit; moving the pin is a change of its own.
-droidtop-agent-core = { git = "https://github.com/Droidtop/droidtop-agent", rev = "2a93171e2524fc864b8de2c509fe89a2fa1314a0" }
-droidtop-agent-store = { git = "https://github.com/Droidtop/droidtop-agent", rev = "2a93171e2524fc864b8de2c509fe89a2fa1314a0" }
-droidtop-agent-pair = { git = "https://github.com/Droidtop/droidtop-agent", rev = "2a93171e2524fc864b8de2c509fe89a2fa1314a0" }
-droidtop-agent-scan = { git = "https://github.com/Droidtop/droidtop-agent", rev = "2a93171e2524fc864b8de2c509fe89a2fa1314a0" }
-droidtop-agent-saves = { git = "https://github.com/Droidtop/droidtop-agent", rev = "2a93171e2524fc864b8de2c509fe89a2fa1314a0" }
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "2a93171e2524fc864b8de2c509fe89a2fa1314a0" }
+# droidtop-agent's Python bindings, as a library this module is built over (droidtop-agent
+# crates/python: Embedder, configure, register; Droidtop/tracker#867), and what Pythia's own submodules use
+# directly: the shared libraries at the tags droidtop-agent pins, and droidtop-agent's service. Every pin
+# here must be droidtop-agent's at the same commit, so one copy of each crate is linked.
+droidtop-agent-python = { git = "https://github.com/Droidtop/droidtop-agent", rev = "217d1f05f57255b480a67536b3a0f4e21117fa4c" }
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "217d1f05f57255b480a67536b3a0f4e21117fa4c" }
+droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
+droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
 # windowcast's host identity folder, the one droidtop-agent and windowcast share,
 # at the commit droidtop-agent pins.
 windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "cd1ed2371b1e793babf6703b5dcfab94d979f1c6" }
@@ -38,11 +37,6 @@ serde_json = "1"
 # every newer Python. generate-import-lib lets Windows link without an
 # installed Python's import library.
 pyo3 = { version = "0.22", features = ["extension-module", "abi3-py310", "generate-import-lib"] }
-
-[features]
-# Starting Pythia's games for a handheld: needs droidtop-agent's
-# launch::Launcher, which the pinned commit does not have yet.
-host-launch = []
 
 [build-dependencies]
 pyo3-build-config = "0.22"

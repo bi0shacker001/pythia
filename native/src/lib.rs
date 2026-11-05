@@ -31,6 +31,7 @@ use pyo3::prelude::*;
 use serde_json::{json, Value};
 
 mod agent;
+mod kdeconnect;
 mod pad;
 mod pair;
 mod remote;
@@ -179,6 +180,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "service", service::fill)?;
     submodule(m, "pad", pad::fill)?;
     submodule(m, "secure_screen", secure::fill)?;
+    submodule(m, "kdeconnect", kdeconnect::fill)?;
     Ok(())
 }
 

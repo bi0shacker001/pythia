@@ -25,6 +25,10 @@ droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", r
 # windowcast's host identity folder, the one droidtop-agent and windowcast share,
 # at the commit droidtop-agent pins.
 windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "cd1ed2371b1e793babf6703b5dcfab94d979f1c6" }
+# KDE Connect, both ways (Droidtop/tracker#645): lib-kdeconnect's device and its one
+# operation table, the same one droidtop's native library passes through. Pinned to the
+# commit on lib-kdeconnect's ci/kdeconnect-core-645 until it is tagged v0.1.0.
+kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", rev = "dc7f5559aa26c6819590e55e4ec979347ce35d10" }
 # Where droidtop-agent keeps its files (as its Dirs::locate).
 dirs = "5"
 # Finding and stopping a running droidtop-agent, on every system.

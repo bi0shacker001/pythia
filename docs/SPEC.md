@@ -328,6 +328,26 @@ What syncs with a device is shown on that device's own page, generated
 from the sync model. It says that game files never sync (UX review AG6).
 Pairing is not released without that page (C1).
 
+### 6.1 KDE Connect (Droidtop/tracker#645, 2026-11-05)
+
+Owner, 2026-11-05: "We want to get kde connect and tailscale integrated more closely. File transfer, keyboard
+input, and etc are good first things", and "Remember we wanted to implement the kde connect protocol and stuff
+internally". Library home, owner: "lib-kdeconnect implements explicitly kde-connect as a programmatic module".
+
+- This computer can be a KDE Connect device: Droidtop/lib-kdeconnect's device, the same one droidtop runs, in
+  `pythia._native.kdeconnect` (one call, `call(op, **kwargs)`, over lib-kdeconnect's operation table) and
+  `pythia.droidtop.kdeconnect`. Phones and computers with the official KDE Connect apps, and droidtop handhelds,
+  find it, pair with it (both screens show the same 8-character code), ping it, share files, links and text with it
+  both ways, share the clipboard, and type into it.
+- It is off until the person turns it on (`kdeconnect_on`); then it starts with Pythia
+  (`kdeconnect.start_in_background`, beside the droidtop service). Files shared to it go to `~/Downloads`. Its state
+  is `DATA_DIR/droidtop/kdeconnect`: its own KDE Connect identity (the official apps need CN = device id and no SAN,
+  so it is not the PeerId) and the paired devices.
+- One KDE Connect per computer: when the official app already runs here it holds UDP 1716, and `start` says so.
+- Not built yet: the Devices page's KDE Connect section (pair, accept with the code, ping, send a file), writing a
+  received clip to the clipboard, and typing what a paired phone types (uinput or libei on Linux, SendInput on
+  Windows). The calls they need exist.
+
 ## 7. Pairing
 
 From UX review A19 (AG5); the owner decision in 1.5. The same protocol is

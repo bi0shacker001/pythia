@@ -40,6 +40,7 @@ mod scan;
 mod secure;
 mod service;
 mod store;
+mod tailscale;
 mod takeover;
 
 // PyO3 0.22's create_exception! tests a `gil-refs` feature this crate does not
@@ -181,6 +182,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "pad", pad::fill)?;
     submodule(m, "secure_screen", secure::fill)?;
     submodule(m, "kdeconnect", kdeconnect::fill)?;
+    submodule(m, "tailscale", tailscale::fill)?;
     Ok(())
 }
 

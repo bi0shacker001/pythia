@@ -62,6 +62,9 @@ def start() -> dict[str, Any]:
     global _follower
     with _lock:
         reply = call("start", state_dir=STATE_DIR, receive_dir=receive_dir(), name=socket.gethostname(), type="desktop")
+        from pythia.droidtop import tailscale
+
+        tailscale.follow_into_kdeconnect()
         if _follower is None or not _follower.is_alive():
             _follower = threading.Thread(target=_follow, name="kdeconnect-events", daemon=True)
             _follower.start()

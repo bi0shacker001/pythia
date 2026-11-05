@@ -349,6 +349,13 @@ internally". Library home, owner: "lib-kdeconnect implements explicitly kde-conn
   devices when it changes (`QClipboard.dataChanged`, sent off the GUI thread; the library does not send back a clip
   that just came); a pairing request (with its code), a received or failed file, a shared link or text, a
   notification, a ping and a ring (with a beep) go to the event log.
+- Over a tailnet: while KDE Connect runs, `pythia.droidtop.tailscale` asks this computer's own Tailscale node for
+  its peers every 30 seconds (`pythia._native.tailscale.status`, lib-net's `net-tailscale`: tailscaled's LocalAPI
+  `GET /localapi/v0/status` over its socket or Windows pipe, as ktailctl and the `tailscale` CLI do) and gives
+  KDE Connect the addresses of the online ones (its `addresses` op), so a phone on the tailnet away from home is
+  reachable. No account token and no control server. Owner, 2026-11-05: "Tailscale applications do it too. Look at
+  the tailscale code, ktailctl ... We're building a local tailscale control plugin". Without tailscaled, nothing
+  changes; a tailnet is never required.
 - Not built yet: the Devices page's KDE Connect section (pair, accept with the code, ping, send a file), and typing
   what a paired phone types (uinput or libei on Linux, SendInput on Windows). The calls they need exist.
 

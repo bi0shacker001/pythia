@@ -29,6 +29,10 @@ windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "c
 # operation table, the same one droidtop's native library passes through. Pinned to the
 # commit on lib-kdeconnect's ci/kdeconnect-core-645 until it is tagged v0.1.0.
 kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", rev = "284fc626aaefc38c50c082b8a5610f960792f3af" }
+# The computer's own Tailscale node, read through tailscaled's LocalAPI (Droidtop/tracker#645):
+# its online peers become addresses KDE Connect reaches. Pinned to the commit on lib-net's
+# ci/tailscale-localapi-645 until it is tagged v0.2.5.
+net-tailscale = { git = "https://github.com/Droidtop/lib-net", rev = "5126949c1ee809b37d8667901d9a9ea780dab5b5" }
 # Where droidtop-agent keeps its files (as its Dirs::locate).
 dirs = "5"
 # Finding and stopping a running droidtop-agent, on every system.

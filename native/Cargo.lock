@@ -1197,6 +1197,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "net-tailscale"
+version = "0.2.5"
+source = "git+https://github.com/Droidtop/lib-net?rev=5126949c1ee809b37d8667901d9a9ea780dab5b5#5126949c1ee809b37d8667901d9a9ea780dab5b5"
+dependencies = [
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1490,6 +1499,7 @@ dependencies = [
  "droidtop-agent-store",
  "gilrs",
  "kdeconnect-service",
+ "net-tailscale",
  "pyo3",
  "pyo3-build-config",
  "serde",

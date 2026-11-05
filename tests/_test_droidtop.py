@@ -509,3 +509,21 @@ class PlainPathTest(TestCase):
         self.assertEqual(kept[0]["dir"], "G:\\keep\\k")
         self.assertEqual(kept[0]["copies"][0]["path"], "G:\\keep\\k\\1")
         self.assertEqual(found[0]["folder"], tempfile.gettempdir())
+
+
+class TailscaleAddressesTest(TestCase):
+    def test_only_online_peers_of_a_running_tailnet(self):
+        from pythia.droidtop import tailscale
+
+        reply = {
+            "present": True,
+            "running": True,
+            "state": "Running",
+            "peers": [
+                {"host_name": "phone", "addresses": ["100.64.0.2", "fd7a:115c:a1e0::2"], "online": True},
+                {"host_name": "old-laptop", "addresses": ["100.64.0.3"], "online": False},
+            ],
+        }
+        self.assertEqual(tailscale.online_addresses(reply), ["100.64.0.2", "fd7a:115c:a1e0::2"])
+        self.assertEqual(tailscale.online_addresses({**reply, "running": False, "state": "Stopped"}), [])
+        self.assertEqual(tailscale.online_addresses({"present": False}), [])

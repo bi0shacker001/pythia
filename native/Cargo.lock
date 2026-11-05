@@ -1199,7 +1199,7 @@ dependencies = [
 [[package]]
 name = "net-tailscale"
 version = "0.2.5"
-source = "git+https://github.com/Droidtop/lib-net?rev=5126949c1ee809b37d8667901d9a9ea780dab5b5#5126949c1ee809b37d8667901d9a9ea780dab5b5"
+source = "git+https://github.com/Droidtop/lib-net?tag=v0.2.5#5126949c1ee809b37d8667901d9a9ea780dab5b5"
 dependencies = [
  "serde_json",
  "thiserror 1.0.69",

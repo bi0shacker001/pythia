@@ -3,7 +3,7 @@ on: [push, pull_request]
 # Builds Pythia every way it ships (the Python wheel and sdist, a meson
 # install, the Debian package) and runs what each one installed, on Linux
 # and, for the wheel, on Windows. Each build includes pythia._native (native/),
-# built with cargo: the runners' Rust for the wheels, Ubuntu's rustc-1.85 for
+# built with cargo: the runners' Rust for the wheels, Ubuntu's rustc-1.91 for
 # the Debian package, as Launchpad builds it. Static Analysis (static.yml) checks the
 # code; this checks that it builds and starts.
 name: Build
@@ -18,7 +18,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential meson gettext desktop-file-utils appstream-util \
-            debhelper dh-python dh-apparmor appstream dpkg-dev python3-all cargo-1.85 rustc-1.85 libudev-dev pkg-config
+            debhelper dh-python dh-apparmor appstream dpkg-dev python3-all cargo-1.91 rustc-1.91 libudev-dev pkg-config
       - name: Meson build, its tests (desktop files, metainfo) and install
         run: |
           meson setup builddir

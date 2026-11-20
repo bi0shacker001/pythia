@@ -5,7 +5,7 @@ edition = "2021"
 # Linked with droidtop-agent's crates, which are GPL-3.0-only.
 license = "GPL-3.0-only"
 publish = false
-rust-version = "1.85"
+rust-version = "1.91"
 description = "Pythia's droidtop side: the computer's agent for droidtop handhelds, as Pythia's own extension module"
 
 [lib]

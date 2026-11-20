@@ -1,6 +1,6 @@
 [build-system]
 # setuptools-rust builds pythia._native (native/), Pythia's droidtop side, with
-# cargo; building Pythia needs a Rust toolchain (1.85 or newer).
+# cargo; building Pythia needs a Rust toolchain (1.91 or newer).
 requires = ["setuptools>=77", "setuptools-rust>=1.9"]
 build-backend = "setuptools.build_meta"
 

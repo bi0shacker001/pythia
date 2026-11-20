@@ -31,68 +31,184 @@ from pythia.identity import get_system_uuid, new_game_id
 
 NAME_SIMILARITY_THRESHOLD = 0.6
 
+# How a folder name reads, as droidtop's GameNaming reads it (droidtop library-core GameNaming.derive and
+# GameTitleParser; droidtop SPEC 7m). droidtop's naming began as a rewrite of this file's and has since been
+# corrected against the same real library, so the rules below are its rules again, restated: the name a
+# folder yields is the title every device keys the game by (`title2:` and its Lutris slug), and two programs
+# that read one folder differently give one game two keys that never join. What droidtop reads past the
+# name (mods, language, kind, flags) stays this file's own classify_folder_tokens, which is ahead there.
+
 # A bare trailing number only counts as a version if it's explicitly marked as one
-# (a "v" prefix) or dotted (contains a '.'/'_' between digit groups, e.g. "0.8.3" or
+# (a "v", "ver" or "version" prefix) or dotted (contains a '.'/'_' between digit groups, e.g. "0.8.3" or
 # "1_3_3") -- a bare integer like the "5"/"6" in "Far Cry 5"/"Far Cry 6" or the "2077"
 # in "Cyberpunk 2077" is far more often a title/sequel number than a version, and
 # treating it as one was silently merging unrelated games (2026-08-02 real-library
 # finding). This won't catch every real case either (a bare build number like
-# "Bunnycop-049" now just stays part of the name) -- best-effort, not exhaustive; see
-# this function's docstring.
+# "Bunnycop-049" now just stays part of the name) -- best-effort, not exhaustive.
 # A version's tail may be letters then digits ("0.8.09r1", "1.0b2", "2.0rc3"):
 # Droidtop/tracker#538, "0.8.09r1" was cut to "0.8.09r" with "1" as a mod.
 _NAME_VERSION_RE = re.compile(
-    r"^(.*?)[-_ ](?:v(\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?)|(\d+[._]\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?))(.*)$"
+    r"^(.*?)[-_ ](?:(?:v|(?i:ver(?:sion)?)\.?)(\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?)"
+    r"|(\d+[._]\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?))(.*)$"
 )
 
-# A small set of generic "this is a part/chapter marker, not a title" words -- when a
-# leaf folder is *just* one of these plus a number (e.g. "Week 1", "Part1", "Chap3+"),
-# the real game name almost always lives on a parent folder instead (2026-08-02 real
-# -library case: BeingADik/Chap3+/10.0-sancho, Fetish Locator/Week 1/2/3, My New
-# Family/Part 1, Thief of Hearts/Part1 all fragmented into separate bogus "games"
-# because only the leaf name was ever considered).
-_GENERIC_PART_PREFIX_RE = re.compile(
-    r"^(chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?)\.?\s*", re.IGNORECASE
+# A dotted version written straight onto a title, a capital V after a lower-case letter: "SomeGameV0.80".
+_GLUED_VERSION_RE = re.compile(r"^(.*[a-z])V(\d+(?:\.\d+)+[a-zA-Z]?)$")
+
+# A version straight after a character no English word goes on through (punctuation, another script):
+# "タイトルv1.02". "ver" or "version" takes any number, a bare "v" only a dotted one.
+_VERSION_AFTER_SYMBOL_RE = re.compile(
+    r"^(.*[^A-Za-z0-9\s\-_.])(?:(?i:ver(?:sion)?)\.?(\d+(?:[._]\d+)*[a-zA-Z]?)|[vV](\d+(?:[._]\d+)+[a-zA-Z]?))$"
 )
+
+# The words a folder uses when it is a part of a game rather than a game: when a leaf folder is *just*
+# one of these plus a number ("Week 1", "Part1", "Chap3+"), the real game name lives on a parent folder
+# (2026-08-02 real-library case: BeingADik/Chap3+/10.0-sancho, Fetish Locator/Week 1/2/3, My New
+# Family/Part 1, Thief of Hearts/Part1 all fragmented into separate bogus "games").
+_LEAF_WORDS = r"chap(?:ter)?|chp|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk|book|bk|pt"
+_GENERIC_PART_PREFIX_RE = re.compile(rf"^({_LEAF_WORDS})\.?\s*", re.IGNORECASE)
+
+# The part words where they END a name with a title in front ("ThiefofHeartsPart3"). Not "book": a flat
+# "name_book1" beside "name_book2" is a numbered title, and those stay separate games.
+_TRAILING_PART_RE = re.compile(
+    r"[-_ .]?(chap(?:ter)?|chp|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk)\.?\s*(\d+)$", re.IGNORECASE
+)
+
+# A roman numeral (capitals only) or a spelled-out number straight after a part word, at the end:
+# "Act II" is "Act 2", "Book Three" is "Book 3".
+_ROMAN_RE = re.compile(rf"^((?i:{_LEAF_WORDS})\.?\s*)([IVX]{{1,4}})\b(?=[\s\-_+.]*$)")
+_WORD_NUMBER_RE = re.compile(
+    rf"^((?i:{_LEAF_WORDS})\.?\s*)((?i:one|two|three|four|five|six|seven|eight|nine|ten))\b(?=[\s\-_+.]*$)"
+)
+_ROMAN_VALUES = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"]
+_NUMBER_WORDS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+
+# Folder names that are an engine's own layout ("game" is Ren'Py's, "www" RPG Maker MV's) or the platform a
+# build is filed under, never a game's title: the title is the game they sit in.
+_ENGINE_FOLDER_NAMES = {
+    "game", "data", "www", "resources", "resource", "res", "lib", "lib64", "libs", "renpy", "contents",
+    "assets", "bin", "binaries", "content", "engine", "runtime", "app", "src", "js",
+    "win", "win32", "win64", "x86", "x64", "windows", "linux", "mac", "macos", "pc",
+    "build", "builds", "release", "releases", "dist",
+}  # fmt: skip
+# A build stage a release filed its folder under, in capitals and nothing else ("REC", "RTS").
+_RELEASE_STAGE_FOLDERS = {"rec", "rts", "rtm"}
+
+# Trailing tokens cut off a name: platform words after any separator, release tags after a dash,
+# underscore or dot only ("Game_Name-win64-Final" is "Game_Name"; "Project Alpha" keeps its last word).
+_TRAILING_TOKEN_RE = re.compile(r"([-_ .]+)([A-Za-z0-9]+)$")
+_TRIM_PLATFORMS = {
+    "pc": "pc", "win": "windows", "win32": "windows", "win64": "windows", "windows": "windows",
+    "lin": "linux", "lin64": "linux", "linux": "linux", "mac": "mac", "osx": "mac", "macos": "mac",
+    "android": "android", "apk": "android", "x86": None, "x64": None, "32bit": None, "64bit": None,
+}  # fmt: skip
+_TRIM_RELEASE_TAGS = {
+    "final", "alpha", "beta", "demo", "repack", "gog", "steam", "epic", "itch", "prototype", "preview", "patched",
+    "pre", "rec", "rts", "rtm",
+}  # fmt: skip
+
+_BRACKET_RE = re.compile(r"[\[({]([^\[\]{}()]*)[\])}]")
+_VERSION_IN_BRACKET_RE = re.compile(r"[vV]?\d+(?:[._]\d+)+[a-zA-Z]?")
+
+
+def _strip_noise(name: str):
+    """``name`` without its bracketed groups ("[GOG]", "(Final)") and, for a name with no spaces, with the
+    dots between words read as spaces ("Game.Name.v1.2-GROUP"); droidtop's GameTitleParser.stripNoise. A
+    bracket holding a short number keeps it ("Game (2)"), a version stays the version ("[v1.2]"), and a
+    year stays as it is. Returns the name and the bracketed text taken out, which still says the folder's
+    kind or language ("(Spanish translation)")."""
+    dropped: list[str] = []
+    had_space = " " in name
+
+    def replace(m):
+        inner = m.group(1).strip()
+        if re.fullmatch(r"\d{1,3}", inner):
+            return f" {inner} "
+        if _VERSION_IN_BRACKET_RE.fullmatch(inner):
+            return " v" + inner.lstrip("vV") + " "
+        if m.group(0).startswith("(") and re.fullmatch(r"(?:19|20)\d\d", inner):
+            return f" ({inner}) "
+        dropped.append(inner)
+        return " "
+
+    s = _BRACKET_RE.sub(replace, name) if any(c in name for c in "[({") else name
+    if not had_space:
+        s = re.sub(r"(?<=[A-Za-z])\.(?=[A-Za-z])", " ", s)
+    if s == name:
+        return name, ""
+    return re.sub(r"\s+", " ", s).strip(" -_.") or name, " ".join(dropped)
+
+
+def _with_arabic(name: str) -> str:
+    """``name`` with a roman numeral or spelled-out number after its part word in digits ("Act II" is
+    "Act 2"); every other name unchanged."""
+    for pattern, values, fold in ((_ROMAN_RE, _ROMAN_VALUES, False), (_WORD_NUMBER_RE, _NUMBER_WORDS, True)):
+        m = pattern.search(name)
+        if m:
+            word = m.group(2).lower() if fold else m.group(2)
+            if word in values:
+                return name[: m.start(2)] + str(values.index(word) + 1) + name[m.end(2) :]
+    return name
+
+
+def _is_engine_folder(name: str) -> bool:
+    lower = name.strip().lower()
+    if lower in _ENGINE_FOLDER_NAMES:
+        return True
+    words = [w for w in re.split(r"[^a-z0-9]+", lower) if w]
+    return len(words) > 1 and all(w in _ENGINE_FOLDER_NAMES for w in words)
+
+
+def _leaf_kind(raw: str) -> str:
+    """What a folder name is when it is not a title: "engine" (the engine's own layout), "release" (a build
+    stage), "version" (a bare dotted version, "10.0-sancho"), "part" (a part word and a number,
+    "Week 1"), else "title"."""
+    name = _with_arabic(_strip_noise(raw)[0])
+    if _is_engine_folder(name):
+        return "engine"
+    if name.strip() == name.strip().upper() and name.strip().lower() in _RELEASE_STAGE_FOLDERS:
+        return "release"
+    if re.match(r"^\d+\.\d", name):
+        return "version"
+    stripped = _GENERIC_PART_PREFIX_RE.sub("", name, count=1)
+    if stripped != name and re.match(r"^\W*\d", stripped):
+        return "part"
+    return "title"
 
 
 def _is_generic_part_leaf(name: str) -> bool:
-    """True if `name` looks like a bare version/part marker with no real title of
-    its own -- either it starts directly with a dotted version number ("10.0-sancho",
-    requires an actual dot so a bare integer like "7" in "7 Days to Die" doesn't
-    false-positive), or it's a known generic word (Week/Part/Chapter/...) immediately
-    followed by a number and nothing else."""
-    if re.match(r"^\d+\.\d", name):
-        return True
-    stripped = _GENERIC_PART_PREFIX_RE.sub("", name, count=1)
-    if stripped == name:
-        return False
-    return bool(re.match(r"^\W*\d", stripped))
+    """True if ``name`` is the structure of one game rather than a game: a part marker ("Chap3+",
+    "Week 2") or a bare version ("12.0-scrappy"); droidtop's GameNaming.isStructuralFolderName."""
+    return _leaf_kind(name) in ("part", "version")
 
 
-def _find_meaningful_ancestor_name(path: Path, max_levels: int = 2):
-    """Walk up from `path` past any generic/part-marker-named parent folders (see
-    _is_generic_part_leaf) to find the nearest ancestor that looks like a real title.
-    Bounded to avoid ever walking up into a library/engine-root folder (e.g. "renpy")
-    -- normal installs never trigger this at all, since it's only consulted when the
-    leaf itself already looked like a bare version/part marker."""
+def _find_meaningful_ancestor(path: Path, max_levels: int = 2):
+    """The nearest ancestor of ``path`` that looks like a real title, walking up past part, version,
+    engine and build-stage folders, and the first part folder passed on the way (the chapter in
+    BeingADik/Chap3+/10.0-sancho). Bounded to two levels, so it never walks up into a library or engine
+    root ("renpy"); consulted only when the leaf has no title of its own. None when there is none."""
     current = path
+    part = None
     for _ in range(max_levels):
         current = current.parent
         name = current.name
-        if not name or _is_generic_part_leaf(name):
+        if not name:
             continue
-        return name
+        kind = _leaf_kind(name)
+        if kind == "title":
+            return _strip_noise(name)[0], part
+        if kind == "part" and part is None:
+            part = _strip_noise(name)[0].strip()
     return None
 
 
 def _extract_version_only(leaf: str):
     """Pull version/mods/language out of a leaf folder name that's *just* a version
     or part marker (the real name comes from an ancestor folder instead -- see
-    _find_meaningful_ancestor_name) -- unlike _derive_name_version_mods_language,
-    there's no name prefix to strip here, and the generic part-word (if any) is
-    stripped rather than kept as a mod tag."""
-    stripped = _GENERIC_PART_PREFIX_RE.sub("", leaf, count=1)
+    _find_meaningful_ancestor) -- unlike _derive_folder, there's no name prefix to
+    strip here, and the generic part-word (if any) is stripped rather than kept as a
+    mod tag."""
+    stripped = _GENERIC_PART_PREFIX_RE.sub("", _with_arabic(leaf), count=1)
     m = re.search(r"(\d+(?:[._]\d+)*[a-zA-Z]*)", stripped)
     if not m:
         return stripped.strip() or leaf, classify_folder_tokens(stripped)
@@ -104,7 +220,7 @@ def _extract_version_only(leaf: str):
 def _split_part(leaf: str):
     """A part folder's part ("Part1", "Week 2", "Chap3+"), the version after it when
     there is a dotted one ("Chapter 3 v1.1" -> 1.1), and what else its name says."""
-    m = re.match(r"^(.*?\d+\+?)(.*)$", leaf)
+    m = re.match(r"^(.*?\d+\+?)(.*)$", _with_arabic(leaf))
     if not m:
         return leaf.strip(), "", classify_folder_tokens("")
     part, rest = m.group(1).strip(" -_"), m.group(2)
@@ -114,6 +230,30 @@ def _split_part(leaf: str):
     return part, "", classify_folder_tokens(rest)
 
 
+def _trim_trailing(name: str):
+    """``name`` with trailing platform words and release tags cut off, the platform the first platform word
+    named, and the words cut; droidtop's GameTitleParser.trimTrailing. The first word is never cut."""
+    platform, cut, s = None, [], name
+    while True:
+        m = _TRAILING_TOKEN_RE.search(s)
+        if not m:
+            break
+        separator, token = m.group(1), m.group(2)
+        head = s[: m.start()]
+        if not head.strip():
+            break
+        lower = token.lower()
+        is_platform = lower in _TRIM_PLATFORMS
+        hard = any(c in "-_." for c in separator)
+        if not (is_platform or (hard and (lower in _TRIM_RELEASE_TAGS or re.fullmatch(r"multi\d*", lower)))):
+            break
+        if is_platform and platform is None:
+            platform = _TRIM_PLATFORMS[lower]
+        cut.insert(0, token)
+        s = head
+    return s, platform, cut
+
+
 def _derive_name_version_mods_language(path: Path):
     """_derive_folder's name, version, mods and language."""
     name, version, details = _derive_folder(path)
@@ -121,44 +261,72 @@ def _derive_name_version_mods_language(path: Path):
 
 
 def _derive_folder(path: Path):
-    """Minimal placeholder splitter -- good enough to seed a canonical name, a
-    version-ish label, a `mods` guess, and a `language` guess from a raw folder name; a
-    proper Sonarr/Radarr-style naming filter system replaces this later. Best-effort --
-    expected to misclassify sometimes, same caveat as the name/version split this
-    extends.
+    """What one folder's name says: the game's name, a version label, and ``details`` (mods, language,
+    kind, flags from classify_folder_tokens; ``part``, the part of the game it is, or None; ``platform``
+    and ``tags``, what came off the end of the name). Read as droidtop's GameNaming.derive reads it, so
+    the two name a folder alike:
 
-    When the leaf folder name itself is just a version/part marker with no real title
-    (see _is_generic_part_leaf), looks to a meaningful ancestor folder for the name
-    instead of minting a bogus separate "game" per part/chapter/version subfolder."""
+    1. A leaf that is a part marker ("Fetish Locator/Week 1") takes its name from the nearest titled
+       ancestor, and the leaf is the part.
+    2. A leaf that is a bare version ("BeingADik/Chap3+/10.0-sancho") takes the ancestor's name, is a
+       version, and a part folder passed on the way is its part.
+    3. A leaf that is an engine's own folder ("game", "www") or a build stage ("REC") is the game above it.
+    4. Otherwise the leaf is a title, with a version, mods and a language after it, and possibly ending in
+       a part marker of its own ("ThiefofHeartsPart3-0.0.9-pc" is part 3 of ThiefofHearts).
+
+    Then platform words and release tags come off the end of the name ("Chubby_Story_Windows" is
+    "Chubby_Story"). Best-effort, expected to misclassify sometimes; nothing here reads the disk."""
     # path.name can be "" for a path a real directory listing would never produce
     # (e.g. a leading "//" parses as a UNC-style anchor with no separate name
-    # component on Windows) -- not reachable through scanning.py's Path.iterdir()
-    # walk, but reachable if a user hand-types a path to `pythia onboard`. Fall back
-    # to the fully-resolved path string so the caller never receives an empty name
-    # (2026-08-03, caught by the fuzz harness in tests/test_naming_fuzz.py).
+    # component on Windows); fall back to the whole path so a caller never gets an
+    # empty name (2026-08-03, caught by the fuzz harness in tests/test_naming_fuzz.py).
     folder_name = path.name or str(path)
+    leaf, dropped = _strip_noise(folder_name)
+    name, version, details = _derive_untrimmed(path, folder_name, leaf, dropped)
+    name = re.sub(r"\s{2,}", " ", name).strip()
+    trimmed, platform, cut = _trim_trailing(name)
+    if cut:
+        name = trimmed
+    details["platform"] = platform
+    details["tags"] = cut
+    return name, version, details
 
-    if _is_generic_part_leaf(folder_name):
-        ancestor_name = _find_meaningful_ancestor_name(path)
-        if ancestor_name is not None:
-            # A part folder (Part1, Week 2) is a part of the title above it; a bare
-            # version folder (12.0-scrappy) is a version, of the part above it when
-            # that is a part folder (droidtop SPEC 7m, segments; UX review A16).
-            if _GENERIC_PART_PREFIX_RE.match(folder_name):
-                part, version, details = _split_part(folder_name)
+
+def _derive_untrimmed(path: Path, folder_name: str, leaf: str, dropped: str):
+    kind = _leaf_kind(folder_name)
+    if kind != "title":
+        ancestor = _find_meaningful_ancestor(path)
+        if ancestor is not None:
+            ancestor_name, ancestor_part = ancestor
+            if kind == "part":
+                part, version, details = _split_part(leaf)
+            elif kind == "version":
+                version, details = _extract_version_only(leaf)
+                part = ancestor_part
             else:
-                version, details = _extract_version_only(folder_name)
-                parent = path.parent.name
-                part = parent if _GENERIC_PART_PREFIX_RE.match(parent) else None
+                version, details, part = "", classify_folder_tokens(dropped), ancestor_part
             details["part"] = part
             return ancestor_name, version, details
 
-    m = _NAME_VERSION_RE.search(folder_name)
-    if not m:
-        return folder_name, "", {"mods": [], "language": None, "kind": "game", "flags": [], "part": None}
-    name = m.group(1).strip(" -_") or folder_name
-    version = (m.group(2) or m.group(3)).replace("_", ".")
-    return name, version, {**classify_folder_tokens(m.group(4)), "part": None}
+    m = _NAME_VERSION_RE.search(leaf)
+    if m:
+        name = m.group(1).strip(" -_") or leaf
+        version = (m.group(2) or m.group(3)).replace("_", ".")
+        details = {**classify_folder_tokens(m.group(4) + " " + dropped), "part": None}
+    else:
+        glued = _GLUED_VERSION_RE.search(leaf) or _VERSION_AFTER_SYMBOL_RE.search(leaf)
+        if glued:
+            name, version = glued.group(1), next(g for g in glued.groups()[1:] if g).replace("_", ".")
+        else:
+            name, version = leaf, ""
+        details = {**classify_folder_tokens(dropped), "part": None}
+    trailing = _TRAILING_PART_RE.search(name)
+    if trailing:
+        title = name[: trailing.start()].strip(" -_.")
+        if title:
+            name = title
+            details["part"] = trailing.group(1)[0].upper() + trailing.group(1)[1:] + " " + trailing.group(2)
+    return name, version, details
 
 
 def _own_entries():

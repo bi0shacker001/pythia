@@ -130,7 +130,19 @@ FLAG_WORDS = {
     "unc": "uncensored",
 }
 # Release-platform words in a folder name: the engine plugin knows the platform; they are not mods.
-PLATFORM_WORDS = {"pc", "win", "windows", "win64", "win32", "linux", "mac", "macos", "osx", "android", "x64", "x86"}
+# droidtop's GameTitleParser.PLATFORMS, the same list, so both read a folder alike.
+PLATFORM_WORDS = {
+    "pc", "win", "windows", "win64", "win32", "linux", "lin", "lin64", "mac", "macos", "osx", "android", "apk",
+    "x64", "x86", "32bit", "64bit",
+}  # fmt: skip
+# How a release was filed, not what the copy holds (droidtop's GameTitleParser.RELEASE_TAGS, less
+# "patched", which is a patch here): a build stage, the store it came from, a distribution's label.
+RELEASE_WORDS = {
+    "final", "alpha", "beta", "demo", "repack", "gog", "steam", "epic", "itch", "prototype", "preview", "pre",
+    "rec", "rts", "rtm", "f95zone", "f95",
+}  # fmt: skip
+# Words that join two tags ("v0.7.8_with_HotFix"), never a mod of their own.
+JOINING_WORDS = {"with", "and", "plus"}
 
 
 def classify_folder_tokens(rest: str) -> dict:
@@ -138,7 +150,7 @@ def classify_folder_tokens(rest: str) -> dict:
     ``{"name": ..., "version": None}``; a name never tells a mod's version),
     ``language`` (a code, or None), ``kind`` (game, mod, patch or
     translation) and ``flags`` (mtl, uncensored). Brackets are stripped; kind,
-    flag and platform words are never mods (UX review A14). Best-effort -- shared
+    flag, platform, release and joining words are never mods (UX review A14). Best-effort -- shared
     by onboarding's naming heuristic and the v1->v2 migration."""
     mods: list[dict] = []
     language = None
@@ -149,7 +161,7 @@ def classify_folder_tokens(rest: str) -> dict:
         if not token or not any(c.isalnum() for c in token):
             continue  # skip empty/punctuation-only leftovers (e.g. a bare "+")
         word = token.lower().strip(".")
-        if word in PLATFORM_WORDS:
+        if word in PLATFORM_WORDS or word in RELEASE_WORDS or word in JOINING_WORDS or re.fullmatch(r"multi\d*", word):
             continue
         kind = next((k for k, words in KIND_WORDS.items() if word in words), None)
         if kind:

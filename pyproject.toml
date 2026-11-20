@@ -76,6 +76,12 @@ path = "native/Cargo.toml"
 binding = "PyO3"
 py-limited-api = "cp310"
 
+[tool.distutils.bdist_wheel]
+# The wheel says so too (abi3, cp310 and up), or pip refuses it on any Python but the one that
+# built it: the Windows wheel was cp312-cp312 around a stable-ABI _native.pyd, and a computer with
+# Python 3.13 could not install it.
+py-limited-api = "cp310"
+
 [tool.setuptools.data-files]
 # pythia.util.datapath and the game-launch wrapper are looked up under the prefix.
 "share/pythia/bin" = ["share/pythia/bin/pythia-wrapper"]

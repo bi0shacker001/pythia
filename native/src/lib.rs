@@ -38,6 +38,7 @@ mod agent;
 mod kdeconnect;
 mod pad;
 mod secure;
+mod tailscale;
 mod takeover;
 
 pub(crate) static FOLDER: Mutex<Option<PathBuf>> = Mutex::new(None);
@@ -123,6 +124,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "pad", pad::fill)?;
     submodule(m, "secure_screen", secure::fill)?;
     submodule(m, "kdeconnect", kdeconnect::fill)?;
+    submodule(m, "tailscale", tailscale::fill)?;
     Ok(())
 }
 

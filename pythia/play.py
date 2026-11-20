@@ -13,6 +13,8 @@ is drawn disabled with its reason, with "Open store page" beside it when the
 game has a store link.
 """
 
+import os
+
 from pythia import datadir
 from pythia.identity import get_system_uuid
 from pythia.util.log import logger
@@ -24,9 +26,23 @@ STORE_PAGES = {
     "gog": "https://www.gog.com/game/{id}",
     "dlsite": "https://www.dlsite.com/maniax/work/=/product_id/{id}.html",
 }
-NO_INSTALL = "Pythia does not install games yet. Install it with its store or launcher, then add its folder."
+NO_INSTALL = "Pythia knows no store to install it from. Install it with its store or launcher, then add its folder."
+# Each store's own installer, by its link (Droidtop/tracker#630): the store downloads and installs the
+# game, and "Find store games" then adds it here. The person's account and DRM stay the store's.
+# GOG Galaxy and the Epic Games Launcher exist on Windows (and macOS) only.
+WINDOWS_ONLY_INSTALLERS = ("gog", "egs")
+NO_INSTALL_LINUX = (
+    "On Linux Pythia installs Steam games through Steam. A GOG or Epic game installs with GOG's offline "
+    "installer (its store page) or a launcher such as Heroic; then Find store games or Add game folder adds it."
+)
+INSTALL_LINKS = {
+    "steam": ("Steam", "steam://install/{id}"),
+    "gog": ("GOG Galaxy", "goggalaxy://openGameView/{id}"),
+    "egs": ("the Epic Games Launcher", "com.epicgames.launcher://apps/{id}?action=install&silent=false"),
+}
 NO_UPDATE = "Pythia records updates but does not download them yet."
-NO_RUNNER = "Nothing starts it here yet: set up how it runs in Pythia (a runner)."
+NO_RUNNER = "Nothing starts it here yet: choose how it runs."
+NO_EPIC = "Epic's games start in Epic's launcher: More > Open in Epic Games Store."
 
 
 def _entries(game_id: str) -> list[dict]:
@@ -79,6 +95,65 @@ def _runner_check(game_id: str) -> str | None:
     return None
 
 
+def folder_variant(own: dict | None) -> dict | None:
+    """The folder Play starts for a folder game: the Current version's, else
+    the one added last whose folder is still there."""
+    if not own:
+        return None
+    current = own.get("current_version")
+    best = None
+    for group in own.get("versions") or []:
+        for variant in group.get("variants") or []:
+            path = variant.get("path")
+            if not path or not os.path.isdir(path):
+                continue
+            rank = (group.get("version") == current and current is not None, variant.get("detected_at") or "")
+            if best is None or rank > best[0]:
+                best = (rank, variant)
+    return best[1] if best else None
+
+
+def launch_of(own: dict | None) -> tuple[dict | None, dict | None]:
+    """A folder game's folder and what Play starts in it (the person's choice,
+    else Pythia's pick), either None when there is none."""
+    from pythia import folder_launch  # noqa: PLC0415
+
+    variant = folder_variant(own)
+    if variant is None:
+        return None, None
+    chosen = variant.get("launch")
+    if chosen and chosen.get("exe"):
+        return variant, chosen
+    return variant, folder_launch.pick(variant["path"], (own or {}).get("canonical_name") or "")
+
+
+def install_state(entries: list[dict]) -> dict:
+    """Install for a game not on this computer: through the first store it is
+    owned on (else known on) that has an installer link."""
+    import sys  # noqa: PLC0415
+
+    owned = {o.get("platform") for e in entries for o in e.get("ownership") or []}
+    stores = sorted(INSTALL_LINKS, key=lambda store: (store not in owned, list(INSTALL_LINKS).index(store)))
+    no_launcher = sys.platform.startswith("linux")
+    skipped = False
+    for store in stores:
+        if no_launcher and store in WINDOWS_ONLY_INSTALLERS:
+            skipped = skipped or bool(_ids(entries, store))
+            continue
+        ids = _ids(entries, store)
+        if ids:
+            name, link = INSTALL_LINKS[store]
+            return {
+                "action": "install",
+                "enabled": True,
+                "via": store,
+                "store": name,
+                "url": link.format(id=ids[0]),
+                "reason": None,
+            }
+    return {"action": "install", "enabled": False, "via": None, "reason": NO_INSTALL_LINUX if skipped else NO_INSTALL}
+
+
 def state(game_id: str, entries: list[dict] | None = None) -> dict:
     """``primary`` (``action`` play or install, ``enabled``, ``via`` steam or
     runner, ``reason`` when disabled), ``update`` (``available``, ``version``,
@@ -99,14 +174,35 @@ def state(game_id: str, entries: list[dict] | None = None) -> dict:
     }
     steam = _ids(entries, "steam")
     if not installed:
-        primary = {"action": "install", "enabled": False, "via": None, "reason": NO_INSTALL}
+        primary = install_state(entries)
     elif steam and _steam_here():
         primary = {"action": "play", "enabled": True, "via": "steam", "reason": None}
     elif any(v.get("runner") for v in _variants(own or {})):
         refused = _runner_check(game_id)
         primary = {"action": "play", "enabled": refused is None, "via": "runner", "reason": refused}
     else:
-        primary = {"action": "play", "enabled": False, "via": None, "reason": NO_RUNNER}
+        # A folder game (Droidtop/tracker#629): its own program, natively or through Wine.
+        from pythia import folder_launch  # noqa: PLC0415
+
+        variant, launch = launch_of(own)
+        if _ids(entries, "egs"):
+            # Epic's games check for its launcher; started from their folder they mostly quit at once.
+            primary = {"action": "play", "enabled": False, "via": None, "reason": NO_EPIC}
+        elif launch:
+            primary = {"action": "play", "enabled": True, "via": "folder", "reason": None, "launch": launch}
+        else:
+            reason = (
+                folder_launch.why_not(variant["path"], (own or {}).get("canonical_name") or "")
+                if variant
+                else NO_RUNNER
+            )
+            primary = {"action": "play", "enabled": False, "via": None, "reason": reason}
+            # Without Wine, the fix is one button (Droidtop/tracker#629): Pythia sets it up.
+            from pythia import wine_setup  # noqa: PLC0415
+
+            if reason == folder_launch.NO_WINE and wine_setup.supported():
+                primary["fix"] = "wine"
+        primary["choose"] = variant is not None
     return {"status": "ok", "primary": primary, "update": update, "store_url": store_page(entries)}
 
 
@@ -119,15 +215,93 @@ def play(game_id: str, entries: list[dict] | None = None) -> dict:
     if current.get("status") != "ok":
         return current
     primary = current["primary"]
+    if primary["action"] == "install" and primary["enabled"]:
+        logger.info("Installing %s through %s", entries[0].get("canonical_name") or game_id, primary["store"])
+        return {"status": "ok", "via": primary["via"], "url": primary["url"], "install": True}
     if primary["action"] != "play" or not primary["enabled"]:
         return {"status": "error", "message": primary.get("reason") or "It cannot start here"}
     name = entries[0].get("canonical_name") or game_id
     if primary["via"] == "steam":
         logger.info("Starting %s through Steam", name)
         return {"status": "ok", "via": "steam", "url": f"steam://rungameid/{_ids(entries, 'steam')[0]}"}
+    if primary["via"] == "folder":
+        return _play_folder(game_id, name)
     from pythia.droidtop.launch import _run_in_pythia  # noqa: PLC0415
 
     result = _run_in_pythia(game_id, name)
     if result.get("result") != "started":
         return {"status": "error", "message": result.get("message", "")}
     return {"status": "ok", "via": "runner"}
+
+
+def _own(game_id: str) -> dict | None:
+    uuid = get_system_uuid()
+    return next((e for e in _entries(game_id) if e.get("system_uuid") == uuid), None)
+
+
+def _play_folder(game_id: str, name: str) -> dict:
+    """Starts a folder game's program and notes when it was played, which the
+    library's Continue playing shelf reads."""
+    from pythia import folder_launch  # noqa: PLC0415
+    from pythia.database import games as games_db  # noqa: PLC0415
+
+    own = _own(game_id)
+    variant, launch = launch_of(own)
+    if own is None or not variant or not launch:
+        return {"status": "error", "message": NO_RUNNER}
+    try:
+        folder_launch.start(variant["path"], launch, game_id)
+    except (OSError, RuntimeError) as ex:
+        return {"status": "error", "message": f"{name} did not start: {ex}"}
+    variant["lastplayed"] = folder_launch.now()
+    games_db.save_entry_and_sync_cache(own)
+    logger.info("Started %s from its folder", name)
+    return {"status": "ok", "via": "folder"}
+
+
+def launch_choices(game_id: str) -> dict:
+    """What "Choose how it runs" offers: the folder, the programs in it
+    (``candidates``), what Play starts now (``current``, and whether the person
+    ``chose`` it), the ways a program can run here (``vias``) and Wine's path."""
+    from pythia import folder_launch  # noqa: PLC0415
+
+    own = _own(game_id)
+    variant, launch = launch_of(own)
+    if variant is None:
+        return {"status": "error", "message": "It has no folder on this computer."}
+    vias = ["native"] + ([] if folder_launch.on_windows() else ["wine"])
+    return {
+        "status": "ok",
+        "folder": variant["path"],
+        "candidates": folder_launch.candidates(variant["path"], (own or {}).get("canonical_name") or ""),
+        "current": launch,
+        "chose": bool(variant.get("launch")),
+        "vias": vias,
+        "wine": folder_launch.wine(),
+        "windows": folder_launch.on_windows(),
+    }
+
+
+def set_launch(game_id: str, exe: str, via: str) -> dict:
+    """Keeps the person's choice of what Play starts; an empty ``exe`` goes
+    back to Pythia's pick. Only this computer's record holds it."""
+    from pathlib import Path  # noqa: PLC0415
+
+    from pythia.database import games as games_db  # noqa: PLC0415
+
+    own = _own(game_id)
+    variant = folder_variant(own)
+    if own is None or variant is None:
+        return {"status": "error", "message": "It has no folder on this computer."}
+    if not exe:
+        variant.pop("launch", None)
+    else:
+        if via not in ("native", "wine"):
+            return {"status": "error", "message": f"{via} is not a way to run it."}
+        root = Path(variant["path"]).resolve()
+        target = (root / exe).resolve()
+        if root not in target.parents or not target.is_file():
+            return {"status": "error", "message": f"{exe} is not a file in its folder."}
+        variant["launch"] = {"exe": target.relative_to(root).as_posix(), "via": via}
+    games_db.save_entry_and_sync_cache(own)
+    return {"status": "ok"}

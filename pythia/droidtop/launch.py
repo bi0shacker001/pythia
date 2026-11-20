@@ -52,9 +52,20 @@ def launch_for_handheld(key: str, title: str = "") -> dict | None:
     ctx = PluginContext(log=lambda message: logger.info("%s", message))
     usable = [(p, d) for p, d in manager_plugins.find_for_game(entries) if p.is_available(ctx)]
     if not usable:
+        # A folder game's own program (Droidtop/tracker#629), as Play on this computer starts it; a
+        # store game goes through its launcher first, which keeps its sign-in and DRM.
+        from pythia import play  # noqa: PLC0415
+
+        for entry in entries:
+            _, launch = play.launch_of(entry)
+            if launch:
+                outcome = play.play(entry["game_id"], [entry])
+                if outcome.get("status") == "ok":
+                    return {"result": "started", "stream": STREAM}
+                return {"result": "failed", "message": outcome.get("message", "")}
         return {
             "result": "failed",
-            "message": f"{name} cannot start here yet: set up how it runs in Pythia (a runner), "
+            "message": f"{name} cannot start here yet: choose how it runs on its page in Pythia, "
             "or install it with its store's launcher",
         }
     plugin, detection = usable[0]

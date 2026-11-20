@@ -106,6 +106,14 @@ def connect_from_redirect_json(pasted_json: str) -> bool:
 class EgsPlugin(LibraryPlugin, ManagerPlugin):
     id = "pythia.library.egs"
     display_name = "Epic Games Store"
+    browser_connect = {"paste": "all the text the page shows after you sign in (it starts with a { )"}
+
+    def browser_login_url(self) -> str:
+        return login_url()
+
+    def connect_with(self, pasted: str) -> bool:
+        return connect_from_redirect_json(pasted.strip())
+
     version = "1.0.0"
     author = "pythia"
     compatible_sources = ["egs"]

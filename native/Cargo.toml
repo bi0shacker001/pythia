@@ -17,17 +17,19 @@ crate-type = ["cdylib"]
 # crates/python: Embedder, configure, register; Droidtop/tracker#867), and what Pythia's own submodules use
 # directly: the shared libraries at the tags droidtop-agent pins, and droidtop-agent's service. Every pin
 # here must be droidtop-agent's at the same commit, so one copy of each crate is linked.
-droidtop-agent-python = { git = "https://github.com/Droidtop/droidtop-agent", rev = "fc5273896cbd31cc00fb140b1db29b8b81f94bff" }
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "fc5273896cbd31cc00fb140b1db29b8b81f94bff" }
-droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.6" }
-droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.6" }
+droidtop-agent-python = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5" }
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5" }
+droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.2.1" }
+droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.2.1" }
 # windowcast's host identity folder, the one droidtop-agent and windowcast share,
 # at the commit droidtop-agent pins.
 windowcast-identity = { git = "https://github.com/Droidtop/windowcast", rev = "37e2e432d565e94a83e49ea064283fbc661c2ef0" }
 # KDE Connect, both ways (Droidtop/tracker#645): lib-kdeconnect's device and its one
-# operation table, the same one droidtop's native library passes through. Pinned to the
-# commit on lib-kdeconnect's ci/kdeconnect-core-645 until it is tagged v0.1.0.
-kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", rev = "284fc626aaefc38c50c082b8a5610f960792f3af" }
+# operation table, the same one droidtop's native library passes through, at its v0.1.0 release.
+kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", tag = "v0.1.0" }
+# The computer's own Tailscale node, read through tailscaled's LocalAPI (Droidtop/tracker#645):
+# its online peers become addresses KDE Connect reaches.
+net-tailscale = { git = "https://github.com/Droidtop/lib-net", tag = "v0.2.6" }
 # Where droidtop-agent keeps its files (as its Dirs::locate).
 dirs = "5"
 # Finding and stopping a running droidtop-agent, on every system.

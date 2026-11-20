@@ -123,6 +123,18 @@ class PluginMeta:
     author: str = "unknown"
     config_schema: list = []
     credential_fields: list = []
+    # A store that connects through its own sign-in page in the person's browser
+    # (Droidtop/tracker#630): ``paste`` says what to copy back once signed in.
+    # Such a plugin defines browser_login_url() and connect_with(pasted).
+    browser_connect: dict | None = None
+
+    def browser_login_url(self) -> str:
+        raise NotImplementedError
+
+    def connect_with(self, pasted: str) -> bool:
+        """Finishes the browser sign-in with what the person pasted; False when
+        it was not what the store's page shows after signing in."""
+        raise NotImplementedError
 
     def get_credential(self, key: str) -> str | None:
         return credentials.get_credential(self.id, key)

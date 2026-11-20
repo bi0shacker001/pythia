@@ -222,7 +222,7 @@ function filteredGames() {
   const q = PythiaQuery.parse(state.search);
   const list = games.filter((g) => {
     const matches = PythiaQuery.matches(g, q);
-    const shelf = state.libraryShelf === 'favourites' ? g.favourite : state.libraryShelf === 'installed' ? g.installed : state.libraryShelf === 'attention' ? g.status !== 'ok' : true;
+    const shelf = state.libraryShelf === 'owned' ? !g.installed && g.ownedOn.length > 0 : state.libraryShelf === 'favourites' ? g.favourite : state.libraryShelf === 'installed' ? g.installed : state.libraryShelf === 'attention' ? g.status !== 'ok' : true;
     return matches && shelf && (state.filterStatus === 'all' || (state.filterStatus === 'pending' ? g.status !== 'ok' : g.status === state.filterStatus)) && (state.source === 'all' || g.source === state.source) && (state.engine === 'all' || g.engine === state.engine);
   });
   const rank = { critical: 0, pending: 1, neutral: 2, ok: 3 };
@@ -281,7 +281,8 @@ function renderLibrary() {
   $$('[data-library-mode]').forEach((b) => b.classList.toggle('active', b.dataset.libraryMode === state.libraryMode));
   if (!model.ready) { host.innerHTML = ''; host.appendChild(stateBlock({ kind: 'loading' })); $('#gameDetail').innerHTML = ''; return; }
   if (!games.length) { host.innerHTML = ''; host.appendChild(stateBlock({ glyph: '▦', title: 'No games yet', body: 'Add a game folder or scan a library folder; Pythia records what it finds and never moves files.', actions: [{ label: 'Add folder', primary: true, run: addFolder }, { label: 'Scan library', run: scanLibrary }] })); $('#gameDetail').innerHTML = ''; return; }
-  if (!list.length) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Nothing matches', body: 'Try fewer filters or another search.', actions: [{ label: 'Clear filters', run: () => $('#clearFilters').click() }] })); }
+  if (!list.length && state.libraryShelf === 'owned' && !state.search) { host.innerHTML = ''; host.appendChild(stateBlock({ glyph: '⌂', title: 'No owned games to install', body: 'Connect Steam, GOG or Epic under Game sources: the games you own there and have not installed show here, each with Install.', actions: [{ label: 'Open Game sources', primary: true, run: () => navigate('sources') }] })); }
+  else if (!list.length) { host.innerHTML = ''; host.appendChild(stateBlock({ title: 'Nothing matches', body: 'Try fewer filters or another search.', actions: [{ label: 'Clear filters', run: () => $('#clearFilters').click() }] })); }
   else drawGameList(host, list);
   renderDetail(games.find((g) => g.id === state.selected) || list[0]);
 }
@@ -462,14 +463,71 @@ function fillPrimarySlot(g, slot, cls) {
     if (!ok(r)) { slot.innerHTML = `<button class="${cls}" type="button" disabled data-reason="${esc(r.message || '')}">Play</button>`; return; }
     const p = r.primary; model.storeUrls[g.id] = r.store_url || null;
     const label = p.action === 'install' ? 'Install' : 'Play';
-    slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}</button>`;
+    slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}${p.enabled && p.via === 'folder' && p.launch?.via === 'wine' ? ' <span class="reason">· Wine</span>' : ''}${p.enabled && p.action === 'install' ? ` <span class="reason">· ${esc(p.store)}</span>` : ''}</button>`;
     const b = $('button', slot);
     if (!p.enabled) { b.title = ''; slot.insertAdjacentElement('beforeend', el(`<small class="slot-reason">${esc(p.reason || '')}</small>`)); }
-    const start = async () => { const r2 = await act('play_game', [g.id], null, { what: `Starting ${g.name}` }); if (ok(r2)) flash(`Started ${g.name}${r2.via === 'steam' ? ' in Steam' : ''}`); };
-    // Steam opens its own window: in the handheld shell that is a hand-off, asked first (UX review A3).
-    b.onclick = () => (p.via === 'steam' ? handOff({ kind: 'launcher', launcher: 'steam', title: `Play ${g.name} in Steam?`, body: 'Steam opens and starts it.', run: start }) : start());
+    // No Wine for a Windows game on Linux: Pythia sets it up with one button (Droidtop/tracker#629).
+    if (p.fix === 'wine') {
+      const fix = el('<button class="btn small primary" type="button">Set up Windows games…</button>');
+      fix.onclick = () => setUpWindowsGames();
+      slot.appendChild(fix);
+    }
+    // A folder game (Droidtop/tracker#629): what Play starts is Pythia's pick, which the person can change.
+    if (p.choose) {
+      const choose = el(`<button class="btn small ghost choose-run" type="button">Choose how it runs…</button>`);
+      choose.onclick = () => chooseLaunch(g, () => fillPrimarySlot(g, slot, cls));
+      slot.appendChild(choose);
+    }
+    const start = async () => {
+      const r2 = await act('play_game', [g.id], null, { what: p.action === 'install' ? `Installing ${g.name}` : `Starting ${g.name}` });
+      if (!ok(r2)) return;
+      // Installing is the store's (Droidtop/tracker#630): it downloads the game; Find store games then adds it here.
+      if (r2.install) flash(`${p.store} opens to install ${g.name}. Once it is installed, File > Find store games adds it here.`);
+      else flash(`Started ${g.name}${r2.via === 'steam' ? ' in Steam' : ''}`);
+    };
+    // A store's app opens its own window: in the handheld shell that is a hand-off, asked first (UX review A3).
+    if (p.action === 'install') b.onclick = () => handOff({ kind: 'launcher', launcher: p.via, title: `Install ${g.name} with ${p.store}?`, body: `${p.store} opens and installs it with your account there.`, run: start });
+    else b.onclick = () => (p.via === 'steam' ? handOff({ kind: 'launcher', launcher: 'steam', title: `Play ${g.name} in Steam?`, body: 'Steam opens and starts it.', run: start }) : start());
     if (state.shell === 'handheld') hhKeepDisabledReachable();
   });
+}
+// Set up Windows games (Droidtop/tracker#629): a Wine build for Pythia's own use, fetched into its runners folder.
+async function setUpWindowsGames() {
+  if (!(await confirm({ title: 'Set up Windows games?', body: 'Pythia downloads a Wine build (Wine Staging from Kron4ek\u2019s Wine-Builds on GitHub, about 100 MB) and unpacks it into its own folder. Nothing is installed on the system. Windows games then play through it, each in a Wine prefix of its own.', proceed: 'Set up' }))) return;
+  pythia.set_up_windows_games();
+  flash('Setting up Windows games; it shows under Activity');
+}
+function renderWindowsGames(host) {
+  if (!host) return;
+  loadInto(host, 'get_wine_setup', [], (r, h) => {
+    if (r.windows) { h.appendChild(el('<div class="form-row"><div class="form-label"><strong>Windows games</strong><small>They run as they are on Windows; nothing to set up.</small></div></div>')); return; }
+    const using = r.builds[0] ? `Pythia\u2019s Wine: ${r.builds[0].name}` : r.system ? `The system\u2019s Wine: ${r.system}` : 'Not set up';
+    const row = el(`<div class="form-row"><div class="form-label"><strong>Windows games</strong><small>${esc(using)}.${r.supported ? '' : ' Pythia sets up Wine on Linux (x86-64) only; install your system\u2019s wine here.'}</small></div>${r.supported ? `<button class="btn" type="button">${r.builds.length ? 'Get the latest Wine' : 'Set up Windows games'}…</button>` : ''}</div>`);
+    $('button', row)?.addEventListener('click', setUpWindowsGames);
+    h.appendChild(row);
+  }, { what: 'Windows games' });
+}
+// "Choose how it runs" (Droidtop/tracker#629): the programs in the game's folder, likeliest first, and on
+// Linux whether it runs natively or through Wine. The choice stays on this computer's record.
+async function chooseLaunch(g, redraw) {
+  const r = await call('get_launch_choices', g.id);
+  if (!ok(r)) { flash(r.message || 'Not available', 'caution'); return; }
+  const list = r.candidates || [];
+  const size = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(0)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const current = r.current || {};
+  const node = el(`<div><p><small class="mono" style="word-break:break-all">${esc(r.folder)}</small></p>${list.length ? `<div class="run-choices">${list.map((c, i) => `<label class="run-choice"><input type="radio" name="run-exe" value="${i}" ${c.exe === current.exe ? 'checked' : ''}><span><strong class="mono">${esc(c.exe)}</strong><small>${c.kind === 'windows' ? 'Windows program' : 'Linux program'} · ${size(c.size)}</small></span></label>`).join('')}</div>` : '<p>Pythia found no program in its folder.</p>'}${(r.vias || []).length > 1 ? `<div class="run-via"><div class="form-label"><strong>Run it</strong><small>${r.wine ? `Wine: ${esc(r.wine)}` : 'Wine is not set up: Settings > General > Windows games sets it up.'}</small></div><select class="field" data-run-via><option value="native">Natively</option><option value="wine" ${current.via === 'wine' ? 'selected' : ''} ${r.wine ? '' : 'disabled'}>Through Wine</option></select></div>` : ''}${r.chose ? '<p><button class="btn small ghost" type="button" data-run-reset>Use Pythia\u2019s pick again</button></p>' : ''}</div>`);
+  // A Windows program on Linux runs through Wine: picking one picks Wine too.
+  const via = $('[data-run-via]', node);
+  $$('input[name="run-exe"]', node).forEach((input) => (input.onchange = () => { if (via && list[Number(input.value)].kind === 'windows' && r.wine) via.value = 'wine'; if (via && list[Number(input.value)].kind === 'linux') via.value = 'native'; }));
+  $('[data-run-reset]', node)?.addEventListener('click', async () => { const r2 = await act('set_launch', [g.id, '', ''], 'Pythia picks what Play starts', { what: 'Changing it' }); if (ok(r2)) { $('.scrim')?.querySelector('[data-cancel]')?.click(); redraw(); } });
+  if (!list.length) { infoSheet({ title: `How ${g.name} runs`, node }); return; }
+  if (!(await confirm({ title: `How ${g.name} runs`, node, proceed: 'Use this' }))) return;
+  const picked = $('input[name="run-exe"]:checked', node);
+  if (!picked) return;
+  const chosen = list[Number(picked.value)];
+  const how = r.windows ? 'native' : via ? via.value : 'native';
+  const r2 = await act('set_launch', [g.id, chosen.exe, how], `Play starts ${chosen.exe}`, { what: 'Changing it' });
+  if (ok(r2)) redraw();
 }
 // Launchers that can show this game, asked for once the page is drawn; "Open in <launcher>" is in its menu.
 function loadManagers(g) {
@@ -1130,7 +1188,7 @@ function openSettingsPane(name) {
   state.settingsPane = name; const btn = $$('[data-settings]').find((b) => b.dataset.settings === name); if (btn) { $$('[data-settings]').forEach((x) => x.classList.toggle('active', x === btn)); $$('.settings-pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === name)); } if (state.view !== 'settings') navigate('settings'); else renderSettingsPane(name); }
 function renderSettingsPane(name) {
   const info = model.info || {}; const app = model.app || {};
-  if (name === 'general') renderModes($('#modesState'));
+  if (name === 'general') { renderModes($('#modesState')); renderWindowsGames($('#windowsGames')); }
   if (name === 'general') { $('#appDataPath').textContent = info.app_data_folder || '';  }
   if (name === 'plugins') { renderPlugins(!state.search); loadInto($('#pluginRepos'), 'get_plugin_repositories', [], (r, host) => { if (!(r.repositories || []).length) host.appendChild(stateBlock({ title: 'No repositories added' })); }, { what: 'Plugin repositories' }); }
   if (name === 'advanced') { $('#systemIdField').value = info.system_uuid || ''; $('#dbPath').textContent = info.app_data_folder || ''; $('#schemaVersion').innerHTML = app.schema_version ? `${routineStatus('Up to date')}v${esc(app.schema_version)}` : ''; $('#logLevelSelect').value = model.config?.log_level === 'debug' ? 'debug' : 'info'; $('#consoleHint').textContent = model.config?.error_console ? 'On for this run. Ctrl+Shift+E toggles it.' : 'Off. Start Pythia with --error-console, or set error_console = True in pythia.conf.'; }
@@ -1186,7 +1244,19 @@ async function accountDialog(pluginId) {
   const a = model.accounts.find((x) => x.id === pluginId);
   if (!a) { infoSheet({ title: 'No account for this source', details: 'This source has no account fields.' }); return; }
   const body = el(`<div></div>`);
-  body.appendChild(el(`<p>${esc(a.connected ? 'Connected. Keys are kept in the library folder; every synced computer can read them.' : 'Enter each field to connect. Keys are kept in the library folder; every synced computer can read them.')}</p>`));
+  // A store that signs in on its own page (GOG, Epic; Droidtop/tracker#630): two steps, both here.
+  if (a.browser) {
+    body.appendChild(el(`<p>${esc(a.connected ? `Connected to ${a.display_name}. Sign in again to use another account.` : `Connect ${a.display_name} so Pythia can list the games you own there.`)}</p>`));
+    const steps = el(`<ol class="connect-steps"><li><button class="btn small" type="button" data-open-login>Sign in to ${esc(a.display_name)} in your browser</button></li><li><span>Copy ${esc(a.browser.paste)}, then </span><button class="btn small primary" type="button" data-paste-login>Paste it here…</button></li></ol>`);
+    $('[data-open-login]', steps).onclick = async () => { const r = await call('open_account_login', a.id); if (!ok(r)) infoSheet({ title: 'Open this page in your browser', details: r.url || r.message }); };
+    $('[data-paste-login]', steps).onclick = async () => {
+      const v = await prompt({ title: `Finish connecting ${a.display_name}`, body: `Paste ${a.browser.paste}.`, hint: a.id.endsWith('egs') ? '{"authorizationCode": ...}' : 'https://embed.gog.com/on_login_success?...&code=...', save: 'Connect' });
+      if (v === null || !v.trim()) return;
+      const r = await act('finish_account_connect', [a.id, v.trim()], `${a.display_name} connected`, { what: `Connecting ${a.display_name}` });
+      if (ok(r)) { await refreshPlugins(); pythia.sync_account(a.id); flash(`Listing the games you own on ${a.display_name}`); $('.scrim')?.querySelector('[data-cancel],[data-proceed]')?.click(); }
+    };
+    body.appendChild(steps);
+  } else body.appendChild(el(`<p>${esc(a.connected ? 'Connected. Keys are kept in the library folder; every synced computer can read them.' : 'Enter each field to connect. Keys are kept in the library folder; every synced computer can read them.')}</p>`));
   a.fields.forEach((f) => { const row = el(`<div class="form-row" style="grid-template-columns:1fr auto"><div class="form-label"><strong>${esc(f.label)}</strong><small>${f.secret ? 'Secret' : ''}</small></div><button class="btn small">${a.connected ? 'Change' : 'Enter'}</button></div>`); $('button', row).onclick = async () => { const v = await prompt({ title: `${a.display_name}: ${f.label}`, hint: f.secret ? 'Paste the key' : f.label }); if (v !== null && v.trim()) { const r = await act('set_account_credential', [a.id, f.key, v.trim()], null, { what: 'Saving' }); if (ok(r)) { flash('Saved', 'info', { private: true }); refreshPlugins(); } } }; body.appendChild(row); });
   if (a.connected) { const b = el('<button class="btn primary" style="margin-top:10px">Sync owned games now</button>'); b.onclick = () => { pythia.sync_account(a.id); flash('Syncing'); navigate('activity'); }; body.appendChild(b); }
   infoSheet({ title: `${a.display_name} account`, node: body });

@@ -349,6 +349,13 @@ internally". Library home, owner: "lib-kdeconnect implements explicitly kde-conn
   devices when it changes (`QClipboard.dataChanged`, sent off the GUI thread; the library does not send back a clip
   that just came); a pairing request (with its code), a received or failed file, a shared link or text, a
   notification, a ping and a ring (with a beep) go to the event log.
+- Over a tailnet: while KDE Connect runs, `pythia.droidtop.tailscale` asks this computer's own Tailscale node for
+  its peers every 30 seconds (`pythia._native.tailscale.status`, lib-net's `net-tailscale`: tailscaled's LocalAPI
+  `GET /localapi/v0/status` over its socket or Windows pipe, as ktailctl and the `tailscale` CLI do) and gives
+  KDE Connect the addresses of the online ones (its `addresses` op), so a phone on the tailnet away from home is
+  reachable. No account token and no control server. Owner, 2026-11-05: "Tailscale applications do it too. Look at
+  the tailscale code, ktailctl ... We're building a local tailscale control plugin". Without tailscaled, nothing
+  changes; a tailnet is never required.
 - Not built yet: the Devices page's KDE Connect section (pair, accept with the code, ping, send a file), and typing
   what a paired phone types (uinput or libei on Linux, SendInput on Windows). The calls they need exist.
 
@@ -599,3 +606,43 @@ so Syncthing carrying either makes the whole game Syncthing's. The Saves
 tab says "Synced by Syncthing (folder <label>)". Ren'Py's two places are
 known by the engine's rule, with no Ludusavi manifest (droidtop-agent
 `saves::engines`).
+
+### 8.8 Play for a game added from a folder (Droidtop/tracker#629)
+
+A folder game has no Lutris runner. Play starts its own program, picked
+from its folder (`pythia/folder_launch.py`): on Windows its `.exe`,
+natively; elsewhere a native build first (`.sh`, `.x86_64`, an ELF file),
+else the `.exe` through Wine when Wine is installed, each game in a Wine
+prefix of its own under Pythia's data folder. Installers, crash reporters,
+redistributables and engine tools are never picked; a program named for the
+game comes first. "Choose how it runs…" beside Play lists the programs and,
+off Windows, natively or through Wine; the choice is this computer's, kept on
+its record of the folder. Play notes when the game was played (Continue
+playing). An Epic game is sent to Epic's launcher, which its games need. A
+handheld's Play there starts a folder game the same way, after its store's
+launcher when it has one.
+
+**Set up Windows games** (Linux, x86-64): when a Windows game has no Wine,
+Play offers it, and Settings > General > Windows games keeps it (and gets the
+latest). Pythia fetches the latest Wine Staging build from Kron4ek's
+Wine-Builds on GitHub, checks its size, refuses an archive that would write
+outside its folder, and unpacks it into its own runners folder; nothing is
+installed on the system. Play then uses the newest build Pythia set up, else
+the system's `wine`. It is a job on the Activity page with its progress.
+DXVK and VKD3D (Direct3D through Vulkan) are not set up yet.
+
+### 8.9 Owned games and Install (Droidtop/tracker#630)
+
+The library's **Owned** view lists the games owned in a connected store and
+not installed here. Install hands the game to its store's own installer, by
+the store's link (`steam://install/<id>`, GOG Galaxy's
+`goggalaxy://openGameView/<id>`, Epic's `com.epicgames.launcher://apps/<id>`),
+the store it is owned on first; the person's account, the download and DRM
+stay the store's. Once it is installed, Find store games adds it. On Linux,
+where GOG Galaxy and the Epic Games Launcher do not exist, only Steam's link
+is offered; a GOG or Epic game says it installs with GOG's offline installer
+or a launcher such as Heroic. Pythia downloading GOG and Epic games itself
+(gogdl, legendary) is the next step. GOG and Epic
+connect in the app: the store's sign-in page opens in the browser, and the
+person pastes back what it shows (GOG's address bar, Epic's page text);
+Pythia then lists what they own there.

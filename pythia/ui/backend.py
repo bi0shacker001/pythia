@@ -1109,8 +1109,8 @@ class Backend(QObject):
             try:
                 if category == "library":
                     item["state"] = {
-                        "has_account": bool(p.credential_fields),
-                        "connected": p.is_connected() if p.credential_fields else None,
+                        "has_account": bool(p.credential_fields or p.browser_connect),
+                        "connected": p.is_connected() if (p.credential_fields or p.browser_connect) else None,
                     }
                 elif category == "manager":
                     item["state"] = {"available": bool(p.is_available(ctx)), "sources": list(p.compatible_sources)}
@@ -1163,12 +1163,48 @@ class Backend(QObject):
                     "fields": [
                         {"key": f["key"], "label": f["label"], "secret": bool(f.get("secret"))}
                         for f in p.credential_fields
+                        if not p.browser_connect
                     ],
+                    "browser": p.browser_connect,
                 }
                 for p in library_plugins.all_plugins()
-                if p.credential_fields
+                if p.credential_fields or p.browser_connect
             ]
         )
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def open_account_login(self, plugin_id: str):
+        """Opens a store's own sign-in page in the person's browser (GOG, Epic;
+        Droidtop/tracker#630): they sign in there, then paste back what it shows."""
+        from PySide6.QtGui import QDesktopServices
+
+        from pythia.plugins import library as library_plugins
+
+        plugin = next((p for p in library_plugins.all_plugins() if p.id == plugin_id and p.browser_connect), None)
+        if plugin is None:
+            return {"status": "error", "message": f"{plugin_id} does not sign in through a browser."}
+        if not QDesktopServices.openUrl(QUrl(plugin.browser_login_url())):
+            return {"status": "error", "message": "The browser did not open.", "url": plugin.browser_login_url()}
+        return {"status": "ok", "url": plugin.browser_login_url()}
+
+    @Slot(str, str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def finish_account_connect(self, plugin_id: str, pasted: str):
+        """Finishes a store's browser sign-in with what the person pasted."""
+        from pythia.plugins import library as library_plugins
+
+        plugin = next((p for p in library_plugins.all_plugins() if p.id == plugin_id and p.browser_connect), None)
+        if plugin is None:
+            return {"status": "error", "message": f"{plugin_id} does not sign in through a browser."}
+        if not plugin.connect_with(pasted):
+            return {
+                "status": "error",
+                "message": f"That was not what {plugin.display_name}'s page shows after signing in, "
+                f"or {plugin.display_name} refused it. Paste {plugin.browser_connect['paste']}.",
+            }
+        return {"status": "ok"}
 
     @Slot(str, str, str, result="QVariant")
     @_guarded
@@ -1351,10 +1387,81 @@ class Backend(QObject):
 
         return play.state(game_id, self._entries_of(game_id))
 
+    @Slot(result="QVariant")
+    @_guarded
+    def get_wine_setup(self):
+        """Windows games on Linux (Droidtop/tracker#629): whether Pythia sets up
+        Wine here, the builds it set up (newest first), and the system's Wine."""
+        import shutil
+
+        from pythia import folder_launch, wine_setup
+
+        return {
+            "status": "ok",
+            "supported": wine_setup.supported(),
+            "windows": folder_launch.on_windows(),
+            "builds": wine_setup.builds(),
+            "system": shutil.which("wine") or shutil.which("wine64"),
+            "using": folder_launch.wine(),
+        }
+
+    @Slot()
+    def set_up_windows_games(self):
+        """Fetches and unpacks the latest Wine build into Pythia's runners
+        folder, as a job on the Activity page."""
+        job = self._job_start("wine", "Set up Windows games", "Wine build")
+        threading.Thread(target=self._wine_setup_worker, args=(job,), daemon=True).start()
+
+    def _wine_setup_worker(self, job: str):
+        from pythia import wine_setup
+
+        last = [-1]
+
+        def progress(done: int, total: int):
+            step = done * 10 // total if total else -1
+            if step != last[0]:
+                last[0] = step
+                self._job_log(
+                    job, f"Downloaded {done // 2**20} of {total // 2**20} MB" if total else f"{done // 2**20} MB"
+                )
+
+        try:
+            build = wine_setup.latest()
+            self._job_log(job, f"Wine {build['version']} ({build['name']}), {build['size'] // 2**20} MB")
+            done = wine_setup.install(progress, build)
+        except wine_setup.SetupError as ex:
+            self._job_finish(job, str(ex), ok=False)
+            return
+        self._job_finish(job, f"Windows games are set up: {done['name']}")
+        self.refresh_games()
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def get_launch_choices(self, game_id: str):
+        """What "Choose how it runs" offers for a folder game: the programs in
+        its folder, what Play starts now, and the ways it can run here."""
+        from pythia import play
+
+        return play.launch_choices(game_id)
+
+    @Slot(str, str, str, result="QVariant")
+    @_guarded
+    def set_launch(self, game_id: str, exe: str, via: str):
+        """Keeps what Play starts for a folder game; an empty exe goes back to
+        Pythia's own pick."""
+        from pythia import play
+
+        result = play.set_launch(game_id, exe, via)
+        if result.get("status") == "ok":
+            self.refresh_games()
+        return result
+
     @Slot(str, result="QVariant")
     @_guarded
     def play_game(self, game_id: str):
-        """Starts the game: through Steam (its steam:// link) or Pythia's runner."""
+        """Starts the game: through Steam (its steam:// link), Pythia's runner, or
+        a folder game's own program (natively, or through Wine)."""
         from PySide6.QtGui import QDesktopServices
 
         from pythia import play
@@ -1362,9 +1469,14 @@ class Backend(QObject):
         result = play.play(game_id, self._entries_of(game_id))
         if result.get("status") == "ok" and result.get("url"):
             if not QDesktopServices.openUrl(QUrl(result["url"])):
-                return {"status": "error", "message": "Steam did not open. Is it installed?"}
+                store = {"steam": "Steam", "gog": "GOG Galaxy", "egs": "The Epic Games Launcher"}.get(
+                    result.get("via") or "", "Its launcher"
+                )
+                return {"status": "error", "message": f"{store} did not open. Is it installed?"}
         if result.get("status") == "ok":
             self._record("info", "pythia", f"Started {game_id} ({result.get('via')})", "play_game")
+        if result.get("via") == "folder":
+            self.refresh_games()  # its last-played time, for Continue playing
         return result
 
     # ---- launcher hand-off --------------------------------------------------

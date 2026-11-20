@@ -88,6 +88,8 @@ jobs:
           Copy-Item "$env:RUNNER_TEMP\helper\bin\windowcast-secure-helper.exe" pythia\windowcast-secure-helper.exe
           python -m pip install --upgrade pip build
           python -m build --wheel
+          # One wheel for every Python from 3.10 on (pyproject.toml, tool.distutils.bdist_wheel).
+          if (-not (Get-ChildItem dist\*-cp310-abi3-win_amd64.whl)) { throw "the wheel is not tagged abi3: $((Get-ChildItem dist\*.whl).Name)" }
           python -m venv "$env:RUNNER_TEMP\venv"
           & "$env:RUNNER_TEMP\venv\Scripts\pip.exe" install (Get-ChildItem dist\*.whl).FullName
           & "$env:RUNNER_TEMP\venv\Scripts\pythia.exe" --version

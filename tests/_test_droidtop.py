@@ -58,6 +58,13 @@ class ScannedGamesTest(TestCase):
         self.assertEqual(game["base"], self.new)
         self.assertEqual(game["install"]["launcher"], "pythia")
 
+    def test_the_current_version_is_the_game_as_play_starts_it(self):
+        # A copy the person made Current (a modded one, an older version) is what a stream from the
+        # handheld runs (play.folder_variant), so it is the one the handheld is told of.
+        (game,) = library.scanned_games([self.entry(current_version="0.9.4")], "me")
+        self.assertEqual(game["install"]["version"], "0.9.4")
+        self.assertEqual(game["base"], self.old)
+
     def test_store_ids_are_the_agents_keys(self):
         steam = self.entry(platform_ids=[{"platform": "f95", "id": "1"}, {"platform": "steam", "id": "440"}])
         egs = self.entry(platform_ids=[{"platform": "egs", "id": "Fortnite"}])

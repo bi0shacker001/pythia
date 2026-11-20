@@ -15,7 +15,7 @@ name>`), else its title as `title2:<Lutris slug>` (`title_key`).
 import os
 import threading
 
-from pythia import datadir
+from pythia import datadir, play
 from pythia.droidtop.native import AgentError, available, submodule
 from pythia.identity import get_system_uuid
 from pythia.util.log import logger
@@ -72,18 +72,20 @@ def keys_of(entry: dict) -> set[str]:
     return {key}
 
 
-def _newest_variant(entry: dict):
-    """The version and variant installed most recently whose folder exists."""
-    best = None
-    for group in entry.get("versions") or []:
-        for variant in group.get("variants") or []:
-            path = variant.get("path")
-            if not path or not os.path.isdir(path):
-                continue
-            stamp = variant.get("detected_at") or ""
-            if best is None or stamp >= best[0]:
-                best = (stamp, group.get("version"), variant)
-    return best
+def _played_variant(entry: dict):
+    """The version and variant Play starts (``play.folder_variant``: the Current
+    version's, else the one added last whose folder is still there), so the
+    handheld is told of the copy a stream from it runs, and its saves are that
+    copy's. A pick of its own here reported the newest copy while Play ran the
+    Current one, a modded copy or an older version the person chose."""
+    variant = play.folder_variant(entry)
+    if variant is None:
+        return None
+    version = next(
+        (g.get("version") for g in entry.get("versions") or [] if any(v is variant for v in g.get("variants") or [])),
+        None,
+    )
+    return version, variant
 
 
 def scanned_games(entries: list[dict], system_uuid: str) -> list[dict]:
@@ -92,10 +94,10 @@ def scanned_games(entries: list[dict], system_uuid: str) -> list[dict]:
     for entry in entries:
         if entry.get("system_uuid") != system_uuid:
             continue
-        newest = _newest_variant(entry)
-        if newest is None:
+        played = _played_variant(entry)
+        if played is None:
             continue
-        _, version, variant = newest
+        version, variant = played
         title = entry.get("canonical_name") or os.path.basename(variant["path"])
         # A version label that only repeats the title (a store install
         # Pythia found no version for) is no version.

@@ -14,7 +14,7 @@ from copy import copy
 from typing import TYPE_CHECKING
 
 from pythia import settings
-from pythia.util import system
+from pythia.util import selfcmd, system
 from pythia.util.log import logger
 from pythia.util.shell import get_terminal_script
 
@@ -105,13 +105,12 @@ class MonitoredCommand:
         # crashes hard on Pythia's own stdlib via the inherited
         # PYTHONPATH.
         wrapper_command = (
-            [
-                sys.executable,
+            selfcmd.script_command(
                 WRAPPER_SCRIPT,
                 self._title,
                 str(len(self.include_processes)),
                 str(len(self.exclude_processes)),
-            ]
+            )
             + self.include_processes
             + self.exclude_processes
         )

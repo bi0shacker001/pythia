@@ -10,6 +10,9 @@ from pythia.util import system
 
 def get() -> str:
     """Return the path for the resources."""
+    if getattr(sys, "frozen", False):
+        # A standalone build carries share/pythia inside its bundle (packaging/pyinstaller/pythia.spec).
+        return os.path.join(sys._MEIPASS, "share", "pythia")  # type: ignore[attr-defined]
     launch_path = os.path.realpath(sys.path[0])
     if launch_path.startswith("/usr/local") and os.path.isdir("/usr/local/share/pythia"):
         data_path = "/usr/local/share/pythia"

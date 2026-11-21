@@ -1,0 +1,81 @@
+# Pythia's standalone Linux packages, a deb and an rpm, over the standalone build
+# packaging/pyinstaller/pythia.spec makes (dist/standalone/pythia). Built by .github/workflows/build.yml
+# from the repository root:
+#
+#     VERSION=<version> nfpm package --config packaging/linux/nfpm.yaml --packager deb --target dist/
+#     VERSION=<version> nfpm package --config packaging/linux/nfpm.yaml --packager rpm --target dist/
+#
+# They carry their own Python and Qt, so they install on any x86-64 distribution with glibc 2.35 or newer
+# (built on Ubuntu 22.04). The package is called pythia, as the Launchpad-built Debian package is: one
+# replaces the other.
+name: pythia
+arch: amd64
+platform: linux
+version: ${VERSION}
+version_schema: none
+section: games
+priority: optional
+maintainer: bi0shacker001 <noreply@github.com>
+description: |
+  Multi-system game library manager.
+  Pythia tracks which versions of which games exist on which of your computers and
+  handhelds, where you own them, and what each one needs to run, and serves them to
+  droidtop handhelds. Largely based on Lutris. This build carries its own Python and Qt.
+vendor: Pythia
+homepage: https://github.com/bi0shacker001/pythia
+license: GPL-3.0-or-later
+
+contents:
+  - src: dist/standalone/pythia/
+    dst: /opt/pythia
+    type: tree
+  - src: /opt/pythia/pythia
+    dst: /usr/bin/pythia
+    type: symlink
+  - src: share/applications/net.pythia.Pythia.desktop
+    dst: /usr/share/applications/net.pythia.Pythia.desktop
+  - src: share/applications/net.pythia.Pythia1.desktop
+    dst: /usr/share/applications/net.pythia.Pythia1.desktop
+  - src: share/metainfo/net.pythia.Pythia.metainfo.xml
+    dst: /usr/share/metainfo/net.pythia.Pythia.metainfo.xml
+  - src: share/man/man1/pythia.1
+    dst: /usr/share/man/man1/pythia.1
+  - src: share/icons/hicolor/
+    dst: /usr/share/icons/hicolor
+    type: tree
+  - src: LICENSE
+    dst: /usr/share/doc/pythia/copyright
+    packager: deb
+  - src: LICENSE
+    dst: /usr/share/licenses/pythia/LICENSE
+    packager: rpm
+
+# What Qt's xcb and Wayland platform plugins and libmagic load from the system.
+overrides:
+  deb:
+    depends:
+      - libc6 (>= 2.35)
+      - libegl1
+      - libgl1
+      - libfontconfig1
+      - libxkbcommon0
+      - libxkbcommon-x11-0
+      - libxcb-cursor0
+      - libxcb-icccm4
+      - libxcb-keysyms1
+      - libxcb-shape0
+      - libdbus-1-3
+      - libmagic1
+  rpm:
+    depends:
+      - glibc >= 2.35
+      - mesa-libEGL
+      - mesa-libGL
+      - fontconfig
+      - libxkbcommon
+      - libxkbcommon-x11
+      - xcb-util-cursor
+      - xcb-util-wm
+      - xcb-util-keysyms
+      - dbus-libs
+      - file-libs

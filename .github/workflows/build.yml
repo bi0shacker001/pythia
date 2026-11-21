@@ -1,8 +1,9 @@
 on: [push, pull_request]
 
 # Builds Pythia every way it ships (the Python wheel and sdist, a meson
-# install, the Debian package) and runs what each one installed, on Linux
-# and, for the wheel, on Windows. Each build includes pythia._native (native/),
+# install, the Debian package, and the standalone installers: Windows, macOS,
+# Linux deb and rpm, packaging/README.md) and runs what each one installed; a
+# tag v<version> publishes them as a release. Each build includes pythia._native (native/),
 # built with cargo: the runners' Rust for the wheels, Ubuntu's rustc-1.91 for
 # the Debian package, as Launchpad builds it. Static Analysis (static.yml) checks the
 # code; this checks that it builds and starts.
@@ -110,3 +111,182 @@ jobs:
         with:
           name: pythia-windows
           path: dist/*.whl
+
+  # Standalone builds, each with its own Python and Qt: what a release offers for download
+  # (packaging/README.md). One PyInstaller spec, then each system's own installer around it.
+  installer-windows:
+    name: Installer (Windows)
+    needs: windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The wheel the Windows job built, installed and ran: its pythia._native and secure-screen helper.
+      - uses: actions/download-artifact@v4
+        with:
+          name: pythia-windows
+          path: wheel
+      - name: Standalone build
+        shell: pwsh
+        run: |
+          python packaging\freeze_requirements.py > "$env:RUNNER_TEMP\requirements.txt"
+          python -m venv "$env:RUNNER_TEMP\freeze"
+          $py = "$env:RUNNER_TEMP\freeze\Scripts\python.exe"
+          & $py -m pip install --upgrade pip
+          & $py -m pip install -r "$env:RUNNER_TEMP\requirements.txt" "pyinstaller==6.22.3"
+          & $py -m pip install --no-deps (Get-ChildItem wheel\*.whl).FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $py -m PyInstaller packaging\pyinstaller\pythia.spec --noconfirm --distpath dist\standalone --workpath build\pyinstaller
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $py packaging\windows\make_icon.py share\icons\hicolor\256x256\apps\net.pythia.Pythia.png dist\standalone\pythia.ico
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run the standalone build
+        shell: pwsh
+        run: |
+          $cli = "dist\standalone\Pythia\pythia-cli.exe"
+          & $cli --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # A copy of itself, as Pythia starts one (pythia.util.selfcmd), with the droidtop agent in it.
+          & $cli --pythia-script packaging\check_standalone.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:APPDATA = "$env:RUNNER_TEMP\appdata"
+          $env:LOCALAPPDATA = "$env:RUNNER_TEMP\localappdata"
+          & $cli --list-games
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Installer
+        shell: pwsh
+        run: |
+          $version = python packaging\version.py
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=$version" "/DSourceDir=$PWD\dist\standalone\Pythia" "/DOutputDir=$PWD\dist" packaging\windows\pythia.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install it, run it, uninstall it
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist\Pythia-*-setup.exe).FullName
+          Start-Process $setup -ArgumentList "/VERYSILENT", "/CURRENTUSER", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          $installed = "$env:LOCALAPPDATA\Programs\Pythia"
+          & "$installed\pythia-cli.exe" --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $shortcut = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Pythia.lnk"
+          if (-not (Test-Path $shortcut)) { throw "no Start menu entry at $shortcut" }
+          Start-Process "$installed\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait
+          Start-Sleep -Seconds 5
+          if (Test-Path $shortcut) { throw "the uninstaller left the Start menu entry" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pythia-installer-windows
+          path: dist/Pythia-*-setup.exe
+
+  packages-linux:
+    name: Packages (Linux deb and rpm)
+    # The oldest supported Ubuntu, so the packages run on every distribution with its glibc or newer.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config cmake
+          curl -fsSL -o "$RUNNER_TEMP/nfpm.tar.gz" https://github.com/goreleaser/nfpm/releases/download/v2.49.0/nfpm_2.49.0_Linux_x86_64.tar.gz
+          echo "2afaa5ffb5e3493402e31e7c67a5a1fb42133e3f66fc315ca0051934125561c7  $RUNNER_TEMP/nfpm.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/nfpm"
+          tar -xzf "$RUNNER_TEMP/nfpm.tar.gz" -C "$RUNNER_TEMP/nfpm" nfpm
+      - name: Standalone build
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python packaging/freeze_requirements.py > "$RUNNER_TEMP/requirements.txt"
+          python -m venv "$RUNNER_TEMP/freeze"
+          "$RUNNER_TEMP/freeze/bin/pip" install --upgrade pip
+          "$RUNNER_TEMP/freeze/bin/pip" install -r "$RUNNER_TEMP/requirements.txt" "pyinstaller==6.22.3"
+          "$RUNNER_TEMP/freeze/bin/pip" install --no-deps dist/*.whl
+          "$RUNNER_TEMP/freeze/bin/python" -m PyInstaller packaging/pyinstaller/pythia.spec --noconfirm --distpath dist/standalone --workpath build/pyinstaller
+      - name: Run the standalone build
+        run: |
+          dist/standalone/pythia/pythia --version
+          dist/standalone/pythia/pythia --pythia-script packaging/check_standalone.py
+          HOME="$RUNNER_TEMP/home" dist/standalone/pythia/pythia --list-games
+      - name: deb and rpm
+        run: |
+          VERSION=$(python packaging/version.py)
+          export VERSION
+          "$RUNNER_TEMP/nfpm/nfpm" package --config packaging/linux/nfpm.yaml --packager deb --target dist/
+          "$RUNNER_TEMP/nfpm/nfpm" package --config packaging/linux/nfpm.yaml --packager rpm --target dist/
+          ls -la dist/*.deb dist/*.rpm
+      - name: Install the deb and run it
+        run: |
+          sudo apt-get install -y ./dist/pythia_*.deb
+          pythia --version
+          test -f /usr/share/applications/net.pythia.Pythia.desktop
+          HOME="$RUNNER_TEMP/home2" pythia --list-games
+      - name: Install the rpm on Fedora and run it
+        run: |
+          docker run --rm -v "$PWD/dist:/dist:ro" fedora:41 sh -c "dnf install -y /dist/pythia-*.rpm && pythia --version && HOME=/tmp pythia --list-games"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pythia-packages-linux
+          path: |
+            dist/pythia_*.deb
+            dist/pythia-*.rpm
+
+  dmg-macos:
+    name: Disk image (macOS, Apple silicon)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Standalone build
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python packaging/freeze_requirements.py > "$RUNNER_TEMP/requirements.txt"
+          python -m venv "$RUNNER_TEMP/freeze"
+          "$RUNNER_TEMP/freeze/bin/pip" install --upgrade pip
+          "$RUNNER_TEMP/freeze/bin/pip" install -r "$RUNNER_TEMP/requirements.txt" "pyinstaller==6.22.3"
+          "$RUNNER_TEMP/freeze/bin/pip" install --no-deps dist/*.whl
+          "$RUNNER_TEMP/freeze/bin/python" -m PyInstaller packaging/pyinstaller/pythia.spec --noconfirm --distpath dist/standalone --workpath build/pyinstaller
+      - name: Run the standalone build
+        run: |
+          app=dist/standalone/Pythia.app/Contents/MacOS/pythia
+          "$app" --version
+          "$app" --pythia-script packaging/check_standalone.py
+          HOME="$RUNNER_TEMP/home" "$app" --list-games
+      - name: Disk image
+        run: sh packaging/macos/make-dmg.sh "$(python packaging/version.py)" arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pythia-dmg-macos
+          path: dist/Pythia-*.dmg
+
+  # A tag v<version> publishes the release: every standalone installer, the wheels and the Launchpad-style deb.
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [deb, wheel, windows, installer-windows, packages-linux, dmg-macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Check the tag is the version, and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 packaging/version.py)
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then echo "tag $GITHUB_REF_NAME is not v$version (pyproject.toml)"; exit 1; fi
+          gh release create "$GITHUB_REF_NAME" --title "Pythia $version" --generate-notes \
+            artifacts/pythia-installer-windows/* artifacts/pythia-packages-linux/* artifacts/pythia-dmg-macos/* \
+            artifacts/pythia-windows/* artifacts/pythia-python/*

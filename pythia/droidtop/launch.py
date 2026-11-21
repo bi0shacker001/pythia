@@ -22,12 +22,12 @@ windowcast streams the window that opens.
 """
 
 import subprocess
-import sys
 
 from pythia import datadir
 from pythia.droidtop.library import keys_of
 from pythia.droidtop.native import submodule
 from pythia.identity import get_system_uuid
+from pythia.util import selfcmd
 from pythia.util.log import logger
 
 STREAM = "windowcast"
@@ -92,7 +92,7 @@ def _run_in_pythia(game_id: str, name: str) -> dict:
         Game(game_id).check_launchable()
     except GameConfigError as ex:
         return {"result": "failed", "message": f"{name} cannot start here: {ex}"}
-    command = [sys.executable, "-m", "pythia.launch", f"pythia:rungameid/{game_id}"]
+    command = selfcmd.module_command("pythia.launch", f"pythia:rungameid/{game_id}")
     try:
         subprocess.Popen(command, stdin=subprocess.DEVNULL, start_new_session=True)  # noqa: S603 (no handheld text in it)
     except OSError as ex:

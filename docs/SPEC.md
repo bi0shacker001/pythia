@@ -134,6 +134,25 @@ the droidtop coordinator for this lane. Later sections follow them.
     - Pythia's Windows wheel carries windowcast's helper at the windowcast
       it pins (`pythia/windowcast-secure-helper.exe`). droidtop-agent does
       the same (its DESIGN.md section 19).
+11. **Every release is a standalone installer on every system.** Owner,
+    2026-11-20: "Needs to be a windows installer, fixed for end user
+    convenience", then "Linux and everything too. Each release needs to be
+    a standalone installer. Linux packages, macos dmgs, debs and rpms".
+    - One PyInstaller spec (`packaging/pyinstaller/pythia.spec`) freezes
+      Pythia with its own Python, Qt and droidtop agent; each system's
+      installer wraps it: an Inno Setup installer for Windows (Start menu
+      entry, optional desktop icon, the `pythia:` link handler, an
+      uninstaller; per person by default, for everyone on request), a disk
+      image for macOS, and a deb and an rpm for Linux (built on Ubuntu
+      22.04, so any distribution with its glibc or newer). No AppImage.
+    - Build runs every one on every push and installs and starts each; a
+      tag `v<version>` (the version in `pyproject.toml`) publishes them
+      with the wheels and the Launchpad-style deb as a GitHub release.
+    - A standalone build has no interpreter, so the copies of itself Pythia
+      starts go through `pythia.util.selfcmd` (`--pythia-module`,
+      `--pythia-script`). PyGObject and dbus-python stay out of it: the Qt
+      UI does not use them.
+    - Uninstalling leaves the person's library and settings in place.
 
 ## 2. The pad model (handheld shell)
 

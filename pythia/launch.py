@@ -38,7 +38,22 @@ def _set_up_locale() -> None:
         )
 
 
+def _console_streams() -> None:
+    """A standalone build with no console (the Windows program the Start menu opens) has no standard
+    streams; what Pythia writes there would raise. They go nowhere instead; the log file still has it."""
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115 (for the process's life)
+
+
 def main() -> None:
+    _console_streams()
+    # A standalone build is one program: the copies of itself it starts come back here (pythia.util.selfcmd).
+    multiprocessing.freeze_support()
+    from pythia.util import selfcmd  # noqa: PLC0415
+
+    if selfcmd.run_requested(sys.argv):
+        return
     # Python 3.14 makes 'forkserver' the default; Pythia's subprocess handling
     # expects fork. Windows has no fork at all.
     if hasattr(os, "fork"):

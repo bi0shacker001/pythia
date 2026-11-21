@@ -18,6 +18,8 @@ data, so the elevated copy writes nothing in an administrator's profile.
 import sys
 from pathlib import Path
 
+from pythia.util import selfcmd
+
 try:  # built with Pythia; missing only in a source tree that was never built
     from pythia import _native  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover - depends on the build
@@ -48,7 +50,8 @@ def change(action: str) -> str:
     ``pythia._native.AgentError`` with the reason when it did not happen."""
     if _native is None:
         raise RuntimeError("Pythia's native module is not built")
-    return _native.secure_screen.request(action, sys.executable, ["-I", "-m", "pythia.secure_screen"])
+    program, *args = selfcmd.module_command("pythia.secure_screen", isolated=True)
+    return _native.secure_screen.request(action, program, args)
 
 
 def main(argv: list[str]) -> int:

@@ -9,8 +9,9 @@ Usage: python packaging/freeze_requirements.py > requirements.txt
 """
 
 import sys
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 LEFT_OUT = {"pygobject", "dbus-python"}
 

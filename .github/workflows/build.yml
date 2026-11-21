@@ -1,144 +1,53 @@
-on: [push, pull_request]
-
-# Builds Pythia every way it ships (the Python wheel and sdist, a meson
-# install, the Debian package, and the standalone installers: Windows, macOS,
-# Linux deb and rpm, packaging/README.md) and runs what each one installed; a
-# tag v<version> publishes them as a release. Each build includes pythia._native (native/),
-# built with cargo: the runners' Rust for the wheels, Ubuntu's rustc-1.91 for
-# the Debian package, as Launchpad builds it. Static Analysis (static.yml) checks the
-# code; this checks that it builds and starts.
+# One build per system, each making what that system installs and running it (packaging/README.md): the
+# Windows installer, the Linux deb and rpm, and a macOS disk image for Apple silicon and one for Intel. Each
+# carries its own Python and Qt and pythia._native, built with cargo. A green build of main is published as
+# an Unstable pre-release (packaging/release_channel.py, docs/SPEC.md, decision 13); Testing and Stable are promoted
+# from those by release-promote.yml. No wheels are built here: Pythia's core is moving away from Python
+# (Droidtop/tracker#958), and a wheel can still be built from the repository by hand (python -m build).
+# Static Analysis (static.yml) checks the code.
 name: Build
 
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
-  deb:
-    name: Meson and Debian package
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential meson gettext desktop-file-utils appstream-util \
-            debhelper dh-python dh-apparmor appstream dpkg-dev python3-all cargo-1.91 rustc-1.91 libudev-dev pkg-config
-      - name: Meson build, its tests (desktop files, metainfo) and install
-        run: |
-          meson setup builddir
-          meson test -C builddir --print-errorlogs
-          DESTDIR="$RUNNER_TEMP/meson-install" meson install -C builddir
-      - name: Debian package
-        run: |
-          dpkg-buildpackage -us -uc -b
-          mkdir -p dist
-          mv ../pythia_*.deb dist/
-      - name: Install the package and run it
-        run: |
-          sudo apt-get install -y ./dist/pythia_*.deb
-          /usr/games/pythia --version
-          cd "$RUNNER_TEMP" && /usr/bin/python3 -c "import pythia._native as n; print('pythia._native', n.__version__)"
-          HOME="$RUNNER_TEMP/home" /usr/games/pythia --list-games
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pythia-deb
-          path: dist/*.deb
-
-  wheel:
-    name: Wheel and sdist (Linux)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install system libraries the Linux dependencies build against
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgirepository-2.0-dev libdbus-1-dev libudev-dev pkg-config libcairo2-dev
-      - name: Build
-        run: |
-          python -m pip install --upgrade pip build
-          python -m build
-      - name: Install the wheel and run it
-        run: |
-          python -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl
-          "$RUNNER_TEMP/venv/bin/pythia" --version
-          cd "$RUNNER_TEMP" && "$RUNNER_TEMP/venv/bin/python" -c "import pythia._native as n; print('pythia._native', n.__version__)"
-          HOME="$RUNNER_TEMP/home" "$RUNNER_TEMP/venv/bin/pythia" --list-games
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pythia-python
-          path: dist/*
-
   windows:
-    name: Wheel (Windows)
+    name: Windows installer
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build, install and run
+      - name: Stamp the build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python packaging\release_channel.py stamp $env:GITHUB_SHA
+      - name: Standalone build
         shell: pwsh
         run: |
-          # Service mode's secure-screen helper (docs/SPEC.md 1.10): windowcast's own
-          # program, at the windowcast native/Cargo.toml pins, carried in the wheel.
+          # Service mode's secure-screen helper (docs/SPEC.md 1.10): windowcast's own program, at the
+          # windowcast native/Cargo.toml pins, carried in the app.
           $rev = (Select-String -Path native\Cargo.toml -Pattern 'windowcast-identity = .*rev = "([0-9a-f]+)"').Matches[0].Groups[1].Value
           if (-not $rev) { throw "no windowcast rev in native/Cargo.toml" }
           cargo install --locked --git https://github.com/Droidtop/windowcast --rev $rev windowcast-secure-helper --root "$env:RUNNER_TEMP\helper"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:RUNNER_TEMP\helper\bin\windowcast-secure-helper.exe" pythia\windowcast-secure-helper.exe
-          python -m pip install --upgrade pip build
-          python -m build --wheel
-          # One wheel for every Python from 3.10 on (pyproject.toml, tool.distutils.bdist_wheel).
-          if (-not (Get-ChildItem dist\*-cp310-abi3-win_amd64.whl)) { throw "the wheel is not tagged abi3: $((Get-ChildItem dist\*.whl).Name)" }
-          python -m venv "$env:RUNNER_TEMP\venv"
-          & "$env:RUNNER_TEMP\venv\Scripts\pip.exe" install (Get-ChildItem dist\*.whl).FullName
-          & "$env:RUNNER_TEMP\venv\Scripts\pythia.exe" --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Push-Location $env:RUNNER_TEMP
-          & "$env:RUNNER_TEMP\venv\Scripts\python.exe" -c "import pythia._native as n; print('pythia._native', n.__version__)"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & "$env:RUNNER_TEMP\venv\Scripts\python.exe" -c "from pythia import secure_screen as s; assert s.HELPER.is_file(), s.HELPER; print('service mode', s.state())"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Pop-Location
-          $env:APPDATA = "$env:RUNNER_TEMP\appdata"
-          $env:LOCALAPPDATA = "$env:RUNNER_TEMP\localappdata"
-          & "$env:RUNNER_TEMP\venv\Scripts\pythia.exe" --list-games
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      # The wheel a Windows computer installs (pip install <wheel>): the one
-      # this job just built, installed and ran.
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pythia-windows
-          path: dist/*.whl
-
-  # Standalone builds, each with its own Python and Qt: what a release offers for download
-  # (packaging/README.md). One PyInstaller spec, then each system's own installer around it.
-  installer-windows:
-    name: Installer (Windows)
-    needs: windows
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      # The wheel the Windows job built, installed and ran: its pythia._native and secure-screen helper.
-      - uses: actions/download-artifact@v4
-        with:
-          name: pythia-windows
-          path: wheel
-      - name: Standalone build
-        shell: pwsh
-        run: |
           python packaging\freeze_requirements.py > "$env:RUNNER_TEMP\requirements.txt"
           python -m venv "$env:RUNNER_TEMP\freeze"
           $py = "$env:RUNNER_TEMP\freeze\Scripts\python.exe"
           & $py -m pip install --upgrade pip
           & $py -m pip install -r "$env:RUNNER_TEMP\requirements.txt" "pyinstaller==6.22.3"
-          & $py -m pip install --no-deps (Get-ChildItem wheel\*.whl).FullName
+          # Pythia itself, pythia._native compiled on the way, straight into the build's environment.
+          & $py -m pip install --no-deps .
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # From outside the checkout, so the installed wheel is what PyInstaller finds, not the source tree.
+          # From outside the checkout, so the installed package is what PyInstaller finds, not the source tree.
           Push-Location $env:RUNNER_TEMP
           & $py -m PyInstaller "$env:GITHUB_WORKSPACE\packaging\pyinstaller\pythia.spec" --noconfirm --distpath "$env:GITHUB_WORKSPACE\dist\standalone" --workpath "$env:RUNNER_TEMP\pyi-build"
           $code = $LASTEXITCODE
@@ -162,7 +71,7 @@ jobs:
       - name: Installer
         shell: pwsh
         run: |
-          $version = python packaging\version.py
+          $version = python packaging\version.py --display
           $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
           if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
@@ -183,11 +92,11 @@ jobs:
           if (Test-Path $shortcut) { throw "the uninstaller left the Start menu entry" }
       - uses: actions/upload-artifact@v4
         with:
-          name: pythia-installer-windows
+          name: pythia-windows-installer
           path: dist/Pythia-*-setup.exe
 
-  packages-linux:
-    name: Packages (Linux deb and rpm)
+  linux:
+    name: Linux deb and rpm
     # The oldest supported Ubuntu, so the packages run on every distribution with its glibc or newer.
     runs-on: ubuntu-22.04
     steps:
@@ -195,6 +104,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Stamp the build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python packaging/release_channel.py stamp "$GITHUB_SHA"
       - name: Install build tools
         run: |
           sudo apt-get update
@@ -205,14 +118,12 @@ jobs:
           tar -xzf "$RUNNER_TEMP/nfpm.tar.gz" -C "$RUNNER_TEMP/nfpm" nfpm
       - name: Standalone build
         run: |
-          python -m pip install --upgrade pip build
-          python -m build --wheel
           python packaging/freeze_requirements.py > "$RUNNER_TEMP/requirements.txt"
           python -m venv "$RUNNER_TEMP/freeze"
           "$RUNNER_TEMP/freeze/bin/pip" install --upgrade pip
           "$RUNNER_TEMP/freeze/bin/pip" install -r "$RUNNER_TEMP/requirements.txt" "pyinstaller==6.22.3"
-          "$RUNNER_TEMP/freeze/bin/pip" install --no-deps dist/*.whl
-          # From outside the checkout, so the installed wheel is what PyInstaller finds, not the source tree.
+          "$RUNNER_TEMP/freeze/bin/pip" install --no-deps .
+          # From outside the checkout, so the installed package is what PyInstaller finds, not the source tree.
           cd "$RUNNER_TEMP" && "$RUNNER_TEMP/freeze/bin/python" -m PyInstaller "$GITHUB_WORKSPACE/packaging/pyinstaller/pythia.spec" --noconfirm --distpath "$GITHUB_WORKSPACE/dist/standalone" --workpath "$RUNNER_TEMP/pyi-build"
       - name: Run the standalone build
         run: |
@@ -221,7 +132,7 @@ jobs:
           HOME="$RUNNER_TEMP/home" dist/standalone/pythia/pythia --list-games
       - name: deb and rpm
         run: |
-          VERSION=$(python packaging/version.py)
+          VERSION=$(python packaging/version.py --package)
           export VERSION
           "$RUNNER_TEMP/nfpm/nfpm" package --config packaging/linux/nfpm.yaml --packager deb --target dist/
           "$RUNNER_TEMP/nfpm/nfpm" package --config packaging/linux/nfpm.yaml --packager rpm --target dist/
@@ -237,62 +148,73 @@ jobs:
           docker run --rm -v "$PWD/dist:/dist:ro" fedora:41 sh -c "dnf install -y /dist/pythia-*.rpm && pythia --version && HOME=/tmp pythia --list-games"
       - uses: actions/upload-artifact@v4
         with:
-          name: pythia-packages-linux
+          name: pythia-linux-packages
           path: |
             dist/pythia_*.deb
             dist/pythia-*.rpm
 
-  dmg-macos:
-    name: Disk image (macOS, Apple silicon)
-    runs-on: macos-15
+  macos:
+    name: macOS disk image (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          # Apple silicon, and Intel Macs on GitHub's Intel runner: one app per chip, since a universal one would
+          # need every Python and Qt dependency and pythia._native built for both.
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Stamp the build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python packaging/release_channel.py stamp "$GITHUB_SHA"
       - name: Standalone build
         run: |
-          python -m pip install --upgrade pip build
-          python -m build --wheel
           python packaging/freeze_requirements.py > "$RUNNER_TEMP/requirements.txt"
           python -m venv "$RUNNER_TEMP/freeze"
           "$RUNNER_TEMP/freeze/bin/pip" install --upgrade pip
           "$RUNNER_TEMP/freeze/bin/pip" install -r "$RUNNER_TEMP/requirements.txt" "pyinstaller==6.22.3"
-          "$RUNNER_TEMP/freeze/bin/pip" install --no-deps dist/*.whl
-          # From outside the checkout, so the installed wheel is what PyInstaller finds, not the source tree.
+          "$RUNNER_TEMP/freeze/bin/pip" install --no-deps .
+          # From outside the checkout, so the installed package is what PyInstaller finds, not the source tree.
           cd "$RUNNER_TEMP" && "$RUNNER_TEMP/freeze/bin/python" -m PyInstaller "$GITHUB_WORKSPACE/packaging/pyinstaller/pythia.spec" --noconfirm --distpath "$GITHUB_WORKSPACE/dist/standalone" --workpath "$RUNNER_TEMP/pyi-build"
       - name: Run the standalone build
         run: |
           app=dist/standalone/Pythia.app/Contents/MacOS/pythia
+          file "$app"
           "$app" --version
           "$app" --pythia-script packaging/check_standalone.py
           HOME="$RUNNER_TEMP/home" "$app" --list-games
       - name: Disk image
-        run: sh packaging/macos/make-dmg.sh "$(python packaging/version.py)" arm64
+        run: sh packaging/macos/make-dmg.sh "$(python packaging/version.py --display)" "${{ matrix.arch }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: pythia-dmg-macos
+          name: pythia-macos-${{ matrix.arch }}
           path: dist/Pythia-*.dmg
 
-  # A tag v<version> publishes the release: every standalone installer, the wheels and the Launchpad-style deb.
-  release:
-    name: Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [deb, wheel, windows, installer-windows, packages-linux, dmg-macos]
+  # A green build of main is the Unstable lane: a permanent pre-release of its own (docs/SPEC.md, decision 13).
+  publish:
+    name: Publish (Unstable)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [windows, linux, macos]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Check the tag is the version, and publish
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Gather the installers and write release-info.json
         run: |
-          version=$(python3 packaging/version.py)
-          if [ "$GITHUB_REF_NAME" != "v$version" ]; then echo "tag $GITHUB_REF_NAME is not v$version (pyproject.toml)"; exit 1; fi
-          gh release create "$GITHUB_REF_NAME" --title "Pythia $version" --generate-notes \
-            artifacts/pythia-installer-windows/* artifacts/pythia-packages-linux/* artifacts/pythia-dmg-macos/* \
-            artifacts/pythia-windows/* artifacts/pythia-python/*
+          python3 packaging/release_channel.py stamp "$GITHUB_SHA"
+          python3 packaging/release_channel.py info artifacts out
+      - name: Publish the pre-release
+        run: python3 packaging/release_channel.py publish-build out

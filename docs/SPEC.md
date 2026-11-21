@@ -145,9 +145,13 @@ the droidtop coordinator for this lane. Later sections follow them.
       uninstaller; per person by default, for everyone on request), a disk
       image for macOS, and a deb and an rpm for Linux (built on Ubuntu
       22.04, so any distribution with its glibc or newer). No AppImage.
-    - Build runs every one on every push and installs and starts each; a
-      tag `v<version>` (the version in `pyproject.toml`) publishes them
-      with the wheels and the Launchpad-style deb as a GitHub release.
+    - Build has one job per system (owner, 2026-11-21: "one build per
+      platform that builds what we need"): Windows, Linux, and macOS once
+      per chip, Apple silicon and Intel ("Our macos builds need to support
+      intel mac as well"). Each installs and starts what it made. No wheels
+      are built ("wheels can be built manually from the repo, but we're
+      trying to move away from python as our core"), nor the Launchpad-style
+      deb, which its own PPA workflows build. Releases are decision 13.
     - A standalone build has no interpreter, so the copies of itself Pythia
       starts go through `pythia.util.selfcmd` (`--pythia-module`,
       `--pythia-script`). PyGObject and dbus-python stay out of it: the Qt
@@ -173,6 +177,28 @@ the droidtop coordinator for this lane. Later sections follow them.
       sign-in (the Windows Run key, a Linux autostart entry, a macOS launch
       agent, each starting `pythia --tray`) and Quit Pythia.
     - The old PID-file `--relaunch` helper is gone; nothing called it.
+13. **Release lanes, as droidtop's.** Owner, 2026-11-21: "we need to start
+    packaging releases, just like we do for the others, for pythia. That
+    means release lanes and stuff".
+    - **Unstable** is every green build of main: Build's publish job makes
+      it a pre-release of its own, tagged `v<version>-dev.<build>`, where
+      the build number is the count of commits up to it
+      (`packaging/release_channel.py`). They are never rewritten; the list
+      of them is Pythia's build history.
+    - **Testing** and **Stable** are the fixed tags `testing` and `stable`,
+      moved by hand (Promote a build, `release-promote.yml`) to an Unstable
+      build. Promotion builds nothing: it publishes that build's own files,
+      each checked against its `release-info.json`, swapping them in with
+      `release-info.json` last so a lane is never empty.
+    - Every release has the same file names (`pythia-windows-setup.exe`,
+      `pythia-macos-arm64.dmg`, `pythia-macos-x86_64.dmg`,
+      `pythia-linux-amd64.deb`, `pythia-linux-x86_64.rpm`) and
+      `release-info.json` (the build, its commit, each file's size and
+      SHA-256): the contract the updater reads.
+    - CI writes the build number into `pythia/_build.py` before it builds,
+      so an installed Pythia knows its build; a copy run from the repository
+      is build 0. The deb and rpm carry `<version>~dev.<build>`, so a newer
+      build installs over an older one.
 13. **The shared UI and a Rust core (Droidtop/tracker#958).** Owner,
     2026-11-20: "let's migrate pythia to the shared UI", "Can we also move
     away from python for our core?", and, after weighing C, "I guess we'll

@@ -1,0 +1,42 @@
+# Moves the Testing or Stable lane to a build already published on Unstable (docs/SPEC.md, decision 13). Builds
+# nothing: it publishes exactly the files that build's pre-release carries, after checking each against its
+# release-info.json, so a lane never carries bytes nobody could have tried on Unstable first.
+name: Promote a build
+
+on:
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: The lane to move
+        type: choice
+        options: [testing, stable]
+        default: testing
+      build:
+        description: The Unstable build to promote (its tag, v0.5.23-dev.170); empty for the newest
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find the build
+        id: build
+        run: |
+          tag="${{ inputs.build }}"
+          if [ -z "$tag" ]; then
+            tag=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              -q '[.[] | select(.tag_name | test("^v[0-9][0-9.]*-dev\\.[0-9]+$"))][0].tag_name')
+          fi
+          case "$tag" in v*-dev.*) ;; *) echo "No Unstable build named: $tag"; exit 1;; esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Download its files
+        run: gh release download "${{ steps.build.outputs.tag }}" --dir out
+      - name: Publish to ${{ inputs.lane }}
+        run: python3 packaging/release_channel.py publish "${{ inputs.lane }}" out

@@ -161,6 +161,7 @@ class Backend(QObject):
     intakeChanged = Signal("QVariant")  # {"detected": [...], "decisions": [...]}
     uiLog = Signal("QVariant")  # one {"ts", "level", "source", "slot", "message"} entry
     handheldsChanged = Signal()  # a handheld was paired, forgotten or changed
+    libraryFoldersChanged = Signal()  # a library folder was added or removed
     modesChanged = Signal()  # manager mode turned on or off (pythia.modes)
     pairingFinished = Signal("QVariant")  # {"status": "ok", "paired": name} or an error result
     asyncResult = Signal("QVariant")  # a slow slot's answer: {"request": id, ...its result}
@@ -193,6 +194,10 @@ class Backend(QObject):
         self._log_handler = _UiLogHandler(self)
         logger.addHandler(self._log_handler)
         self.refresh_games()
+        # The library folders are scanned on their own, a minute after start and then every scan_minutes.
+        self._library_scan_stop = threading.Event()
+        self._library_scan_running = threading.Lock()
+        threading.Thread(target=self._scan_library_folders_loop, daemon=True, name="pythia-library-scan").start()
         self._follow_agent_events()
         self._follow_kdeconnect()
         # The handhelds' state changed (a pairing, a session): droidtop-agent's
@@ -2435,13 +2440,103 @@ class Backend(QObject):
     def get_tools(self):
         return self._unavailable("get_tools", "Downloadable tools are not managed on this platform yet.")
 
+    # ---- library folders (scanned on their own; owner, 2026-11-21: "games aren't being auto-added") ----------
     @Slot(result="QVariant")
     @_guarded
     def get_library_folders(self):
-        return self._unavailable(
-            "get_library_folders",
-            "Pythia does not keep a list of library folders yet; scan a folder when you add games.",
+        """The library folders, one list with the droidtop agent's (pythia.droidtop.store.library_folders): each with
+        its ``kind`` (``games`` or ``roms``) and whether it is ``present`` on this computer, and how often they are
+        scanned (``scan_minutes``)."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("get_library_folders")
+        from pythia.droidtop import store
+
+        folders = store.library_folders()
+        rows = [
+            {"path": path, "kind": kind, "present": Path(path).is_dir()}
+            for kind in ("games", "roms")
+            for path in folders[kind]
+        ]
+        return _jsonable({"status": "ok", "folders": rows, "scan_minutes": store.scan_minutes()})
+
+    @Slot(str, str, result="QVariant")
+    @_guarded
+    def add_library_folder(self, path_str: str, kind: str):
+        """Adds a games or ROMs folder to the library folders. A games folder is scanned at once: what it holds is
+        added, and what Pythia is unsure of waits in Review."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("add_library_folder")
+        from pythia.droidtop import store
+
+        kind = "roms" if kind == "roms" else "games"
+        path_str = _normalize_path(path_str)
+        if not Path(path_str).is_dir():
+            return {"status": "error", "message": f"{path_str} is not a folder on this computer"}
+        folders = store.library_folders()
+        if path_str not in folders[kind]:
+            folders[kind].append(path_str)
+            store.set_library_folders(**{kind: folders[kind]})
+        self.libraryFoldersChanged.emit()
+        if kind == "games":
+            self.start_scan(path_str)
+        return {"status": "ok"}
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def remove_library_folder(self, path_str: str):
+        """Stops tracking a library folder. Nothing in it is touched, and the games already added stay."""
+        from pythia import droidtop
+
+        if not droidtop.available():
+            return self._agent_unavailable("remove_library_folder")
+        from pythia.droidtop import store
+
+        folders = store.library_folders()
+        store.set_library_folders(
+            games=[p for p in folders["games"] if p != path_str], roms=[p for p in folders["roms"] if p != path_str]
         )
+        self.libraryFoldersChanged.emit()
+        return {"status": "ok"}
+
+    def _scan_library_folders_loop(self):
+        """Scans every games folder a minute after Pythia starts and then every ``scan_minutes``: new games are
+        added, unsure ones wait in Review (_scan_worker). One pass at a time; nothing is scanned without the agent's
+        module, which keeps the list."""
+        wait = 60
+        while not self._library_scan_stop.wait(wait):
+            from pythia import droidtop
+
+            if not droidtop.available():
+                return
+            from pythia.droidtop import store
+
+            try:
+                self.scan_library_folders_now()
+                wait = store.scan_minutes() * 60
+            except Exception as ex:  # noqa: BLE001 -- the loop outlives one failed pass
+                logger.warning("Scanning the library folders failed: %s", ex)
+                wait = 30 * 60
+
+    def scan_library_folders_now(self):
+        """One pass over the games folders that exist here, in order (not a slot: the loop and add call it)."""
+        from pythia.droidtop import store
+
+        if not self._library_scan_running.acquire(blocking=False):
+            return
+        try:
+            for path in store.library_folders()["games"]:
+                if not Path(path).is_dir():
+                    continue
+                job = self._job_start(
+                    "scan", f"Scan {Path(path).name or path}", "A library folder: new games are added"
+                )
+                self._scan_worker(path, job)
+        finally:
+            self._library_scan_running.release()
 
     @Slot(result="QVariant")
     @_guarded

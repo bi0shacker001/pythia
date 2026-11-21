@@ -18,6 +18,32 @@ def settings() -> dict:
     return submodule("store").settings()
 
 
+def library_folders() -> dict[str, list[str]]:
+    """The person's library folders: ``games`` and ``roms``. One list for Pythia's library and for the droidtop agent's
+    scanner (its ``game_folders`` and ``rom_folders``), so the games a handheld sees are the games Pythia keeps."""
+    current = settings()
+    return {"games": list(current.get("game_folders") or []), "roms": list(current.get("rom_folders") or [])}
+
+
+def set_library_folders(games: list[str] | None = None, roms: list[str] | None = None) -> None:
+    """Replaces the game folders, the ROM folders or both (None leaves one as it is)."""
+    changes: dict[str, Any] = {}
+    if games is not None:
+        changes["game_folders"] = games
+    if roms is not None:
+        changes["rom_folders"] = roms
+    if changes:
+        submodule("store").set_settings(**changes)
+
+
+def scan_minutes() -> int:
+    """How often the library folders are scanned, in minutes: the agent's own ``scan_minutes`` (30 when unset)."""
+    try:
+        return max(1, int(settings().get("scan_minutes") or 30))
+    except (TypeError, ValueError):
+        return 30
+
+
 def devices() -> list[dict]:
     """The paired handhelds: ``id``, ``name``, ``last_seen_ms``,
     ``last_address``, ``trusted``, ``launch`` (it may start games here) and ``offered`` (what this computer

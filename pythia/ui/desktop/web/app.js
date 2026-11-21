@@ -1110,7 +1110,7 @@ function updateSystems(raw) {
 // ---- Game sources and Save backups ---------------------------------------------------------
 // What each launcher on this computer lists (backend get_launcher_entries, from droidtop's scanner), against the library.
 function renderSources() {
-  loadInto($('#libraryFolders'), 'get_library_folders', [], (r, host) => { (r.folders || []).forEach((f) => host.appendChild(el(`<div class="account-row"><div class="card-icon">F</div><div><strong>${esc(f.path)}</strong></div></div>`))); if (!(r.folders || []).length) host.appendChild(stateBlock({ title: 'No game folder yet', body: 'Add a folder that holds games, or scan one that holds many.' })); }, { what: 'Game folders', actions: [{ label: 'Scan a folder', primary: true, run: scanLibrary }] });
+  renderLibraryFolders();
   loadInto($('#scanSettings'), 'get_scan_settings', [], () => {}, { what: 'Scan settings' });
   renderCapabilityList($('#view-sources [data-capability-list="library"]'), 'library');
   renderLauncher();
@@ -1410,6 +1410,31 @@ async function addFolder() {
 async function findStoreGames() {
   const r = await call('start_store_scan');
   if (ok(r)) { flash('Finding store games'); navigate('activity'); } else flash(r.status === 'unavailable' ? r.message : `Could not ask the stores: ${r.message}`, 'caution');
+}
+// The library folders: Pythia scans them on its own (backend get_library_folders, one list with the droidtop agent's).
+function renderLibraryFolders() {
+  loadInto($('#libraryFolders'), 'get_library_folders', [], (r, host) => {
+    (r.folders || []).forEach((f) => {
+      const line = !f.present ? 'Not on this computer' : f.kind === 'roms' ? 'ROMs' : `Games, scanned every ${r.scan_minutes} min`;
+      const row = el(`<div class="account-row"><div class="card-icon">${f.kind === 'roms' ? 'R' : 'F'}</div><div><strong>${esc(f.path)}</strong><small>${esc(line)}</small></div><button class="btn small">Remove</button></div>`);
+      row.querySelector('button').addEventListener('click', () => removeLibraryFolder(f.path));
+      host.appendChild(row);
+    });
+    if (!(r.folders || []).length) host.appendChild(stateBlock({ title: 'No library folder yet', body: 'Add a folder that holds games. Pythia scans it now and again on its own.' }));
+    const bar = el(`<div class="form-actions"><button class="btn primary">Add a folder</button></div>`);
+    bar.querySelector('button').addEventListener('click', addLibraryFolder);
+    host.appendChild(bar);
+  }, { what: 'Library folders' });
+}
+async function addLibraryFolder() {
+  const path = await prompt({ title: 'Add a library folder', body: 'Pythia scans it now and every so often: new games are added, and the ones it is unsure of wait in Review. Nothing is written into your game folders.', hint: pathHint('G:\games', '~/Games'), kind: 'path', check: checkPath('folder'), save: 'Add', pick: { label: 'Browse', run: pickFolder('Add a library folder') } });
+  if (!path || !path.trim()) return;
+  const r = await act('add_library_folder', [path.trim(), 'games'], null, { what: 'Adding' }); if (!ok(r)) return;
+  flash('Added'); renderLibraryFolders();
+}
+async function removeLibraryFolder(path) {
+  const r = await act('remove_library_folder', [path], null, { what: 'Removing' }); if (!ok(r)) return;
+  flash('Removed'); renderLibraryFolders();
 }
 async function scanLibrary() {
   const path = await prompt({ title: 'Scan a library folder', body: 'Pythia looks through it and shows what it found. Nothing is added until you Add, and nothing is ever written into your game folders.', hint: pathHint('G:\\games', '~/Games'), kind: 'path', check: checkPath('folder'), save: 'Look', pick: { label: 'Browse', run: pickFolder('Scan a library folder') } });
@@ -2059,6 +2084,7 @@ function connect() {
     startShell();
     call('start_pad').then((r) => { model.pad = r; if (ok(r) && !r.available) ErrorConsole.reportWeb('warn', r.reason || 'Controllers are not read', 'start_pad'); });
     pythia.modesChanged.connect(() => refreshModes().then(() => renderCurrent()));
+    pythia.libraryFoldersChanged.connect(() => { if (state.view === 'sources') renderLibraryFolders(); });
     pythia.handheldsChanged.connect(() => { if (state.view === 'devices') renderHandhelds(); if (state.shell === 'handheld' && state.hhPage === 'systems') renderHandheld(); });
     pythia.pairingFinished.connect((r) => flash(r.status === 'ok' ? `Paired with ${r.paired}` : `Not paired: ${r.message}`, r.status === 'ok' ? 'info' : 'caution'));
     pythia.logLine.connect(() => { if (state.view === 'activity') renderJobs(); });

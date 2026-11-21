@@ -223,6 +223,18 @@ the droidtop coordinator for this lane. Later sections follow them.
     lib-ui's Compose Multiplatform components over a Rust core built from
     the shared library families; Python goes when the last piece has moved.
 
+14. **Library folders, scanned on their own.** Owner, 2026-11-21: "game
+    detection seems broken, games aren't being auto-added". Pythia kept no
+    folder list: a game arrived only by Scan a folder.
+    - The library folders are one list with the droidtop agent's
+      `game_folders` and `rom_folders` (`pythia.droidtop.store`), so the games
+      Pythia keeps and the games a handheld sees come from the same folders.
+    - Game sources > Library folders in the web UI adds and removes them. A
+      games folder is scanned when it is added, a minute after Pythia starts,
+      and then every `scan_minutes` (the agent's setting, 30 by default):
+      what is identified is added, what Pythia is unsure of waits in Review.
+      One pass runs at a time. Removing a folder leaves its games and files.
+
 ## 2. The pad model (handheld shell)
 
 From UX review A7 (HH2, HH10, HH11; conflicts C2 and C3). A4, A5 and A6

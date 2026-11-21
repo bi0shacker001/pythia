@@ -169,9 +169,12 @@ def start_app(tray_only: bool = False) -> bool:
     from pythia.util import selfcmd  # noqa: PLC0415
 
     command = selfcmd.app_command(*(["--tray"] if tray_only else []))
-    flags = {}
+    flags: dict[str, int | bool] = {}
     if os.name == "nt":
-        flags["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        # As pythia.folder_launch does: the names exist only on Windows, which mypy on Linux cannot see.
+        flags["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0x8) | getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200
+        )
     else:
         flags["start_new_session"] = True
     subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **flags)  # noqa: S603 (Pythia's own program)

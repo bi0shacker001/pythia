@@ -6,7 +6,6 @@ import os
 import sys
 
 import pythia._native as native
-
 from pythia.util import datapath
 
 data = datapath.get()

@@ -72,3 +72,12 @@ Root: HKA; Subkey: "Software\Classes\pythia\shell\open\command"; ValueType: stri
 
 [Run]
 Filename: "{app}\Pythia.exe"; Description: "{cm:LaunchProgram,Pythia}"; Flags: nowait postinstall skipifsilent
+; Pythia's own updater (pythia/updater.py) runs this installer silently with /RELAUNCH=1: Pythia opens again
+; once the update is in.
+Filename: "{app}\Pythia.exe"; Flags: nowait; Check: Relaunching
+
+[Code]
+function Relaunching: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;

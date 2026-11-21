@@ -199,6 +199,23 @@ the droidtop coordinator for this lane. Later sections follow them.
       so an installed Pythia knows its build; a copy run from the repository
       is build 0. The deb and rpm carry `<version>~dev.<build>`, so a newer
       build installs over an older one.
+    - **The updater** (`pythia.updater`; owner: "Does pythia have an
+      auto-updater?"). A release build checks its lane two minutes after it
+      starts and every six hours, and says so in a tray message when a newer
+      build is out; the tray has Check for updates (Update to <version> once
+      one is found) and Update lane. It downloads this system's installer,
+      checks its SHA-256 and hands it over, and Pythia quits: Windows runs it
+      silently and it opens Pythia again (`/RELAUNCH=1`); on macOS the new
+      app replaces this one and opens; on Linux the deb or rpm goes in
+      through the administrator prompt (pkexec), then Pythia starts again.
+    - **The lane starts as the one installed** (owner: "The updater should
+      default to whatever stream is installed"). An installer cannot carry
+      its lane, since promotion does not rebuild, so the first check asks
+      which lane has this very build (Stable, then Testing, else Unstable)
+      and keeps it; the person changes it from the tray.
+    - Only a release build updates itself. A copy run from the repository,
+      or Pythia from a distribution or the Launchpad PPA, is updated the way
+      it was installed, and the tray says so.
 13. **The shared UI and a Rust core (Droidtop/tracker#958).** Owner,
     2026-11-20: "let's migrate pythia to the shared UI", "Can we also move
     away from python for our core?", and, after weighing C, "I guess we'll

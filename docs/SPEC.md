@@ -153,6 +153,32 @@ the droidtop coordinator for this lane. Later sections follow them.
       `--pythia-script`). PyGObject and dbus-python stay out of it: the Qt
       UI does not use them.
     - Uninstalling leaves the person's library and settings in place.
+12. **One running Pythia, always in the tray; commands are requests to it.**
+    Owner, 2026-11-20, after a pairing made with `--droidtop-serve` left
+    nothing on screen: "There's no pythia tray icon, window, or anything, so
+    this pair is useless", then "Let's keep the flags, but let's force the
+    tray icon and stuff. They're calls to a running process, doing something
+    headlessly just doesn't surface the window".
+    - Pythia runs once per person (`pythia.instance`): a local channel (a
+      named pipe on Windows, a Unix socket elsewhere) with a key in the
+      person's own data folder, so another account cannot drive it.
+    - A bare `pythia` shows the running one's window; `--droidtop-serve`,
+      `--droidtop-pair`, `--droidtop-pair-show`, `--droidtop-devices` and
+      `--droidtop-unpair` are requests to it, which start the app first
+      (with its tray icon) when none runs. `--droidtop-serve` no longer
+      blocks: it makes sure the running Pythia serves, and returns.
+    - The tray icon is always there while Pythia runs (where the desktop has
+      a tray). Closing the window leaves Pythia serving from the tray; the
+      tray's menu has Open Pythia, what the agent is doing, Start at
+      sign-in (the Windows Run key, a Linux autostart entry, a macOS launch
+      agent, each starting `pythia --tray`) and Quit Pythia.
+    - The old PID-file `--relaunch` helper is gone; nothing called it.
+13. **The shared UI and a Rust core (Droidtop/tracker#958).** Owner,
+    2026-11-20: "let's migrate pythia to the shared UI", "Can we also move
+    away from python for our core?", and, after weighing C, "I guess we'll
+    stick with rust". Pythia moves, in place and one piece at a time, onto
+    lib-ui's Compose Multiplatform components over a Rust core built from
+    the shared library families; Python goes when the last piece has moved.
 
 ## 2. The pad model (handheld shell)
 

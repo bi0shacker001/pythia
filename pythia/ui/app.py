@@ -9,7 +9,8 @@ QtWebEngine rendering the real HTML/CSS/JS mockup at pythia/ui/desktop/web/
 index.html) -- the fast-iteration testing surface for UI changes, explicit-
 hint-only per mode.py's own docstring, never auto-selected.
 
-Flags: `--ui <desktop|bigpicture|web>` picks the front end; `--error-console`
+Flags: `--ui <desktop|bigpicture|web>` picks the front end; `--tray` starts with the window
+hidden in the tray (start at sign-in, pythia.autostart); `--error-console`
 turns on the web UI's error console for this run (the config key
 `error_console = True` in pythia.conf turns it on permanently). Off by default.
 """
@@ -55,7 +56,7 @@ def run(argv: list[str] | None = None) -> int:
 
     from pythia.ui import mode
 
-    mode.launch(hint=ui_hint, error_console=error_console)
+    mode.launch(hint=ui_hint, error_console=error_console, tray_only="--tray" in argv)
     return 0
 
 

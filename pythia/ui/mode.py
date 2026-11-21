@@ -28,7 +28,45 @@ def resolve_mode(app, hint: str | None) -> str:
     return "web"
 
 
-def launch(hint: str | None = None, relaunch: bool = False, error_console: bool = False):
+def _become_the_running_pythia(app, tray_only: bool) -> bool:
+    """This process becomes the one running Pythia (pythia.instance): it answers requests (show, quit, the
+    droidtop commands), puts its icon in the tray and keeps running there when its window closes (docs/SPEC.md,
+    decision 12). False when another Pythia already runs; that one is asked to show its window instead."""
+    import os  # noqa: PLC0415
+
+    from pythia import instance  # noqa: PLC0415
+    from pythia.droidtop import commands  # noqa: PLC0415
+    from pythia.ui import tray  # noqa: PLC0415
+    from pythia.util import datapath  # noqa: PLC0415
+
+    on_qt = tray.MainThread()
+
+    def show(_args, _say):
+        on_qt.run.emit(lambda: tray.show_windows(app))
+        return 0
+
+    def quit_app(_args, say):
+        say("Pythia is quitting.")
+        on_qt.run.emit(app.quit)
+        return 0
+
+    running = instance.Instance({"show": show, "quit": quit_app, **commands.HANDLERS})
+    if not running.start():
+        instance.request("show")
+        return False
+    app.aboutToQuit.connect(running.stop)
+    icon = tray.install(app, os.path.join(datapath.get(), "media", "logo.png"))
+    # Kept for the app's life: the icon, the channel and the hop onto the Qt thread.
+    app.setProperty("pythiaRunning", True)
+    app._pythia_keep = (on_qt, running, icon)  # noqa: SLF001
+    if tray_only and icon is not None:
+        from PySide6.QtCore import QTimer  # noqa: PLC0415
+
+        QTimer.singleShot(0, lambda: tray.hide_windows(app))
+    return True
+
+
+def launch(hint: str | None = None, error_console: bool = False, tray_only: bool = False):
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError:
@@ -40,19 +78,13 @@ def launch(hint: str | None = None, relaunch: bool = False, error_console: bool 
         )
         sys.exit(1)
 
-    from pythia.ui import singleton
-
-    if relaunch:
-        singleton.terminate_existing_instance()
-
     # QApplication (a QGuiApplication subclass) works for both the QML big-picture
     # front end and the QtWidgets desktop one -- one Application instance is created
     # here, up front, and handed to whichever front end resolve_mode() picks.
     app = QApplication.instance() or QApplication(sys.argv)
+    if not _become_the_running_pythia(app, tray_only):
+        return
     mode = resolve_mode(app, hint)
-
-    singleton.write_pidfile()
-    app.aboutToQuit.connect(singleton.clear_pidfile)
 
     from pythia.ui.backend import Backend
 

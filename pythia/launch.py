@@ -2,10 +2,11 @@
 what bin/pythia runs once it has set up the search path (source tree, or the
 meson and Debian layouts).
 
-A bare `pythia`, or `--ui <desktop|bigpicture|web>` picking a front end (see
-pythia.ui.mode), starts the Qt UI when PySide6 is installed; any other flag
-(list, install, export, exec, the droidtop commands...) is the headless CLI,
-so scripting never needs a display.
+A bare `pythia`, `--ui <desktop|bigpicture|web>` picking a front end (see
+pythia.ui.mode), or `--tray` (start in the tray, as at sign-in) starts the Qt UI
+when PySide6 is installed, or shows the one already running (pythia.instance).
+The droidtop commands are requests to that running Pythia, which they start when
+none runs; the other flags (list, install, export, exec...) are the command line.
 """
 
 import gettext
@@ -60,7 +61,14 @@ def main() -> None:
         multiprocessing.set_start_method("fork", force=True)
     _set_up_locale()
 
-    if len(sys.argv) == 1 or "--ui" in sys.argv:
+    if len(sys.argv) == 1 or "--ui" in sys.argv or "--tray" in sys.argv:
+        # One Pythia per person (pythia.instance): when one runs, it shows its window and this copy ends.
+        from pythia import instance  # noqa: PLC0415
+
+        if instance.request("ping") is not None:
+            if "--tray" not in sys.argv:
+                instance.request("show")
+            return
         try:
             from pythia.ui.app import main as qt_main  # noqa: PLC0415
         except ImportError as ex:

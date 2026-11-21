@@ -71,7 +71,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-j", "--json", action="store_true", help="Display the list of games in JSON format")
     parser.add_argument("--reinstall", action="store_true", help="Reinstall game")
     droidtop = parser.add_argument_group("droidtop", "This computer as the droidtop agent of paired handhelds")
-    droidtop.add_argument("--droidtop-serve", action="store_true", help="Serve paired droidtop handhelds until stopped")
+    droidtop.add_argument(
+        "--droidtop-serve", action="store_true", help="Have the running Pythia serve paired droidtop handhelds"
+    )
     droidtop.add_argument("--droidtop-pair", metavar="CODE", help="Pair with a handheld showing CODE")
     droidtop.add_argument(
         "--droidtop-pair-show",
@@ -250,54 +252,19 @@ def _droidtop_command(args) -> bool:
 
 
 def _run_droidtop_command(args) -> int:
-    """The droidtop agent's commands (pythia.droidtop): Pythia is this
-    computer's agent while it runs."""
-    from pythia.droidtop import AgentError, pair, service, store  # noqa: PLC0415
+    """The droidtop agent's commands: requests to the running Pythia, which serves paired handhelds while it
+    runs and shows its tray icon; it is started first when none runs (pythia.instance, docs/SPEC.md decision 12)."""
+    from pythia import instance  # noqa: PLC0415
 
-    try:
-        if args.droidtop_pair:
-            print(f"Paired with {pair.pair(args.droidtop_pair)}.")
-        elif args.droidtop_pair_show:
-            shown = pair.show()
-            print("On droidtop: Settings > Computers > Pair a computer > Use a code from the computer.")
-            for place in shown["places"]:
-                print(f"Address: {place['address']}  ({place['label']})")
-            print(f"Code:    {shown['code'][:3]} {shown['code'][3:]}")
-            print("Waiting up to 10 minutes; Ctrl+C stops.")
-            try:
-                while (status := pair.status())["state"] == "waiting":
-                    time.sleep(0.5)
-            except KeyboardInterrupt:
-                pair.cancel()
-                return 1
-            if status["state"] != "paired":
-                print(status.get("error", "Pairing stopped."))
-                return 1
-            print(f"Paired with {status['paired']}.")
-        elif args.droidtop_devices:
-            devices = store.devices()
-            if not devices:
-                print("No handheld is paired. On droidtop: Settings > Computers > Pair a computer.")
-            for d in devices:
-                print(f"{d['id'][:16]}  {d['name']}")
-        elif args.droidtop_unpair:
-            store.unpair(args.droidtop_unpair)
-            print("Forgotten.")
-        elif args.droidtop_serve:
-            me = store.identity()
-            service.serve()
-            print(f"{me['name']} ({me['id'][:16]}) serves paired droidtop handhelds. Ctrl+C stops.")
-            try:
-                while service.serving()["state"] == "serving":
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                return 0
-            print(service.serving().get("reason", "The agent stopped."))
-            return 1
-    except AgentError as ex:
-        print(ex)
-        return 1
-    return 0
+    if args.droidtop_pair:
+        return instance.ask("droidtop-pair", {"code": args.droidtop_pair})
+    if args.droidtop_pair_show:
+        return instance.ask("droidtop-pair-show")
+    if args.droidtop_devices:
+        return instance.ask("droidtop-devices")
+    if args.droidtop_unpair:
+        return instance.ask("droidtop-unpair", {"id": args.droidtop_unpair})
+    return instance.ask("droidtop-serve", tray_only=True)
 
 
 def run(argv: list[str] | None = None) -> int:

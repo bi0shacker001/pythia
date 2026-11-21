@@ -169,15 +169,13 @@ def start_app(tray_only: bool = False) -> bool:
     from pythia.util import selfcmd  # noqa: PLC0415
 
     command = selfcmd.app_command(*(["--tray"] if tray_only else []))
-    flags: dict[str, int | bool] = {}
+    null = subprocess.DEVNULL
     if os.name == "nt":
         # As pythia.folder_launch does: the names exist only on Windows, which mypy on Linux cannot see.
-        flags["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0x8) | getattr(
-            subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200
-        )
+        detached = getattr(subprocess, "DETACHED_PROCESS", 0x8) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200)
+        subprocess.Popen(command, stdin=null, stdout=null, stderr=null, creationflags=detached)  # noqa: S603
     else:
-        flags["start_new_session"] = True
-    subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **flags)  # noqa: S603 (Pythia's own program)
+        subprocess.Popen(command, stdin=null, stdout=null, stderr=null, start_new_session=True)  # noqa: S603
     deadline = time.monotonic() + START_TIMEOUT
     while time.monotonic() < deadline:
         if request("ping") is not None:

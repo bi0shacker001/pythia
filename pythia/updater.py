@@ -187,14 +187,15 @@ def apply(path: str) -> None:
         mode = "/CURRENTUSER" if here.lower().startswith(os.environ.get("LOCALAPPDATA", "~").lower()) else "/ALLUSERS"
         subprocess.Popen(  # noqa: S603 (our own checked installer)
             [path, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", mode, "/RELAUNCH=1"],
-            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
             close_fds=True,
         )
         return
     if kind and kind.startswith("macos-dmg"):
         bundle = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", ".."))
         _after_quit(
-            'mnt=$(mktemp -d)\n'
+            "mnt=$(mktemp -d)\n"
             f'hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "{path}" >/dev/null\n'
             f'rm -rf "{bundle}.old" && mv "{bundle}" "{bundle}.old" && ditto "$mnt/Pythia.app" "{bundle}" '
             f'&& rm -rf "{bundle}.old" || mv "{bundle}.old" "{bundle}"\n'

@@ -9,7 +9,6 @@ couple of minutes after it starts and every six hours, and says so in a tray mes
 
 import threading
 
-
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtGui import QAction, QActionGroup, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
@@ -174,7 +173,9 @@ def _update_actions(app: QApplication, tray: QSystemTrayIcon, menu: QMenu) -> tu
                 path = updater.download(info, progress)
             except (OSError, ValueError) as error:
                 busy.clear()
-                on_main(lambda: (show({"state": "error", "line": f"Couldn't update Pythia: {error}"}, True)))
+                # Kept as text: Python unbinds the exception when the except block ends, before the Qt thread runs this.
+                line = f"Couldn't update Pythia: {error}"
+                on_main(lambda: show({"state": "error", "line": line}, True))
                 return
 
             def hand_over() -> None:

@@ -77,7 +77,7 @@ def build_number(commit):
     last = re.search(r'[?&]page=(\d+)>; rel="last"', headers)
     if last:
         return int(last.group(1))
-    body = json.loads(out[len(headers):].strip())
+    body = json.loads(out[len(headers) :].strip())
     if len(body) != 1:
         sys.exit(f"Could not count the commits reachable from {commit}")
     return 1
@@ -168,8 +168,19 @@ def publish_build(out):
     if release_or_none(tag) is not None:
         gh("release", "delete", tag, "--yes", "--cleanup-tag")
     paths = [os.path.join(out, name) for name in files_of(document)]
-    gh("release", "create", tag, *paths, "--target", document["commit"], "--prerelease",
-       "--title", f"Pythia {tag}", "--notes", notes_for(document, "unstable"))
+    gh(
+        "release",
+        "create",
+        tag,
+        *paths,
+        "--target",
+        document["commit"],
+        "--prerelease",
+        "--title",
+        f"Pythia {tag}",
+        "--notes",
+        notes_for(document, "unstable"),
+    )
     print(f"Published {tag} at {document['commit']}")
 
 
@@ -192,8 +203,18 @@ def publish(channel, out):
     point_tag(channel, document["commit"])
     if release is None:
         flags = ["--prerelease"] if channel == "testing" else []
-        gh("release", "create", channel, *[os.path.join(out, n) for n in names], "--verify-tag",
-           "--title", title, "--notes", notes, *flags)
+        gh(
+            "release",
+            "create",
+            channel,
+            *[os.path.join(out, n) for n in names],
+            "--verify-tag",
+            "--title",
+            title,
+            "--notes",
+            notes,
+            *flags,
+        )
         print(f"Created the {channel} release at {document['commit']}")
         return
     for asset in release["assets"]:

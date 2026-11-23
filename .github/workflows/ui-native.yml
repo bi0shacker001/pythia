@@ -23,6 +23,9 @@ permissions:
   contents: read
 
 env:
+  # The patched compose-native: release v<CN_VERSION> of mytop-project/compose-native, its sha256 pinned here.
+  CN_VERSION: 1.13.0-beta01-mytop.1
+  CN_SHA256: 5ace9958184fa4a1a5d331cda484a908696506a9bcab54d966d5260332bae3c1
   SDL_TAG: release-3.2.30
   DEV_PACKAGES: >-
     build-essential cmake ninja-build pkg-config git file
@@ -45,6 +48,17 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Fetch the patched compose-native repository (mytop-project/compose-native)
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(cygpath -m "$RUNNER_TEMP" 2>/dev/null || echo "$RUNNER_TEMP")"
+          mkdir -p "$temp/cn-maven"
+          base="https://github.com/mytop-project/compose-native/releases/download/v$CN_VERSION"
+          curl --fail --location --silent --show-error --output "$temp/cn-maven.tar.gz" "$base/compose-native-maven-$CN_VERSION.tar.gz"
+          echo "$CN_SHA256  $temp/cn-maven.tar.gz" | sha256sum --check
+          tar --force-local -xzf "$temp/cn-maven.tar.gz" -C "$temp/cn-maven"
+          echo "CN_REPO=$temp/cn-maven" >> "$GITHUB_ENV"
       - name: System packages
         run: |
           sudo apt-get update
@@ -191,6 +205,17 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Fetch the patched compose-native repository (mytop-project/compose-native)
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(cygpath -m "$RUNNER_TEMP" 2>/dev/null || echo "$RUNNER_TEMP")"
+          mkdir -p "$temp/cn-maven"
+          base="https://github.com/mytop-project/compose-native/releases/download/v$CN_VERSION"
+          curl --fail --location --silent --show-error --output "$temp/cn-maven.tar.gz" "$base/compose-native-maven-$CN_VERSION.tar.gz"
+          echo "$CN_SHA256  $temp/cn-maven.tar.gz" | sha256sum --check
+          tar --force-local -xzf "$temp/cn-maven.tar.gz" -C "$temp/cn-maven"
+          echo "CN_REPO=$temp/cn-maven" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           name: arm64-sysroot
@@ -264,6 +289,17 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Fetch the patched compose-native repository (mytop-project/compose-native)
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(cygpath -m "$RUNNER_TEMP" 2>/dev/null || echo "$RUNNER_TEMP")"
+          mkdir -p "$temp/cn-maven"
+          base="https://github.com/mytop-project/compose-native/releases/download/v$CN_VERSION"
+          curl --fail --location --silent --show-error --output "$temp/cn-maven.tar.gz" "$base/compose-native-maven-$CN_VERSION.tar.gz"
+          echo "$CN_SHA256  $temp/cn-maven.tar.gz" | shasum -a 256 --check
+          tar -xzf "$temp/cn-maven.tar.gz" -C "$temp/cn-maven"
+          echo "CN_REPO=$temp/cn-maven" >> "$GITHUB_ENV"
       - name: SDL3
         run: brew install sdl3
       - name: Unit tests and release executable
@@ -318,6 +354,17 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Fetch the patched compose-native repository (mytop-project/compose-native)
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(cygpath -m "$RUNNER_TEMP" 2>/dev/null || echo "$RUNNER_TEMP")"
+          mkdir -p "$temp/cn-maven"
+          base="https://github.com/mytop-project/compose-native/releases/download/v$CN_VERSION"
+          curl --fail --location --silent --show-error --output "$temp/cn-maven.tar.gz" "$base/compose-native-maven-$CN_VERSION.tar.gz"
+          echo "$CN_SHA256  $temp/cn-maven.tar.gz" | sha256sum --check
+          tar --force-local -xzf "$temp/cn-maven.tar.gz" -C "$temp/cn-maven"
+          echo "CN_REPO=$temp/cn-maven" >> "$GITHUB_ENV"
       - name: Unit tests, release executable and distribution folder
         working-directory: ui-native
         shell: bash

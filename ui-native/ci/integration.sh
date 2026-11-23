@@ -122,9 +122,8 @@ if [ "$WINDOW" = "--window" ]; then
   grep -q '^ui: rendered get_system_info status=ok' "$OUT/ui.log"
   grep -q '^ui: rendered events=[1-9]' "$OUT/ui.log"
   grep -q '^smoke: ok' "$OUT/ui.log"
-  if ! grep -q '^exit=0' "$OUT/ui.exit"; then
-    echo "::warning::the window rendered and left, but exited with $(cat "$OUT/ui.exit") (the BadWindow teardown bug of the spike?)"
-  fi
+  # The patched compose-native ends the window cleanly (the stock one raised BadWindow on teardown, exit 1).
+  grep -q '^exit=0' "$OUT/ui.exit"
   test -s "$OUT/screen.png"
 fi
 echo "integration: ok"

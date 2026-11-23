@@ -2,9 +2,12 @@
 
 import re
 from pathlib import Path
-from unittest import TestCase
+from unittest import SkipTest, TestCase
 
-from PySide6.QtCore import QObject, Signal, Slot
+try:
+    from PySide6.QtCore import QObject, Signal, Slot
+except ImportError as ex:  # the schema is read from Qt's meta-objects
+    raise SkipTest("PySide6 is not installed") from ex
 
 from pythia.ipc import schema
 from pythia.ipc.server import BUILTINS

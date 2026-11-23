@@ -135,10 +135,12 @@ jobs:
           . .venv/bin/activate
           make req-python
           make dev
+          # The backend channel's tests (tests/_test_ipc_*.py) serve the real Backend, offscreen.
+          pip install PySide6
       - name: Run Unit Test
         run: |
           . .venv/bin/activate
-          nose2 --exclude-ci
+          QT_QPA_PLATFORM=offscreen nose2 --exclude-ci
 
   unit-test-windows:
     name: UnitTest (Windows)

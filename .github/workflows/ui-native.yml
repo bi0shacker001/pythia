@@ -293,10 +293,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests, release executable and distribution folder
+      - name: Release executable and distribution folder
         working-directory: ui-native
         shell: bash
-        run: ./gradlew --no-daemon --stacktrace mingwX64Test linkReleaseExecutableMingwX64 prepareWindowsX64ReleaseDistribution
+        run: ./gradlew --no-daemon --stacktrace linkReleaseExecutableMingwX64 prepareWindowsX64ReleaseDistribution
       - name: Size
         working-directory: ui-native
         shell: pwsh

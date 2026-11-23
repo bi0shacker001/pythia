@@ -18,6 +18,7 @@ import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import platform.linux.sockaddr_un
 import platform.posix.AF_UNIX
 import platform.posix.EINTR
 import platform.posix.MSG_NOSIGNAL
@@ -33,7 +34,7 @@ import platform.posix.memcpy
 import platform.posix.memset
 import platform.posix.send
 import platform.posix.shutdown
-import platform.posix.sockaddr_un
+
 import platform.posix.socket
 import platform.posix.strerror
 

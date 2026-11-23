@@ -37,9 +37,9 @@ class LocationsTest {
 
     @Test
     fun onWindowsTheChannelIsAPipeNamedForTheCleanedUserName() {
-        val here = windows("USERNAME" to "a b\c", "APPDATA" to "C:\Users\a\AppData\Roaming")
-        assertEquals("\\.\pipe\pythia-backend-a_b_c", here.address())
-        assertEquals("C:\Users\a\AppData\Roaming\Pythia\instance.key", here.keyPath())
+        val here = windows("USERNAME" to "a b\\c", "APPDATA" to "C:\\Users\\a\\AppData\\Roaming")
+        assertEquals("\\\\.\\pipe\\pythia-backend-a_b_c", here.address())
+        assertEquals("C:\\Users\\a\\AppData\\Roaming\\Pythia\\instance.key", here.keyPath())
     }
 
     @Test

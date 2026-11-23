@@ -59,6 +59,8 @@ abstract class GenerateBackendClient : DefaultTask() {
         out.appendLine("package dev.mytop.pythia.ui.backend")
         out.appendLine()
         out.appendLine("import dev.droidtop.lib.ui.contract.Answer")
+        out.appendLine("import dev.mytop.pythia.ui.BackendChannel")
+        out.appendLine("import dev.mytop.pythia.ui.BackendEvent")
         out.appendLine("import kotlinx.coroutines.flow.Flow")
         out.appendLine("import kotlinx.serialization.json.JsonArray")
         out.appendLine("import kotlinx.serialization.json.JsonElement")

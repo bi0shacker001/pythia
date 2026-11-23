@@ -10,7 +10,7 @@ class Locations(private val isWindows: Boolean, private val env: (String) -> Str
 
     private fun join(base: String, vararg parts: String): String {
         val sep = if (isWindows) "\\" else "/"
-        return parts.fold(base.trimEnd('/', '\')) { acc, part -> acc + sep + part }
+        return parts.fold(base.trimEnd('/', '\\')) { acc, part -> acc + sep + part }
     }
 
     /** The user name as Pythia cleans it for a pipe name (getpass.getuser, then every odd character to an underscore). */
@@ -34,7 +34,7 @@ class Locations(private val isWindows: Boolean, private val env: (String) -> Str
 
     /** The channel: a pipe name on Windows, a socket path elsewhere. */
     fun address(): String {
-        if (isWindows) return "\\.\pipe\pythia-backend-" + user()
+        if (isWindows) return "\\\\.\\pipe\\pythia-backend-" + user()
         set("PYTHIA_RUNTIME_DIR")?.let { return join(it, "backend.sock") }
         if (set("PYTHIA_DATA_DIR") != null) return join(dataDir(), "run", "backend.sock")
         set("XDG_RUNTIME_DIR")?.let { return join(it, "pythia", "backend.sock") }

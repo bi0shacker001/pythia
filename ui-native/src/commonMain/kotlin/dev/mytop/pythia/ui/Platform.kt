@@ -1,5 +1,7 @@
 package dev.mytop.pythia.ui
 
+import kotlinx.coroutines.CoroutineDispatcher
+
 /** A connected, blocking, full-duplex byte stream; one thread may read while another writes. */
 interface Stream {
     /** Reads up to [buffer].size bytes; at least one, or -1 when the other side has gone. */
@@ -14,6 +16,9 @@ interface Stream {
 
 /** The channel could not be opened or broke; [message] says why in words a screen can show. */
 class StreamException(message: String) : Exception(message)
+
+/** Where blocking reads and writes of the channel run (Dispatchers.IO is not in common code on Kotlin/Native). */
+expect val blockingDispatcher: CoroutineDispatcher
 
 /** True on Windows, where the channel is a named pipe. */
 expect val isWindowsHost: Boolean

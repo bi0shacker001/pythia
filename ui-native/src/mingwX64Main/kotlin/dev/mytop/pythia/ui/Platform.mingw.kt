@@ -3,6 +3,7 @@
 package dev.mytop.pythia.ui
 
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
@@ -11,12 +12,14 @@ import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import platform.posix.fclose
 import platform.posix.fopen
 import platform.posix.fread
@@ -34,26 +37,28 @@ import platform.windows.ReadFile
 import platform.windows.Sleep
 import platform.windows.WriteFile
 
+actual val blockingDispatcher: CoroutineDispatcher = Dispatchers.IO
+
 actual val isWindowsHost: Boolean = true
 
 actual fun environmentVariable(name: String): String? = getenv(name)?.toKString()
 
 actual fun readTextFile(path: String): String? {
     val file = fopen(path, "r") ?: return null
-    val bytes = ArrayList<Byte>()
+    var bytes = ByteArray(0)
     try {
         memScoped {
             val buf = allocArray<ByteVar>(4096)
             while (true) {
                 val n = fread(buf, 1u, 4096u, file).toInt()
                 if (n <= 0) break
-                for (i in 0 until n) bytes.add(buf[i])
+                bytes += buf.readBytes(n)
             }
         }
     } finally {
         fclose(file)
     }
-    return bytes.toByteArray().decodeToString()
+    return bytes.decodeToString()
 }
 
 private const val ERROR_FILE_NOT_FOUND = 2

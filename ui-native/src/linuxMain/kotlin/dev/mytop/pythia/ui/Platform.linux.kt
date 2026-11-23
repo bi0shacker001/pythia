@@ -3,6 +3,7 @@
 package dev.mytop.pythia.ui
 
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
@@ -11,10 +12,12 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
-import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import platform.posix.AF_UNIX
 import platform.posix.EINTR
 import platform.posix.MSG_NOSIGNAL
@@ -34,26 +37,28 @@ import platform.posix.sockaddr_un
 import platform.posix.socket
 import platform.posix.strerror
 
+actual val blockingDispatcher: CoroutineDispatcher = Dispatchers.IO
+
 actual val isWindowsHost: Boolean = false
 
 actual fun environmentVariable(name: String): String? = getenv(name)?.toKString()
 
 actual fun readTextFile(path: String): String? {
     val file = fopen(path, "r") ?: return null
-    val bytes = ArrayList<Byte>()
+    var bytes = ByteArray(0)
     try {
         memScoped {
             val buf = allocArray<ByteVar>(4096)
             while (true) {
                 val n = fread(buf, 1u, 4096u, file).toInt()
                 if (n <= 0) break
-                for (i in 0 until n) bytes.add(buf[i])
+                bytes += buf.readBytes(n)
             }
         }
     } finally {
         fclose(file)
     }
-    return bytes.toByteArray().decodeToString()
+    return bytes.decodeToString()
 }
 
 private fun errorText(): String = strerror(errno)?.toKString() ?: "error $errno"

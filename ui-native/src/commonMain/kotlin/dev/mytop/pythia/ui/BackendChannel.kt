@@ -56,7 +56,7 @@ class BackendChannel private constructor(private val stream: Stream, private val
     fun eventsNamed(name: String): Flow<JsonArray> = bus.filter { it.name == name }.map { it.args }
 
     private fun startReading(onClosed: (String) -> Unit) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch(blockingDispatcher) {
             val decoder = FrameDecoder()
             val buffer = ByteArray(64 * 1024)
             var reason = "Pythia closed the connection."
@@ -111,7 +111,7 @@ class BackendChannel private constructor(private val stream: Stream, private val
         }
         try {
             val bytes = Framing.encode(frame)
-            writeLock.withLock { withContext(Dispatchers.IO) { stream.write(bytes) } }
+            writeLock.withLock { withContext(blockingDispatcher) { stream.write(bytes) } }
             return withTimeout(timeoutMs) { deferred.await() }
         } catch (e: TimeoutCancellationException) {
             lock.withLock { waiting.remove(id) }
@@ -138,12 +138,12 @@ class BackendChannel private constructor(private val stream: Stream, private val
             onClosed: (String) -> Unit = {},
         ): Opened {
             val keyFile = where.keyPath()
-            val text = withContext(Dispatchers.IO) { readTextFile(keyFile) }
+            val text = withContext(blockingDispatcher) { readTextFile(keyFile) }
                 ?: return Opened.Down("Pythia has not run on this computer yet: there is no key at $keyFile.")
             val key = parseKey(text) ?: return Opened.Down("The key at $keyFile is not a key.")
             val address = where.address()
             val stream = try {
-                withContext(Dispatchers.IO) { openStream(address) }
+                withContext(blockingDispatcher) { openStream(address) }
             } catch (e: StreamException) {
                 return Opened.Down("Pythia is not running: ${e.message} ($address).")
             }

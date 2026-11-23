@@ -1,0 +1,353 @@
+name: Native front end
+
+# ui-native/: Pythia's native front end (Compose compiled with Kotlin/Native by compose-native, no JVM at runtime),
+# talking to the running Pythia over its backend channel (docs/SPEC.md, decision 16). Builds for linuxX64, linuxArm64
+# (cross-linked on x64: the Kotlin/Native compiler does not run on an arm64 Linux host) and mingwX64, and runs the
+# binary's --probe against Pythia's real Backend, served headless by ui-native/ci/serve_backend.py.
+on:
+  push:
+    paths:
+      - "ui-native/**"
+      - "schema/backend-ipc.json"
+      - ".github/workflows/ui-native.yml"
+      - ".gitmodules"
+  pull_request:
+    paths:
+      - "ui-native/**"
+      - "schema/backend-ipc.json"
+      - ".github/workflows/ui-native.yml"
+      - ".gitmodules"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SDL_TAG: release-3.2.30
+  DEV_PACKAGES: >-
+    build-essential cmake ninja-build pkg-config git file
+    libfontconfig1-dev libdbus-1-dev libegl-dev libgl-dev libgles-dev libgbm-dev
+    libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev
+    libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols
+    libdrm-dev libudev-dev libasound2-dev libpulse-dev libdecor-0-dev
+
+jobs:
+  linux-x64:
+    name: linuxX64 (build, test)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $DEV_PACKAGES
+      - name: Cache SDL3
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: /opt/sdl3
+          key: sdl3-${{ env.SDL_TAG }}-x64-v1
+      - name: Build SDL3 (Ubuntu 24.04 has no libsdl3)
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$SDL_TAG" https://github.com/libsdl-org/SDL /tmp/sdl
+          cmake -S /tmp/sdl -B /tmp/sdl/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/opt/sdl3 -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          cmake --build /tmp/sdl/build
+          cmake --install /tmp/sdl/build
+      - name: Install SDL3
+        run: |
+          sudo cp -a /opt/sdl3/lib/. /usr/local/lib/ 2>/dev/null || sudo cp -a /opt/sdl3/lib*/. /usr/local/lib/
+          sudo cp -a /opt/sdl3/include/. /usr/local/include/
+          sudo ldconfig
+      - name: Unit tests and release executable
+        working-directory: ui-native
+        env:
+          LINUX_X64_NATIVE_LIBRARY_DIRS: /usr/local/lib
+        run: ./gradlew --no-daemon --stacktrace linuxX64Test linkReleaseExecutableLinuxX64
+      - name: Size
+        working-directory: ui-native
+        run: |
+          bin=$(find build/bin/linuxX64 -type f -path '*releaseExecutable*' -name '*.kexe' | head -n1)
+          mkdir -p out
+          cp "$bin" out/pythia-ui
+          strip -o out/pythia-ui.stripped out/pythia-ui
+          {
+            echo "### linuxX64"
+            echo "unstripped $(stat -c %s out/pythia-ui) bytes, stripped $(stat -c %s out/pythia-ui.stripped) bytes"
+            echo '```'
+            ldd out/pythia-ui | sed 's/(0x[0-9a-f]*)//'
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pythia-ui-linuxX64
+          path: ui-native/out/pythia-ui
+          retention-days: 7
+
+  integration:
+    name: Integration (linuxX64 against the real Backend)
+    needs: linux-x64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $DEV_PACKAGES
+          sudo apt-get install -y libgirepository-2.0-dev python3-gi-cairo libcairo2-dev libgtk-3-dev libgdk-pixbuf-2.0-dev libgnome-desktop-3-dev libwebkit2gtk-4.1-dev
+      - uses: actions/cache@v4
+        with:
+          path: /opt/sdl3
+          key: sdl3-${{ env.SDL_TAG }}-x64-v1
+          fail-on-cache-miss: true
+      - name: Install SDL3
+        run: |
+          sudo cp -a /opt/sdl3/lib/. /usr/local/lib/ 2>/dev/null || sudo cp -a /opt/sdl3/lib*/. /usr/local/lib/
+          sudo ldconfig
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m venv .venv
+          . .venv/bin/activate
+          make req-python
+          make dev
+          pip install PySide6
+      - uses: actions/download-artifact@v4
+        with:
+          name: pythia-ui-linuxX64
+          path: bin
+      - name: Probe with no Pythia running (the unavailable state, with its reason)
+        run: |
+          chmod +x bin/pythia-ui
+          export PYTHIA_DATA_DIR="$RUNNER_TEMP/pythia-none"
+          set +e
+          bin/pythia-ui --probe | tee probe-none.txt
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -eq 2
+          grep -q '^unavailable: Pythia has not run on this computer yet' probe-none.txt
+      - name: Serve the real Backend and probe it
+        run: |
+          . .venv/bin/activate
+          export PYTHIA_DATA_DIR="$RUNNER_TEMP/pythia-data"
+          mkdir -p "$PYTHIA_DATA_DIR"
+          PYTHONPATH="$PWD" python ui-native/ci/serve_backend.py > server.log 2>&1 &
+          echo $! > server.pid
+          for _ in $(seq 1 90); do grep -q '^ready' server.log && break; sleep 1; done
+          cat server.log
+          grep -q '^ready' server.log
+          bin/pythia-ui --probe | tee probe.txt
+          grep '^hello: ' probe.txt | grep -q '"status":"ok"'
+          grep '^hello: ' probe.txt | grep -q '"server":"pythia"'
+          grep '^get_system_info: ' probe.txt | grep -q '"status":"ok"'
+          grep '^get_system_info: ' probe.txt | grep -q "system_uuid"
+          # The same, with Pythia gone: the answer is the unavailable state with the reason, not a hang or a crash.
+          kill "$(cat server.pid)"
+          sleep 2
+          set +e
+          bin/pythia-ui --probe | tee probe-gone.txt
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -eq 2
+          grep -q '^unavailable: Pythia is not running' probe-gone.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-linuxX64
+          path: |
+            probe*.txt
+            server.log
+
+  arm64-sysroot:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $DEV_PACKAGES
+      - name: Cache SDL3
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: /opt/sdl3
+          key: sdl3-${{ env.SDL_TAG }}-arm64-v1
+      - name: Build SDL3
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$SDL_TAG" https://github.com/libsdl-org/SDL /tmp/sdl
+          cmake -S /tmp/sdl -B /tmp/sdl/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/opt/sdl3 -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          cmake --build /tmp/sdl/build
+          cmake --install /tmp/sdl/build
+      - name: Pack the link-time libraries
+        run: |
+          mkdir -p /tmp/sysroot
+          cp -a /usr/lib/aarch64-linux-gnu/. /tmp/sysroot/
+          cp -a /opt/sdl3/lib/. /tmp/sysroot/ 2>/dev/null || cp -a /opt/sdl3/lib*/. /tmp/sysroot/
+          tar -C /tmp/sysroot -czf /tmp/arm64-sysroot.tgz .
+          ls -l /tmp/arm64-sysroot.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arm64-sysroot
+          path: /tmp/arm64-sysroot.tgz
+          retention-days: 3
+
+  linux-arm64-build:
+    name: linuxArm64 (cross-linked)
+    needs: arm64-sysroot
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: arm64-sysroot
+          path: /tmp/dl
+      - run: sudo mkdir -p /opt/arm64-sysroot && sudo tar -C /opt/arm64-sysroot -xzf /tmp/dl/arm64-sysroot.tgz
+      - name: Cross-build for linuxArm64
+        working-directory: ui-native
+        env:
+          LINUX_ARM64_NATIVE_LIBRARY_DIRS: /opt/arm64-sysroot
+        run: ./gradlew --no-daemon --stacktrace linkReleaseExecutableLinuxArm64
+      - name: Size
+        working-directory: ui-native
+        run: |
+          bin=$(find build/bin/linuxArm64 -type f -path '*releaseExecutable*' -name '*.kexe' | head -n1)
+          mkdir -p out
+          cp "$bin" out/pythia-ui
+          {
+            echo "### linuxArm64"
+            echo "unstripped $(stat -c %s out/pythia-ui) bytes"
+            file out/pythia-ui
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pythia-ui-linuxArm64
+          path: ui-native/out/pythia-ui
+          retention-days: 7
+
+  linux-arm64-run:
+    name: linuxArm64 (runs on arm64)
+    needs: linux-arm64-build
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $DEV_PACKAGES
+      - uses: actions/cache@v4
+        with:
+          path: /opt/sdl3
+          key: sdl3-${{ env.SDL_TAG }}-arm64-v1
+          fail-on-cache-miss: true
+      - name: Install SDL3
+        run: |
+          sudo cp -a /opt/sdl3/lib/. /usr/local/lib/ 2>/dev/null || sudo cp -a /opt/sdl3/lib*/. /usr/local/lib/
+          sudo ldconfig
+      - uses: actions/download-artifact@v4
+        with:
+          name: pythia-ui-linuxArm64
+          path: bin
+      - name: Runs, and says why Pythia is not there (no Pythia on this runner)
+        run: |
+          chmod +x bin/pythia-ui
+          export PYTHIA_DATA_DIR="$RUNNER_TEMP/pythia-none"
+          set +e
+          bin/pythia-ui --probe | tee probe.txt
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -eq 2
+          grep -q '^unavailable: Pythia has not run on this computer yet' probe.txt
+
+  windows:
+    name: mingwX64 (build, test, integration)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests, release executable and distribution folder
+        working-directory: ui-native
+        shell: bash
+        run: ./gradlew --no-daemon --stacktrace mingwX64Test linkReleaseExecutableMingwX64 prepareWindowsX64ReleaseDistribution
+      - name: Size
+        working-directory: ui-native
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build -Recurse -Filter *.exe | Where-Object { $_.FullName -match 'istribution' } | Select-Object -First 1
+          if (-not $exe) { Get-ChildItem build -Recurse -Filter *.exe | ForEach-Object { $_.FullName }; throw "no distribution exe" }
+          "PYTHIA_DIST=$($exe.DirectoryName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $files = Get-ChildItem $exe.DirectoryName -File
+          $total = ($files | Measure-Object -Property Length -Sum).Sum
+          $lines = @("### mingwX64", "exe $($exe.Length) bytes, distribution folder $total bytes") + ($files | ForEach-Object { "$($_.Name) $($_.Length)" })
+          $lines | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . PySide6
+      - name: Serve the real Backend and probe it over the named pipe
+        shell: pwsh
+        run: |
+          $env:PYTHIA_DATA_DIR = Join-Path $env:RUNNER_TEMP "pythia-data"
+          New-Item -ItemType Directory -Force $env:PYTHIA_DATA_DIR | Out-Null
+          $env:PYTHONPATH = $PWD.Path
+          $server = Start-Process python -ArgumentList "ui-native/ci/serve_backend.py" -PassThru -NoNewWindow `
+            -RedirectStandardOutput server.log -RedirectStandardError server.err
+          $up = $false
+          for ($i = 0; $i -lt 90; $i++) {
+            if ((Test-Path server.log) -and (Select-String -Path server.log -Pattern '^ready' -Quiet)) { $up = $true; break }
+            Start-Sleep -Seconds 1
+          }
+          Get-Content server.log, server.err -ErrorAction SilentlyContinue
+          if (-not $up) { throw "the Backend did not come up" }
+          $exe = Join-Path $env:PYTHIA_DIST "pythia-ui.exe"
+          if (-not (Test-Path $exe)) { $exe = (Get-ChildItem $env:PYTHIA_DIST -Filter *.exe | Select-Object -First 1).FullName }
+          $out = & $exe --probe
+          $code = $LASTEXITCODE
+          $out | Tee-Object -FilePath probe.txt
+          Stop-Process -Id $server.Id -Force
+          if ($code -ne 0) { throw "probe exited $code" }
+          $hello = ($out | Where-Object { $_ -like 'hello: *' }) -join ''
+          $info = ($out | Where-Object { $_ -like 'get_system_info: *' }) -join ''
+          if (-not ($hello -like '*"status":"ok"*' -and $hello -like '*"server":"pythia"*')) { throw "no ok hello" }
+          if (-not ($info -like '*"status":"ok"*' -and $info -like '*"system_uuid"*')) { throw "no ok get_system_info" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pythia-ui-windowsX64
+          path: |
+            ${{ env.PYTHIA_DIST }}
+            probe.txt
+            server.log
+            server.err
+          retention-days: 7

@@ -274,6 +274,32 @@ the droidtop coordinator for this lane. Later sections follow them.
       `cancel_job` (only the folder watch can be stopped). `gamesChanged` and
       the HTML UI's slots are unchanged.
 
+16. **The native front end starts as `ui-native/` (Droidtop/tracker#958,
+    step 5).** A self-contained Gradle build in this repo: Kotlin 2.4.20,
+    Compose Multiplatform and compose-native 1.13.0-beta01 (Kotlin/Native,
+    no JVM at runtime), for linuxX64, linuxArm64 and mingwX64.
+    - **The shared UI library** (tokens, format, the backend contract) is
+      consumed from source: `ui-native/vendor/mytop-ui` is a git submodule
+      pinned at tag v0.3.0 and included as a composite build. Nothing of it is
+      copied.
+    - **The client is generated at build time** from
+      `schema/backend-ipc.json` (a Gradle task; nothing generated is checked
+      in): one suspend function per method answering the contract's
+      `Answer`, one Flow per event. The transport sits behind expect/actual:
+      a Unix socket on Linux (the code is posix and moves to a shared source
+      set when a macOS build is added), a named pipe on Windows opened for
+      overlapped I/O (a synchronous pipe handle would serialise a waiting
+      read against the write the server is waiting for). Frames and the first
+      `hello` with the key are as decision 15; the key and address are found
+      the way Pythia finds them (`PYTHIA_DATA_DIR`, `XDG_*`, `%APPDATA%`).
+    - **The skeleton shows only what the backend answers:** `hello`,
+      `get_system_info` and the live event stream, or the reason Pythia is
+      not available, retrying every few seconds. No sample data. `--probe`
+      does the same headless, prints the answers and exits (0 ok, 1 an answer
+      that is not ok, 2 Pythia unreachable); CI runs it against the real
+      Backend.
+    - **Not yet:** a macOS build, the real screens, packaging.
+
 ## 2. The pad model (handheld shell)
 
 From UX review A7 (HH2, HH10, HH11; conflicts C2 and C3). A4, A5 and A6

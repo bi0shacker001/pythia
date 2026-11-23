@@ -181,9 +181,10 @@ def command(folder: str, launch: dict, game_id: str) -> tuple[list[str], dict]:
     return [str(exe)], env
 
 
-def start(folder: str, launch: dict, game_id: str) -> None:
+def start(folder: str, launch: dict, game_id: str) -> "subprocess.Popen":
     """Starts the game in its own folder, in a process of its own that outlives
-    Pythia. Raises OSError or RuntimeError with the reason when it cannot."""
+    Pythia, and returns the process (pythia.running follows it). Raises OSError or
+    RuntimeError with the reason when it cannot."""
     exe = Path(folder) / launch["exe"]
     if not exe.is_file():
         raise RuntimeError(f"{launch['exe']} is not in the game's folder any more. Choose how it runs.")
@@ -198,8 +199,9 @@ def start(folder: str, launch: dict, game_id: str) -> None:
         )
     else:
         kwargs["start_new_session"] = True
-    subprocess.Popen(args, **kwargs)  # noqa: S603 (the person's own game, chosen in its folder)
+    proc = subprocess.Popen(args, **kwargs)  # noqa: S603 (the person's own game, chosen in its folder)
     logger.info("Started %s (%s)", exe, launch.get("via"))
+    return proc
 
 
 def now() -> int:

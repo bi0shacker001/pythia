@@ -15,7 +15,7 @@ game has a store link.
 
 import os
 
-from pythia import datadir
+from pythia import datadir, running
 from pythia.identity import get_system_uuid
 from pythia.util.log import logger
 
@@ -250,9 +250,10 @@ def _play_folder(game_id: str, name: str) -> dict:
     if own is None or not variant or not launch:
         return {"status": "error", "message": NO_RUNNER}
     try:
-        folder_launch.start(variant["path"], launch, game_id)
+        proc = folder_launch.start(variant["path"], launch, game_id)
     except (OSError, RuntimeError) as ex:
         return {"status": "error", "message": f"{name} did not start: {ex}"}
+    running.TRACKER.track(game_id, proc, "folder")
     variant["lastplayed"] = folder_launch.now()
     games_db.save_entry_and_sync_cache(own)
     logger.info("Started %s from its folder", name)

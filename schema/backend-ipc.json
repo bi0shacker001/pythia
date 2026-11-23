@@ -64,6 +64,16 @@
       "returns": "answer"
     },
     {
+      "name": "cancel_job",
+      "params": [
+        {
+          "name": "job_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
       "name": "cancel_pairing",
       "params": [],
       "returns": "answer"
@@ -280,6 +290,31 @@
       "returns": "answer"
     },
     {
+      "name": "get_game_art",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "role",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_game_detail",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
       "name": "get_game_saves",
       "params": [
         {
@@ -293,6 +328,22 @@
       ],
       "returns": "answer",
       "async": true
+    },
+    {
+      "name": "get_game_systems",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_games",
+      "params": [
+        {
+          "name": "since_version",
+          "type": "string",
+          "optional": true
+        }
+      ],
+      "returns": "answer"
     },
     {
       "name": "get_handheld_games",
@@ -371,6 +422,11 @@
     },
     {
       "name": "get_plugin_repositories",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_running_games",
       "params": [],
       "returns": "answer"
     },
@@ -639,6 +695,16 @@
       "name": "quit_app",
       "params": [],
       "returns": "none"
+    },
+    {
+      "name": "quit_game",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
     },
     {
       "name": "read_clipboard",
@@ -1210,8 +1276,32 @@
       ]
     },
     {
+      "name": "gameStarted",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "gameStopped",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
       "name": "gamesChanged",
       "params": []
+    },
+    {
+      "name": "gamesVersionChanged",
+      "params": [
+        {
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "handheldsChanged",

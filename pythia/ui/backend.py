@@ -36,7 +36,7 @@ from typing import Any
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
-from pythia import datadir, downloads, onboarding, reconciliation, scanning
+from pythia import datadir, downloads, gaming_api, onboarding, reconciliation, running, scanning
 from pythia.database import games as games_db
 from pythia.identity import get_system_uuid
 from pythia.util.log import logger
@@ -170,6 +170,10 @@ class Backend(QObject):
     lookChanged = Signal("QVariant")  # a Look's live counts, its proposals, or that it was added (pythia.look)
     padAction = Signal(str)  # a controller press, named (pythia.pad), only while Pythia has the focus
     kdeconnectEvent = Signal("QVariant")  # one KDE Connect event (pythia.droidtop.kdeconnect), on the GUI thread
+    # For a front end that reads the library as cards (pythia.gaming_api); gamesChanged above is unchanged.
+    gamesVersionChanged = Signal(str)  # the library was read again; the version get_games answers with now
+    gameStarted = Signal("QVariant")  # a game Pythia started is running: {"game_id", "via", "started_at", "pid"}
+    gameStopped = Signal("QVariant")  # it ended: the same, and "exit_code" (None when not known)
 
     def __init__(self, error_console: bool = False):
         super().__init__()
@@ -180,6 +184,8 @@ class Backend(QObject):
         self._watcher: dict[str, Any] | None = None
         self._async_requests = 0
         self._games = []
+        self._cards: list[dict] = []
+        self._games_version = ""
         self._lock = threading.Lock()
         self._ui_log: list[dict] = []
         self._jobs: list[dict] = []
@@ -196,6 +202,7 @@ class Backend(QObject):
         self._log_handler = _UiLogHandler(self)
         logger.addHandler(self._log_handler)
         self.refresh_games()
+        running.TRACKER.subscribe(self._on_running_game)
         # The library folders are scanned on their own, a minute after start and then every scan_minutes.
         self._library_scan_stop = threading.Event()
         self._library_scan_running = threading.Lock()
@@ -433,7 +440,12 @@ class Backend(QObject):
             }
             for gid, entries in sorted(games.items())
         ]
+        with self._lock:
+            self._cards = gaming_api.cards(self._games, get_system_uuid())
+            self._games_version = gaming_api.version(self._cards)
+            version = self._games_version
         self.gamesChanged.emit()
+        self.gamesVersionChanged.emit(version)
         # While this process serves droidtop handhelds, the library is theirs too.
         from pythia.droidtop import library as droidtop_library
 
@@ -2671,3 +2683,117 @@ class Backend(QObject):
     @_guarded
     def get_storage_roles(self):
         return self._unavailable("get_storage_roles", "Storage roles arrive with save backups and game transfer.")
+
+    # ---- the library as a gaming front end reads it (pythia.gaming_api; Droidtop/tracker#920) ---------------------
+    @Slot(result="QVariant")
+    @_guarded
+    def get_games(self, since_version: str = ""):
+        """Every game as one card, from the library as it is held in memory: ``version`` (changes when any card
+        does) and ``games`` (id, title, sort_name, platforms, runner, installed, last_played in epoch seconds,
+        playtime_hours, favourite, art roles known, year, added, stores, sources, has_update). Given the
+        ``since_version`` a client already has, a library that has not changed answers ``unchanged`` and no
+        cards. gamesVersionChanged carries the new version whenever the library is read again."""
+        from pythia.ipc import ui_contract
+
+        with self._lock:
+            version, cards = self._games_version, self._cards
+        if since_version and since_version == version:
+            return ui_contract.ok("get_games", version=version, unchanged=True, games=[])
+        return _jsonable(ui_contract.ok("get_games", version=version, unchanged=False, games=cards))
+
+    @Slot(result="QVariant")
+    @_guarded
+    def get_game_systems(self):
+        """The platforms the library has: ``id``, ``name``, ``count`` (games), ``installed``, ``favourites`` and
+        ``last_played`` each; a game on several platforms counts under each, one without any under "Unknown
+        platform". Counted from the cards in one pass."""
+        from pythia.ipc import ui_contract
+
+        with self._lock:
+            version, cards = self._games_version, self._cards
+        return ui_contract.ok("get_game_systems", version=version, systems=gaming_api.systems(cards))
+
+    def _game_of(self, game_id: str) -> dict | None:
+        with self._lock:
+            return next((g for g in self._games if g.get("game_id") == game_id), None)
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def get_game_detail(self, game_id: str):
+        """One game's page from the library held in memory: ``fields`` is what Pythia records (title, year, notes,
+        platforms, runners, store ids, ownership, versions, updates, play facts) and ``missing`` names, as an
+        ``unavailable`` answer each, what it does not record (genre, developer, publisher, description, rating).
+        Nothing is guessed."""
+        from pythia.ipc import ui_contract
+
+        game = self._game_of(game_id)
+        if game is None:
+            return ui_contract.error(f"No game {game_id} in the library", slot="get_game_detail", code="no-such-game")
+        return _jsonable(ui_contract.ok("get_game_detail", **gaming_api.detail(game, get_system_uuid())))
+
+    @Slot(str, str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def get_game_art(self, game_id: str, role: str):
+        """The local file of a game's art for ``role`` (cover, banner, logo, background, icon, screenshot): ``path``,
+        ``uri``, ``mime`` and ``size``, from the art already on this computer (Lutris's folders, Steam's library
+        art). ``unavailable`` with the reason when there is none. Nothing is downloaded."""
+        from pythia.ipc import ui_contract
+
+        game = self._game_of(game_id)
+        if game is None:
+            return ui_contract.error(f"No game {game_id} in the library", slot="get_game_art", code="no-such-game")
+        return gaming_api.art(game.get("entries") or [], role)
+
+    # ---- running games ----------------------------------------------------------------------------------------------
+    def _on_running_game(self, kind: str, info: dict):
+        (self.gameStarted if kind == "started" else self.gameStopped).emit(_jsonable(info))
+
+    @Slot(result="QVariant")
+    @_guarded
+    def get_running_games(self):
+        """The games Pythia started that are still running (``game_id``, ``via``, ``started_at``, ``pid``), oldest
+        first. A game started by Steam's link or another launcher is not here: that process is theirs."""
+        from pythia.ipc import ui_contract
+
+        return ui_contract.ok(
+            "get_running_games",
+            games=running.TRACKER.games(),
+            scope="Games Pythia started itself (a folder or a runner)",
+        )
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def quit_game(self, game_id: str):
+        """Asks a game Pythia started to end (its process group gets SIGTERM; taskkill on Windows). The end is told
+        as gameStopped. ``unavailable`` for a game this Pythia did not start or has lost track of."""
+        from pythia.ipc import ui_contract
+
+        if not running.TRACKER.quit(game_id):
+            return self._unavailable("quit_game", running.NOT_STARTED_HERE)
+        self._record("info", "pythia", f"Asked {game_id} to end", "quit_game")
+        return ui_contract.ok("quit_game", game_id=game_id, asked=True)
+
+    # ---- jobs ------------------------------------------------------------------------------------------------------
+    @Slot(str, result="QVariant")
+    @_guarded
+    def cancel_job(self, job_id: str):
+        """Stops a running job where Pythia can: the folder watch (stop_watch). A scan, a look, a sync or a merge
+        runs to its end, and the answer says so (``unavailable``); a job that already ended says that."""
+        from pythia.ipc import ui_contract
+
+        with self._lock:
+            job = next((j for j in self._jobs if j["id"] == job_id), None)
+            watching = bool(self._watcher and self._watcher.get("job") == job_id)
+        if job is None:
+            return ui_contract.error(f"No job {job_id}", slot="cancel_job", code="no-such-job")
+        if job["state"] != "running":
+            return self._unavailable("cancel_job", f"This job already ended ({job['state']}).")
+        if watching:
+            self.stop_watch()
+            return ui_contract.ok("cancel_job", job=job_id, stopping=True)
+        return self._unavailable(
+            "cancel_job",
+            f"Pythia cannot stop a {job['kind']} job half way; it runs to its end. "
+            "Only the folder watch can be stopped.",
+        )

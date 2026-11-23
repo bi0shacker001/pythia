@@ -23,7 +23,7 @@ windowcast streams the window that opens.
 
 import subprocess
 
-from pythia import datadir
+from pythia import datadir, running
 from pythia.droidtop.library import keys_of
 from pythia.droidtop.native import submodule
 from pythia.identity import get_system_uuid
@@ -94,9 +94,10 @@ def _run_in_pythia(game_id: str, name: str) -> dict:
         return {"result": "failed", "message": f"{name} cannot start here: {ex}"}
     command = selfcmd.module_command("pythia.launch", f"pythia:rungameid/{game_id}")
     try:
-        subprocess.Popen(command, stdin=subprocess.DEVNULL, start_new_session=True)  # noqa: S603 (no handheld text in it)
+        proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, start_new_session=True)  # noqa: S603 (no handheld text in it)
     except OSError as ex:
         return {"result": "failed", "message": f"Pythia could not start {name}: {ex}"}
+    running.TRACKER.track(game_id, proc, "runner")
     logger.info("Starting %s for a handheld (%s)", name, " ".join(command))
     return {"result": "started", "stream": STREAM}
 

@@ -262,6 +262,17 @@ the droidtop coordinator for this lane. Later sections follow them.
       dicts.
     - A call runs on the Qt thread, as over QWebChannel, so a slot behaves
       the same whoever calls it.
+    - **The library as cards (Droidtop/tracker#920).** For a front end that
+      shows the library as shelves and lists, not as the HTML UI's records:
+      `get_games` (every game's card in one answer from the library held in
+      memory, with a `version`; `gamesVersionChanged` carries the new one),
+      `get_game_systems`, `get_game_detail` (what Pythia records, and under
+      `missing` what it does not: genre, developer, publisher, description,
+      rating), `get_game_art` (a local file per role, or `unavailable`),
+      `get_running_games`/`quit_game` with `gameStarted`/`gameStopped` (only
+      games Pythia started itself; a Steam launch is Steam's), and
+      `cancel_job` (only the folder watch can be stopped). `gamesChanged` and
+      the HTML UI's slots are unchanged.
 
 ## 2. The pad model (handheld shell)
 

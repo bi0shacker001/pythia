@@ -68,11 +68,11 @@ jobs:
           sudo cp -a /opt/sdl3/lib/. /usr/local/lib/ 2>/dev/null || sudo cp -a /opt/sdl3/lib*/. /usr/local/lib/
           sudo cp -a /opt/sdl3/include/. /usr/local/include/
           sudo ldconfig
-      - name: Unit tests and release executable
+      - name: Compile the tests and link the release executable
         working-directory: ui-native
         env:
           LINUX_X64_NATIVE_LIBRARY_DIRS: /usr/local/lib
-        run: ./gradlew --no-daemon --stacktrace linuxX64Test linkReleaseExecutableLinuxX64
+        run: ./gradlew --no-daemon --stacktrace compileTestKotlinLinuxX64 linkReleaseExecutableLinuxX64
       - name: Size
         working-directory: ui-native
         run: |

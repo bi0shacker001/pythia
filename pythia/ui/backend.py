@@ -113,6 +113,8 @@ def _off_the_main_thread(fn):
     def wrapper(self, *args):
         return self._answer_later(fn.__name__, lambda: fn(self, *args))
 
+    # Read by pythia.ipc.schema: this slot answers "pending" and settles through asyncResult.
+    wrapper.answers_later = True  # type: ignore[attr-defined]
     return wrapper
 
 

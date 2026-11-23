@@ -234,6 +234,34 @@ the droidtop coordinator for this lane. Later sections follow them.
       and then every `scan_minutes` (the agent's setting, 30 by default):
       what is identified is added, what Pythia is unsure of waits in Review.
       One pass runs at a time. Removing a folder leaves its games and files.
+15. **Pythia keeps its Python core; its backend is reachable from another
+    process (Droidtop/tracker#958).** Owner, 2026-11-23: Pythia keeps its
+    Python core; its three front ends are removed later and replaced by the
+    shared Compose UI built with compose-native, which talks to the existing
+    core. This amends decision 13's Rust core for now: nothing is rewritten.
+    - `pythia.ipc` serves the same `Backend` slots the web UI calls, from the
+      running Pythia (decision 12), started with it. The web UI is unchanged.
+    - **Where:** a Unix socket on Linux and macOS (`backend.sock` in
+      `$XDG_RUNTIME_DIR/pythia`, else Pythia's data folder under `run/`;
+      folder 0700, socket 0600) and a named pipe on Windows
+      (`\\.\pipe\pythia-backend-<user>`, remote clients refused). A named pipe
+      there because CPython's `socket` has no AF_UNIX on Windows. Never TCP.
+      The first message must carry the install's key (the one in
+      `pythia.instance`), which only this person's data folder holds.
+    - **What:** length-prefixed JSON, `{id, method, args}` answered by the
+      backend contract's answer (`ok`, `unavailable`, `error`, `pending`;
+      mytop-ui `contract/`, vendored unchanged as `pythia/ipc/ui_contract.py`
+      at the pin in `pythia/ipc/__init__.py`). A pending answer is settled
+      later by a message on the same connection; every signal of the
+      Backend is pushed as an event.
+    - **No drift:** the method and event list is read from the Backend's
+      slots and signals and checked in as `schema/backend-ipc.json`
+      (`python -m pythia.ipc.schema` writes it); a test fails when the two
+      differ. The Kotlin client is generated from that file. The schema types
+      arguments, not the fields of results, which the slots build as free-form
+      dicts.
+    - A call runs on the Qt thread, as over QWebChannel, so a slot behaves
+      the same whoever calls it.
 
 ## 2. The pad model (handheld shell)
 

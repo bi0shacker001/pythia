@@ -1,0 +1,90 @@
+{
+  "about": "Cases every implementation of the contract must decode the same way (contract/README.md). `input` is what a backend sent; `decoded` is the one reading of it: status, the contract's own fields when present, and every other field under `fields`.",
+  "cases": [
+    {
+      "name": "ok with the operation's fields",
+      "input": {"status": "ok", "slot": "games", "games": [{"id": "steam:440"}], "count": 1},
+      "decoded": {"status": "ok", "slot": "games", "fields": {"games": [{"id": "steam:440"}], "count": 1}}
+    },
+    {
+      "name": "ok with nothing else",
+      "input": {"status": "ok"},
+      "decoded": {"status": "ok", "fields": {}}
+    },
+    {
+      "name": "a legacy bare list counts as ok",
+      "input": [{"id": "plugin.a"}],
+      "decoded": {"status": "ok", "fields": {"value": [{"id": "plugin.a"}]}}
+    },
+    {
+      "name": "unavailable with its reason",
+      "input": {"status": "unavailable", "slot": "move_app_data", "message": "Moving Pythia's data is not built yet."},
+      "decoded": {"status": "unavailable", "slot": "move_app_data", "message": "Moving Pythia's data is not built yet.", "fields": {}}
+    },
+    {
+      "name": "unavailable with a title",
+      "input": {"status": "unavailable", "message": "Build it with make native.", "title": "Pythia's droidtop module is not built"},
+      "decoded": {"status": "unavailable", "message": "Build it with make native.", "title": "Pythia's droidtop module is not built", "fields": {}}
+    },
+    {
+      "name": "error with a code",
+      "input": {"status": "error", "message": "The computer could not be reached.", "code": "unreachable"},
+      "decoded": {"status": "error", "message": "The computer could not be reached.", "code": "unreachable", "fields": {}}
+    },
+    {
+      "name": "pending with its request id",
+      "input": {"status": "pending", "slot": "get_game_saves", "request": "get_game_saves-3"},
+      "decoded": {"status": "pending", "slot": "get_game_saves", "request": "get_game_saves-3", "fields": {}}
+    },
+    {
+      "name": "a settled answer names the request it settles",
+      "input": {"status": "ok", "request": "get_game_saves-3", "files": []},
+      "decoded": {"status": "ok", "request": "get_game_saves-3", "fields": {"files": []}}
+    },
+    {
+      "name": "unknown fields are kept",
+      "input": {"status": "error", "message": "No space left.", "free_bytes": 0},
+      "decoded": {"status": "error", "message": "No space left.", "fields": {"free_bytes": 0}}
+    },
+    {
+      "name": "no answer at all",
+      "input": null,
+      "decoded": {"status": "error", "message": "There was no answer.", "code": "no_answer", "fields": {}}
+    },
+    {
+      "name": "not an object",
+      "input": "done",
+      "decoded": {"status": "error", "message": "The answer could not be read.", "code": "malformed", "fields": {}}
+    },
+    {
+      "name": "an unknown status",
+      "input": {"status": "maybe"},
+      "decoded": {"status": "error", "message": "The answer could not be read.", "code": "malformed", "fields": {}}
+    },
+    {
+      "name": "no status",
+      "input": {"games": []},
+      "decoded": {"status": "error", "message": "The answer could not be read.", "code": "malformed", "fields": {}}
+    },
+    {
+      "name": "unavailable without its reason",
+      "input": {"status": "unavailable"},
+      "decoded": {"status": "error", "message": "The answer could not be read.", "code": "malformed", "fields": {}}
+    },
+    {
+      "name": "error without its reason",
+      "input": {"status": "error", "code": "unreachable"},
+      "decoded": {"status": "error", "message": "The answer could not be read.", "code": "malformed", "fields": {}}
+    },
+    {
+      "name": "pending without a request id",
+      "input": {"status": "pending"},
+      "decoded": {"status": "error", "message": "The answer could not be read.", "code": "malformed", "fields": {}}
+    },
+    {
+      "name": "a contract field of the wrong type",
+      "input": {"status": "error", "message": 42},
+      "decoded": {"status": "error", "message": "The answer could not be read.", "code": "malformed", "fields": {}}
+    }
+  ]
+}

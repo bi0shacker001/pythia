@@ -65,6 +65,11 @@ def _key(create: bool) -> bytes | None:
     return key
 
 
+def channel_key() -> bytes:
+    """The key of this install's channels (this one and pythia.ipc's), made when there is none."""
+    return _key(create=True) or b""
+
+
 class Instance:
     """The running app's side: listens on the channel and answers requests on threads of their own."""
 

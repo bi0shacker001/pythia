@@ -1,0 +1,1341 @@
+{
+  "protocol": 1,
+  "contract": "mytop-project/mytop-ui@8a88ee97ca7b12cb2319f0d303eb547c943cc4a3 contract/python/ui_contract.py",
+  "methods": [
+    {
+      "name": "accept_offered_game",
+      "params": [
+        {
+          "name": "device_id",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "add_from_look",
+      "params": [
+        {
+          "name": "rows",
+          "type": "any"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "add_library_folder",
+      "params": [
+        {
+          "name": "path_str",
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "apply_update",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "back_up_saves_now",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "cancel_pairing",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "check_path",
+      "params": [
+        {
+          "name": "path_str",
+          "type": "string"
+        },
+        {
+          "name": "want",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "check_updates",
+      "params": [],
+      "returns": "none"
+    },
+    {
+      "name": "clear_finished_jobs",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "clear_ui_log",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "confirm_pairing",
+      "params": [
+        {
+          "name": "same",
+          "type": "boolean"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "describe_store_links",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "device_offered",
+      "params": [
+        {
+          "name": "device_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "device_syncs",
+      "params": [
+        {
+          "name": "device_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "discard_look",
+      "params": [],
+      "returns": "none"
+    },
+    {
+      "name": "enable_platform",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "platform",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "export_diagnostics",
+      "params": [
+        {
+          "name": "dest_dir",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "export_library_report",
+      "params": [
+        {
+          "name": "dest_dir",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "find_computers",
+      "params": [],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "find_manager_for_game",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "finish_account_connect",
+      "params": [
+        {
+          "name": "plugin_id",
+          "type": "string"
+        },
+        {
+          "name": "pasted",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "forget_detected",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "forget_game",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "forget_handheld",
+      "params": [
+        {
+          "name": "device_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "get_account_plugins",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_agent_status",
+      "params": [],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_all_plugins",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_app_info",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_capabilities",
+      "params": [
+        {
+          "name": "category",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_downloader_plugins",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_folder_vocabulary",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_game_saves",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "fetch",
+          "type": "boolean"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_handheld_games",
+      "params": [],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_handhelds",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_intake",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_jobs",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_launch_choices",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_launcher_entries",
+      "params": [],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_library_folders",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_look",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_modes",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_platform_status",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_play_state",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_plugin_repositories",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_save_backups",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_scan_settings",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_start",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_storage_roles",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_system_info",
+      "params": [],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_system_uuid",
+      "params": [],
+      "returns": "string"
+    },
+    {
+      "name": "get_tools",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_transfer_settings",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_ui_config",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_ui_log",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "get_ui_mode",
+      "params": [],
+      "returns": "string"
+    },
+    {
+      "name": "get_wine_setup",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "import_f95",
+      "params": [
+        {
+          "name": "db_path",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "link_variant_to_version",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "base_version",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "mark_pairing_network_explained",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "merge_cluster",
+      "params": [
+        {
+          "name": "surviving_id",
+          "type": "string"
+        },
+        {
+          "name": "retired_ids",
+          "type": "any"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "merge_games",
+      "params": [
+        {
+          "name": "surviving_id",
+          "type": "string"
+        },
+        {
+          "name": "retired_id",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "move_app_data",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "open_account_login",
+      "params": [
+        {
+          "name": "plugin_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "open_in_manager",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "manager_id",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "open_path",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "open_url",
+      "params": [
+        {
+          "name": "url",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "pair_compare_status",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "pair_with_code",
+      "params": [
+        {
+          "name": "code",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "pairing_network_explained",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "pairing_status",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "pick_computer",
+      "params": [
+        {
+          "name": "computer",
+          "type": "any"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "pick_file",
+      "params": [
+        {
+          "name": "title",
+          "type": "string"
+        }
+      ],
+      "returns": "string"
+    },
+    {
+      "name": "pick_folder",
+      "params": [
+        {
+          "name": "title",
+          "type": "string"
+        }
+      ],
+      "returns": "string"
+    },
+    {
+      "name": "play_game",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "play_on_device",
+      "params": [
+        {
+          "name": "device_id",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "quit_app",
+      "params": [],
+      "returns": "none"
+    },
+    {
+      "name": "read_clipboard",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "rebuild_index",
+      "params": [],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "record_launcher_entry",
+      "params": [
+        {
+          "name": "folder",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "refresh_merge_candidates",
+      "params": [],
+      "returns": "none"
+    },
+    {
+      "name": "remember_shell",
+      "params": [
+        {
+          "name": "shell",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "remove_library_folder",
+      "params": [
+        {
+          "name": "path_str",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "remove_store_link",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "platform",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "rename_game",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "report_web_error",
+      "params": [
+        {
+          "name": "level",
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "type": "string"
+        },
+        {
+          "name": "context",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "reset_identity",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "resolveDecision",
+      "params": [
+        {
+          "name": "path_str",
+          "type": "string"
+        },
+        {
+          "name": "decision",
+          "type": "any"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "restore_save_copy",
+      "params": [
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "save_notes",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "text",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "serve_from_pythia_again",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "set_account_credential",
+      "params": [
+        {
+          "name": "plugin_id",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_current_version",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_device_offer",
+      "params": [
+        {
+          "name": "device_id",
+          "type": "string"
+        },
+        {
+          "name": "what",
+          "type": "string"
+        },
+        {
+          "name": "on",
+          "type": "boolean"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_engine_kind",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_favourite",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "on",
+          "type": "boolean"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_handheld_launch",
+      "params": [
+        {
+          "name": "device_id",
+          "type": "string"
+        },
+        {
+          "name": "allowed",
+          "type": "boolean"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_launch",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "exe",
+          "type": "string"
+        },
+        {
+          "name": "via",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_log_level",
+      "params": [
+        {
+          "name": "level",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_manager_mode",
+      "params": [
+        {
+          "name": "on",
+          "type": "boolean"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_option",
+      "params": [
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_plugin_enabled",
+      "params": [
+        {
+          "name": "plugin_id",
+          "type": "string"
+        },
+        {
+          "name": "enabled",
+          "type": "boolean"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_resident_watcher",
+      "params": [
+        {
+          "name": "enabled",
+          "type": "boolean"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_service_mode",
+      "params": [
+        {
+          "name": "action",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "set_start_in",
+      "params": [
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_store_link",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "text",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_sync_folder",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "set_ui_mode",
+      "params": [
+        {
+          "name": "mode",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "set_up_windows_games",
+      "params": [],
+      "returns": "none"
+    },
+    {
+      "name": "set_variant_details",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": "string"
+        },
+        {
+          "name": "language",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "show_pairing_code",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "start_look",
+      "params": [
+        {
+          "name": "path_str",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "start_onboard",
+      "params": [
+        {
+          "name": "path_str",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "start_pad",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "start_pair_offer",
+      "params": [],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "start_scan",
+      "params": [
+        {
+          "name": "path_str",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "start_store_scan",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "start_watch",
+      "params": [
+        {
+          "name": "command_str",
+          "type": "string"
+        },
+        {
+          "name": "watch_dir_str",
+          "type": "string"
+        },
+        {
+          "name": "plugin_id",
+          "type": "string",
+          "optional": true
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "start_watch_for",
+      "params": [
+        {
+          "name": "plugin_id",
+          "type": "string"
+        },
+        {
+          "name": "command_str",
+          "type": "string"
+        },
+        {
+          "name": "watch_dir_str",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "stop_pair_offer",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "stop_watch",
+      "params": [],
+      "returns": "none"
+    },
+    {
+      "name": "sync_account",
+      "params": [
+        {
+          "name": "plugin_id",
+          "type": "string"
+        }
+      ],
+      "returns": "none"
+    },
+    {
+      "name": "sync_all_accounts",
+      "params": [],
+      "returns": "answer"
+    },
+    {
+      "name": "turn_agent_back_on",
+      "params": [],
+      "returns": "answer",
+      "async": true
+    }
+  ],
+  "events": [
+    {
+      "name": "accountSyncComplete",
+      "params": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "asyncResult",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "decisionNeeded",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "downloadDetected",
+      "params": [
+        {
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "gamesChanged",
+      "params": []
+    },
+    {
+      "name": "handheldsChanged",
+      "params": []
+    },
+    {
+      "name": "intakeChanged",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "jobsChanged",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "kdeconnectEvent",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "libraryFoldersChanged",
+      "params": []
+    },
+    {
+      "name": "logLine",
+      "params": [
+        {
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "lookChanged",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "mergeCandidatesReady",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "mergeComplete",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "modesChanged",
+      "params": []
+    },
+    {
+      "name": "onboardComplete",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "padAction",
+      "params": [
+        {
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "pairingFinished",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "platformEnableComplete",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "scanComplete",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "uiLog",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "updateCheckComplete",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    }
+  ]
+}

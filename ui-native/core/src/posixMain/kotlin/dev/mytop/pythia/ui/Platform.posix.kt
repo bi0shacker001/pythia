@@ -3,46 +3,44 @@
 package dev.mytop.pythia.ui
 
 import kotlinx.cinterop.ByteVar
-import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
-import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import platform.linux.sockaddr_un
-import platform.posix.AF_UNIX
 import platform.posix.EINTR
-import platform.posix.MSG_NOSIGNAL
 import platform.posix.SHUT_RDWR
-import platform.posix.SOCK_STREAM
-import platform.posix.connect
 import platform.posix.errno
 import platform.posix.fclose
+import platform.posix.fflush
 import platform.posix.fopen
 import platform.posix.fread
 import platform.posix.getenv
-import platform.posix.memcpy
-import platform.posix.memset
 import platform.posix.send
 import platform.posix.shutdown
-
-import platform.posix.socket
 import platform.posix.strerror
+
+/** The shared part of the Unix transport (Linux and macOS): a connected stream socket for [address]; throws [StreamException] with the reason. */
+internal expect fun connectUnixSocket(address: String): Int
+
+/** The flags of `send` that keep a vanished peer from ending this program with SIGPIPE (the socket option does it where there is no flag). */
+internal expect val sendFlags: Int
 
 actual val blockingDispatcher: CoroutineDispatcher = Dispatchers.IO
 
 actual val isWindowsHost: Boolean = false
 
 actual fun environmentVariable(name: String): String? = getenv(name)?.toKString()
+
+actual fun flushOutput() {
+    fflush(null)
+}
 
 actual fun readTextFile(path: String): String? {
     val file = fopen(path, "r") ?: return null
@@ -62,7 +60,7 @@ actual fun readTextFile(path: String): String? {
     return bytes.decodeToString()
 }
 
-private fun errorText(): String = strerror(errno)?.toKString() ?: "error $errno"
+internal fun errorText(): String = strerror(errno)?.toKString() ?: "error $errno"
 
 /** A Unix stream socket; sockets are full duplex, so one thread reads while another writes. */
 private class UnixStream(private val fd: Int) : Stream {
@@ -80,8 +78,7 @@ private class UnixStream(private val fd: Int) : Stream {
         var sent = 0
         while (sent < data.size) {
             val n = data.usePinned {
-                // MSG_NOSIGNAL: a Pythia that has gone is an error here, not a SIGPIPE that ends this program.
-                send(fd, it.addressOf(sent), (data.size - sent).convert(), MSG_NOSIGNAL.convert())
+                send(fd, it.addressOf(sent), (data.size - sent).convert(), sendFlags)
             }.toLong()
             if (n < 0) {
                 if (errno == EINTR) continue
@@ -97,19 +94,7 @@ private class UnixStream(private val fd: Int) : Stream {
     }
 }
 
-actual fun openStream(address: String): Stream = memScoped {
-    val bytes = address.encodeToByteArray()
-    if (bytes.size >= 100) throw StreamException("the socket path is too long for a Unix socket")
-    val addr = alloc<sockaddr_un>()
-    val fd = socket(AF_UNIX, SOCK_STREAM.convert(), 0)
-    if (fd < 0) throw StreamException(errorText())
-    memset(addr.ptr, 0, sizeOf<sockaddr_un>().convert())
-    addr.sun_family = AF_UNIX.convert()
-    bytes.usePinned { memcpy(addr.sun_path, it.addressOf(0), bytes.size.convert()) }
-    if (connect(fd, addr.ptr.reinterpret(), sizeOf<sockaddr_un>().convert()) != 0) {
-        val reason = errorText()
-        platform.posix.close(fd)
-        throw StreamException(reason)
-    }
-    UnixStream(fd)
+actual fun openStream(address: String): Stream {
+    if (address.encodeToByteArray().size >= 100) throw StreamException("the socket path is too long for a Unix socket")
+    return UnixStream(connectUnixSocket(address))
 }

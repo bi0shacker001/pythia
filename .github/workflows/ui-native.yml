@@ -68,11 +68,11 @@ jobs:
           sudo cp -a /opt/sdl3/lib/. /usr/local/lib/ 2>/dev/null || sudo cp -a /opt/sdl3/lib*/. /usr/local/lib/
           sudo cp -a /opt/sdl3/include/. /usr/local/include/
           sudo ldconfig
-      - name: Compile the tests and link the release executable
+      - name: Unit tests and release executable
         working-directory: ui-native
         env:
           LINUX_X64_NATIVE_LIBRARY_DIRS: /usr/local/lib
-        run: ./gradlew --no-daemon --stacktrace compileTestKotlinLinuxX64 linkReleaseExecutableLinuxX64
+        run: ./gradlew --no-daemon --stacktrace linuxX64Test linkReleaseExecutableLinuxX64
       - name: Size
         working-directory: ui-native
         run: |
@@ -104,7 +104,7 @@ jobs:
       - name: Ubuntu dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends $DEV_PACKAGES
+          sudo apt-get install -y --no-install-recommends $DEV_PACKAGES xvfb x11-apps imagemagick libgl1-mesa-dri libglx-mesa0 libegl-mesa0
           sudo apt-get install -y libgirepository-2.0-dev python3-gi-cairo libcairo2-dev libgtk-3-dev libgdk-pixbuf-2.0-dev libgnome-desktop-3-dev libwebkit2gtk-4.1-dev
       - uses: actions/cache@v4
         with:
@@ -130,47 +130,18 @@ jobs:
         with:
           name: pythia-ui-linuxX64
           path: bin
-      - name: Probe with no Pythia running (the unavailable state, with its reason)
-        run: |
-          chmod +x bin/pythia-ui
-          export PYTHIA_DATA_DIR="$RUNNER_TEMP/pythia-none"
-          set +e
-          bin/pythia-ui --probe | tee probe-none.txt
-          status=${PIPESTATUS[0]}
-          set -e
-          test "$status" -eq 2
-          grep -q '^unavailable: Pythia has not run on this computer yet' probe-none.txt
-      - name: Serve the real Backend and probe it
+      - name: Probe, reconnect and the window against the real Backend
+        env:
+          OUT: ${{ github.workspace }}/integration-out
         run: |
           . .venv/bin/activate
-          export PYTHIA_DATA_DIR="$RUNNER_TEMP/pythia-data"
-          mkdir -p "$PYTHIA_DATA_DIR"
-          PYTHONPATH="$PWD" python ui-native/ci/serve_backend.py > server.log 2>&1 &
-          echo $! > server.pid
-          for _ in $(seq 1 90); do grep -q '^ready' server.log && break; sleep 1; done
-          cat server.log
-          grep -q '^ready' server.log
-          bin/pythia-ui --probe | tee probe.txt
-          grep '^hello: ' probe.txt | grep -q '"status":"ok"'
-          grep '^hello: ' probe.txt | grep -q '"server":"pythia"'
-          grep '^get_system_info: ' probe.txt | grep -q '"status":"ok"'
-          grep '^get_system_info: ' probe.txt | grep -q "system_uuid"
-          # The same, with Pythia gone: the answer is the unavailable state with the reason, not a hang or a crash.
-          kill "$(cat server.pid)"
-          sleep 2
-          set +e
-          bin/pythia-ui --probe | tee probe-gone.txt
-          status=${PIPESTATUS[0]}
-          set -e
-          test "$status" -eq 2
-          grep -q '^unavailable: Pythia is not running' probe-gone.txt
+          chmod +x bin/pythia-ui
+          ui-native/ci/integration.sh bin/pythia-ui --window
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: probe-linuxX64
-          path: |
-            probe*.txt
-            server.log
+          name: integration-linuxX64
+          path: integration-out
 
   arm64-sysroot:
     runs-on: ubuntu-24.04-arm
@@ -280,6 +251,60 @@ jobs:
           test "$status" -eq 2
           grep -q '^unavailable: Pythia has not run on this computer yet' probe.txt
 
+  macos:
+    name: macOS (build, test, integration)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: SDL3
+        run: brew install sdl3
+      - name: Unit tests and release executable
+        working-directory: ui-native
+        run: ./gradlew --no-daemon --stacktrace macosArm64Test linkReleaseExecutableMacosArm64
+      - name: Size
+        working-directory: ui-native
+        run: |
+          bin=$(find build/bin/macosArm64 -type f -path '*releaseExecutable*' -perm -u+x | head -n1)
+          echo "binary: $bin"
+          mkdir -p out
+          cp "$bin" out/pythia-ui
+          {
+            echo "### macosArm64"
+            echo "$(stat -f %z out/pythia-ui) bytes"
+            otool -L out/pythia-ui
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install . PySide6
+      - name: Probe and reconnect against the real Backend
+        env:
+          OUT: ${{ github.workspace }}/integration-out
+        run: |
+          . .venv/bin/activate
+          ui-native/ci/integration.sh ui-native/out/pythia-ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pythia-ui-macosArm64
+          path: |
+            ui-native/out/pythia-ui
+            integration-out
+          retention-days: 7
+
   windows:
     name: mingwX64 (build, test, integration)
     runs-on: windows-latest
@@ -293,10 +318,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Release executable and distribution folder
+      - name: Unit tests, release executable and distribution folder
         working-directory: ui-native
         shell: bash
-        run: ./gradlew --no-daemon --stacktrace linkReleaseExecutableMingwX64 prepareWindowsX64ReleaseDistribution
+        run: ./gradlew --no-daemon --stacktrace mingwX64Test linkReleaseExecutableMingwX64 prepareWindowsX64ReleaseDistribution
       - name: Size
         working-directory: ui-native
         shell: pwsh

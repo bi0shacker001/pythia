@@ -32,6 +32,10 @@ import androidx.compose.ui.window.rememberWindowState
 import dev.droidtop.lib.ui.contract.Answer
 import dev.droidtop.lib.ui.format.ValueFormat
 import dev.droidtop.lib.ui.tokens.ThemePalette
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.system.exitProcess
@@ -43,10 +47,31 @@ import kotlin.system.exitProcess
  */
 fun main(args: Array<String>) {
     if ("--probe" in args) exitProcess(probe())
+    if ("--watch" in args) exitProcess(watch())
+    val smoke = "--smoke" in args
     application {
         val scope = rememberCoroutineScope()
         val connection = remember { PythiaConnection(scope) }
         LaunchedEffect(connection) { connection.start() }
+        if (smoke) {
+            // CI: once the window has what a person would see (both answers and an event), say so, hold the window
+            // a few seconds for the screenshot, and leave.
+            LaunchedEffect(connection) {
+                val seen = withTimeoutOrNull(120_000) {
+                    combine(connection.state, connection.events) { state, events ->
+                        state is PythiaState.Ready && state.systemInfo is Answer.Ok && events.isNotEmpty()
+                    }.first { it }
+                }
+                if (seen == null) {
+                    uiLog("smoke: timed out")
+                } else {
+                    uiLog("smoke: ready")
+                    delay(5_000)
+                    uiLog("smoke: ok")
+                }
+                exitApplication()
+            }
+        }
         Window(
             onCloseRequest = ::exitApplication,
             title = "Pythia",
@@ -94,6 +119,10 @@ private fun PythiaTheme(palette: ThemePalette, content: @Composable () -> Unit) 
 private fun PythiaScreen(connection: PythiaConnection) {
     val state by connection.state.collectAsState()
     val events by connection.events.collectAsState()
+    // The window's own log, which CI reads: what has been composed on screen so far.
+    LaunchedEffect(events.size) {
+        if (events.isNotEmpty()) uiLog("ui: rendered events=${events.size} newest=${events.first().name}")
+    }
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -102,6 +131,7 @@ private fun PythiaScreen(connection: PythiaConnection) {
         when (val s = state) {
             is PythiaState.Connecting -> Text("Connecting to Pythia...")
             is PythiaState.Unavailable -> {
+                LaunchedEffect(s.reason) { uiLog("ui: rendered unavailable: ${s.reason}") }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(ThemePalette.DEFAULT.dangerPlate)),
@@ -138,6 +168,7 @@ private fun PythiaScreen(connection: PythiaConnection) {
 /** One answer of the backend, as it came: its status and its fields, or the reason it is not ok. */
 @Composable
 private fun AnswerCard(title: String, answer: Answer) {
+    LaunchedEffect(answer) { uiLog("ui: rendered $title status=${if (answer is Answer.Ok) "ok" else "not ok"}") }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)

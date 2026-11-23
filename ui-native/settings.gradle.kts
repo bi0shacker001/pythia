@@ -1,5 +1,7 @@
 rootProject.name = "pythia-ui"
 
+include(":core")
+
 pluginManagement {
     repositories {
         mavenCentral()

@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import platform.posix.fclose
+import platform.posix.fflush
 import platform.posix.fopen
 import platform.posix.fread
 import platform.posix.getenv
@@ -38,6 +39,10 @@ import platform.windows.Sleep
 import platform.windows.WriteFile
 
 actual val blockingDispatcher: CoroutineDispatcher = Dispatchers.IO
+
+actual fun flushOutput() {
+    fflush(null)
+}
 
 actual val isWindowsHost: Boolean = true
 

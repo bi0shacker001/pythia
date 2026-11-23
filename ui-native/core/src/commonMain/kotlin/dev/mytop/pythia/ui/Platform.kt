@@ -20,6 +20,15 @@ class StreamException(message: String) : Exception(message)
 /** Where blocking reads and writes of the channel run (Dispatchers.IO is not in common code on Kotlin/Native). */
 expect val blockingDispatcher: CoroutineDispatcher
 
+/** Flushes what the program printed, so a log read while it runs is not behind. */
+expect fun flushOutput()
+
+/** One line of the program's own log: printed and flushed at once, because CI reads it while the window runs. */
+fun uiLog(text: String) {
+    println(text)
+    flushOutput()
+}
+
 /** True on Windows, where the channel is a named pipe. */
 expect val isWindowsHost: Boolean
 

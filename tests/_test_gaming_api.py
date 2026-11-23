@@ -114,9 +114,7 @@ class CardsTest(LibraryCase):
         )
         (self.coverart / "moonlit-harbor.jpg").write_bytes(b"jpg")
         card = gaming_api.card(self.game("g1"), self.me)
-        self.assertEqual(
-            (card["id"], card["title"], card["sort_name"]), ("g1", "Moonlit Harbor", "Harbor, Moonlit")
-        )
+        self.assertEqual((card["id"], card["title"], card["sort_name"]), ("g1", "Moonlit Harbor", "Harbor, Moonlit"))
         self.assertEqual(card["platforms"], ["Windows", "Linux"])
         self.assertEqual((card["runner"], card["runners"]), ("wine", ["wine"]))
         self.assertTrue(card["installed"])

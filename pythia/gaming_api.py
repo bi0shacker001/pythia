@@ -116,9 +116,7 @@ def card(game: dict, system_uuid: str) -> dict:
     )
     sources = list(
         dict.fromkeys(
-            str(v["source"]["kind"])
-            for v in variants
-            if isinstance(v.get("source"), dict) and v["source"].get("kind")
+            str(v["source"]["kind"]) for v in variants if isinstance(v.get("source"), dict) and v["source"].get("kind")
         )
     )
     return {
@@ -279,9 +277,7 @@ def art_path(entries: list[dict], role: str) -> tuple[Path | None, str | None]:
         found = next((p for p in (_in_folder(settings.BANNER_PATH, s) for s in slugs) if p), None)
         found = found or next((p for p in (_steam(i, "header.jpg") for i in steam_ids) if p), None)
     elif role == "icon":
-        found = next(
-            (p for p in (_first_file(Path(settings.ICON_PATH) / f"pythia_{s}.png") for s in slugs) if p), None
-        )
+        found = next((p for p in (_first_file(Path(settings.ICON_PATH) / f"pythia_{s}.png") for s in slugs) if p), None)
     elif role == "logo":
         found = next((p for p in (_steam(i, "logo.png") for i in steam_ids) if p), None)
     elif role == "background":

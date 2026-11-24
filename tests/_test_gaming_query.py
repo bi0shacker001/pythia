@@ -13,7 +13,7 @@ setup_test_environment()
 SUBSET = Path(__file__).resolve().parent / "fixtures" / "platforms-database-subset.json"
 
 
-# What Lutris, Pythia's runners and libretro's map write as a game's platform, and the droidtop-platforms system each is.
+# What Lutris, Pythia's runners and libretro's map write as a platform, and the droidtop-platforms system each is.
 COMMON_PLATFORMS = {
     "Nintendo Entertainment System": "nes",
     "Nintendo NES": "nes",

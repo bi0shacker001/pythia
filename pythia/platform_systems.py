@@ -6,9 +6,14 @@ A game's variants carry a platform name the way Lutris and Pythia's runners spel
 shelves them the same way. This maps one to the other from that same data, pinned as the submodule
 ``vendor/droidtop-platforms`` at one commit (``git submodule status``), never a table copied here.
 
-A name is matched, ignoring case and punctuation, to a system's name or its id. The three operating systems
-Pythia lists a PC game under have no system of their own in that data, only ``pc``, and are mapped to it. A name
-that matches nothing is not guessed at: it keeps its own slug as the id and says ``known: false``.
+A name is matched, ignoring case and punctuation, to a system's name, its id or one of its ``aliases``: the other
+names launchers and emulator frontends write for it, kept in that data ("Super Nintendo Entertainment System" for
+``snes``). Pythia keeps no table of its own; a name it uses that the data lacks is added there. A name that matches
+nothing is not guessed at: it keeps its own slug as the id and says ``known: false``.
+
+The one file that is read, platforms-database.json, is carried in every build of Pythia (the wheel, the
+installers, the packages): the submodule sits inside the package at ``pythia/data/droidtop-platforms`` and only that
+file is packaged.
 """
 
 import json
@@ -21,12 +26,9 @@ from pythia.util.log import logger
 from pythia.util.strings import slugify
 
 DATABASE_NAME = "platforms-database.json"
-# Where the pinned data is in a source tree. A build that does not carry the submodule maps nothing (see known).
-PINNED = Path(__file__).resolve().parents[1] / "vendor" / "droidtop-platforms" / DATABASE_NAME
-
-# Names Pythia's own PC games are listed under, which droidtop-platforms has as one system, "pc".
-PC_NAMES = ("windows", "linux", "macos", "mac os x", "pc windows", "pc linux")
-PC_SYSTEM = "pc"
+# Where the pinned data is, in a source tree and in an installed package alike. A source tree whose submodule is not
+# checked out maps nothing (see known).
+PINNED = Path(__file__).resolve().parent / "data" / "droidtop-platforms" / DATABASE_NAME
 
 _lock = threading.Lock()
 _loaded: dict[Path, "Systems"] = {}
@@ -46,12 +48,20 @@ class Systems:
             ident, name = item.get("id"), item.get("name")
             if not ident or not name:
                 continue
-            self.by_id[str(ident)] = {"id": str(ident), "name": str(name)}
+            aliases = item.get("aliases")
+            self.by_id[str(ident)] = {
+                "id": str(ident),
+                "name": str(name),
+                "aliases": [str(a) for a in aliases] if isinstance(aliases, list) else [],
+            }
         for system in self.by_id.values():
             # A name shared by two systems (Sega Mega Drive and its Japanese twin) belongs to the first.
             self._by_key.setdefault(_key(system["name"]), system)
         for system in self.by_id.values():
             self._by_key.setdefault(_key(system["id"]), system)
+        for system in self.by_id.values():
+            for alias in system["aliases"]:
+                self._by_key.setdefault(_key(alias), system)
 
     def __len__(self) -> int:
         return len(self.by_id)
@@ -60,8 +70,6 @@ class Systems:
         """``id``, ``name`` and ``known`` for one platform name."""
         key = _key(platform or "")
         found = self._by_key.get(key)
-        if found is None and key in {_key(n) for n in PC_NAMES}:
-            found = self.by_id.get(PC_SYSTEM)
         if found is not None:
             return {"id": found["id"], "name": found["name"], "known": True}
         return {"id": slugify(platform) if platform else "unknown", "name": platform or "Unknown platform", "known": False}

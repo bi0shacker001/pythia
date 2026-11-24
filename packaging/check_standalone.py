@@ -14,4 +14,11 @@ if sys.platform == "win32":
     from pythia import secure_screen
 
     assert secure_screen.HELPER.is_file(), secure_screen.HELPER
-print("pythia._native", native.__version__, "data", data)
+# The droidtop-platforms data pythia.platform_systems reads is in the build: without it no platform maps to a
+# droidtop system, and one of its own aliases resolves.
+from pythia import platform_systems
+
+assert platform_systems.PINNED.is_file(), platform_systems.PINNED
+assert platform_systems.system_of("Super Nintendo Entertainment System")["id"] == "snes", "the aliases are missing"
+assert platform_systems.system_of("Sony PlayStation 2")["id"] == "ps2"
+print("pythia._native", native.__version__, "data", data, "platforms", len(platform_systems.load()))

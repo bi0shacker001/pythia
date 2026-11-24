@@ -21,6 +21,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: The pinned droidtop-platforms data
+        # pythia.platform_systems reads it, and every build of Pythia carries it (packaging/check_standalone.py).
+        run: git submodule update --init pythia/data/droidtop-platforms
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -101,6 +104,9 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      - name: The pinned droidtop-platforms data
+        # pythia.platform_systems reads it, and every build of Pythia carries it (packaging/check_standalone.py).
+        run: git submodule update --init pythia/data/droidtop-platforms
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -167,6 +173,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+      - name: The pinned droidtop-platforms data
+        # pythia.platform_systems reads it, and every build of Pythia carries it (packaging/check_standalone.py).
+        run: git submodule update --init pythia/data/droidtop-platforms
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

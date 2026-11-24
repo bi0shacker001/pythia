@@ -1,54 +1,13 @@
 {
   "version": 1,
-  "source": "ES-DE es_systems.xml (linux), MIT -- regenerate with generator/from_esde_systems.py (a subset of the pinned file, for the tests)",
+  "source": "ES-DE es_systems.xml (linux), MIT -- regenerate with generator/from_esde_systems.py (the rows the tests use, with the aliases of the droidtop-platforms change that adds them)",
   "platforms": [
-    {
-      "id": "dos",
-      "name": "DOS (PC)",
-      "extensions": [
-        "7z",
-        "bat",
-        "com",
-        "conf",
-        "cue",
-        "dosz",
-        "exe",
-        "img",
-        "iso",
-        "zip"
-      ],
-      "retroArchCore": "dosbox_pure",
-      "theme": "dos"
-    },
-    {
-      "id": "genesis",
-      "name": "Sega Genesis",
-      "extensions": [
-        "32x",
-        "68k",
-        "7z",
-        "bin",
-        "bms",
-        "chd",
-        "cue",
-        "gen",
-        "gg",
-        "iso",
-        "m3u",
-        "md",
-        "mdx",
-        "sg",
-        "sgd",
-        "smd",
-        "sms",
-        "zip"
-      ],
-      "retroArchCore": "genesis_plus_gx",
-      "theme": "genesis"
-    },
     {
       "id": "nes",
       "name": "Nintendo Entertainment System",
+      "aliases": [
+        "Nintendo NES"
+      ],
       "extensions": [
         "3dsen",
         "7z",
@@ -62,46 +21,31 @@
       "theme": "nes"
     },
     {
-      "id": "pc",
-      "name": "PC",
+      "id": "snes",
+      "name": "Nintendo SNES (Super Nintendo)",
+      "aliases": [
+        "Nintendo SNES",
+        "Super Nintendo Entertainment System"
+      ],
       "extensions": [
         "7z",
-        "bat",
-        "com",
-        "conf",
-        "cue",
-        "dosz",
-        "exe",
-        "img",
-        "iso",
+        "bin",
+        "bml",
+        "bs",
+        "bsx",
+        "dx2",
+        "fig",
+        "gd3",
+        "gd7",
+        "mgd",
+        "sfc",
+        "smc",
+        "st",
+        "swc",
         "zip"
       ],
-      "retroArchCore": "dosbox_pure",
-      "theme": "pc"
-    },
-    {
-      "id": "ps2",
-      "name": "Sony PlayStation 2",
-      "extensions": [
-        "bin",
-        "chd",
-        "ciso",
-        "cso",
-        "desktop",
-        "dump",
-        "elf",
-        "gz",
-        "img",
-        "iso",
-        "isz",
-        "m3u",
-        "mdf",
-        "ngr",
-        "nrg",
-        "zso"
-      ],
-      "retroArchCore": "pcee2",
-      "theme": "ps2"
+      "retroArchCore": "snes9x",
+      "theme": "snes"
     },
     {
       "id": "psx",
@@ -133,27 +77,270 @@
       "theme": "psx"
     },
     {
-      "id": "snes",
-      "name": "Nintendo SNES (Super Nintendo)",
+      "id": "ps2",
+      "name": "Sony PlayStation 2",
+      "extensions": [
+        "bin",
+        "chd",
+        "ciso",
+        "cso",
+        "desktop",
+        "dump",
+        "elf",
+        "gz",
+        "img",
+        "iso",
+        "isz",
+        "m3u",
+        "mdf",
+        "ngr",
+        "nrg",
+        "zso"
+      ],
+      "retroArchCore": "pcee2",
+      "theme": "ps2"
+    },
+    {
+      "id": "pc",
+      "name": "PC",
+      "aliases": [
+        "Linux"
+      ],
+      "extensions": [
+        "7z",
+        "bat",
+        "com",
+        "conf",
+        "cue",
+        "dosz",
+        "exe",
+        "img",
+        "iso",
+        "zip"
+      ],
+      "retroArchCore": "dosbox_pure",
+      "theme": "pc"
+    },
+    {
+      "id": "dos",
+      "name": "DOS (PC)",
+      "aliases": [
+        "MS-DOS"
+      ],
+      "extensions": [
+        "7z",
+        "bat",
+        "com",
+        "conf",
+        "cue",
+        "dosz",
+        "exe",
+        "img",
+        "iso",
+        "zip"
+      ],
+      "retroArchCore": "dosbox_pure",
+      "theme": "dos"
+    },
+    {
+      "id": "genesis",
+      "name": "Sega Genesis",
+      "aliases": [
+        "Sega Genesis/Mega Drive"
+      ],
+      "extensions": [
+        "32x",
+        "68k",
+        "7z",
+        "bin",
+        "bms",
+        "chd",
+        "cue",
+        "gen",
+        "gg",
+        "iso",
+        "m3u",
+        "md",
+        "mdx",
+        "sg",
+        "sgd",
+        "smd",
+        "sms",
+        "zip"
+      ],
+      "retroArchCore": "genesis_plus_gx",
+      "theme": "genesis"
+    },
+    {
+      "id": "windows",
+      "name": "Microsoft Windows",
+      "extensions": [
+        "appimage",
+        "desktop",
+        "sh"
+      ],
+      "retroArchCore": null,
+      "theme": "windows"
+    },
+    {
+      "id": "videopac",
+      "name": "Philips Videopac G7000",
+      "aliases": [
+        "Phillips Videopac+",
+        "Phillips C52",
+        "Brandt Jopac"
+      ],
       "extensions": [
         "7z",
         "bin",
-        "bml",
-        "bs",
-        "bsx",
-        "dx2",
-        "fig",
-        "gd3",
-        "gd7",
-        "mgd",
-        "sfc",
-        "smc",
-        "st",
-        "swc",
         "zip"
       ],
-      "retroArchCore": "snes9x",
-      "theme": "snes"
+      "retroArchCore": "o2em",
+      "theme": "videopac"
+    },
+    {
+      "id": "odyssey2",
+      "name": "Magnavox Odyssey 2",
+      "aliases": [
+        "Magnavox Odyssey²"
+      ],
+      "extensions": [
+        "7z",
+        "bin",
+        "zip"
+      ],
+      "retroArchCore": "o2em",
+      "theme": "odyssey2"
+    },
+    {
+      "id": "atari800",
+      "name": "Atari 800",
+      "aliases": [
+        "Atari 8bit computers"
+      ],
+      "extensions": [
+        "7z",
+        "a52",
+        "atr",
+        "atx",
+        "bin",
+        "car",
+        "cas",
+        "cdm",
+        "com",
+        "rom",
+        "xex",
+        "xfd",
+        "zip"
+      ],
+      "retroArchCore": "atari800",
+      "theme": "atari800"
+    },
+    {
+      "id": "msx",
+      "name": "MSX",
+      "aliases": [
+        "Microsoft MSX",
+        "MSX, MSX2, MSX2+, MSX turboR"
+      ],
+      "extensions": [
+        "7z",
+        "cas",
+        "col",
+        "di1",
+        "di2",
+        "dmk",
+        "dsk",
+        "fd1",
+        "fd2",
+        "m3u",
+        "mx1",
+        "mx2",
+        "ogv",
+        "ri",
+        "rom",
+        "sc",
+        "sg",
+        "wav",
+        "xsa",
+        "zip"
+      ],
+      "retroArchCore": "bluemsx",
+      "theme": "msx"
+    },
+    {
+      "id": "apple2",
+      "name": "Apple II",
+      "aliases": [
+        "Apple IIe"
+      ],
+      "extensions": [
+        "7z",
+        "do",
+        "dsk",
+        "nib",
+        "po",
+        "zip"
+      ],
+      "retroArchCore": "applewin",
+      "theme": "apple2"
+    },
+    {
+      "id": "pcengine",
+      "name": "NEC PC Engine",
+      "aliases": [
+        "NEC PC Engine TurboGrafx-16"
+      ],
+      "extensions": [
+        "7z",
+        "ccd",
+        "chd",
+        "cue",
+        "img",
+        "iso",
+        "m3u",
+        "pce",
+        "rom",
+        "sgx",
+        "toc",
+        "zip"
+      ],
+      "retroArchCore": "mednafen_pce",
+      "theme": "pcengine"
+    },
+    {
+      "id": "gbc",
+      "name": "Nintendo Game Boy Color",
+      "extensions": [
+        "7z",
+        "bs",
+        "cgb",
+        "dmg",
+        "gb",
+        "gbc",
+        "gbx",
+        "sfc",
+        "sgb",
+        "smc",
+        "zip"
+      ],
+      "retroArchCore": "gambatte",
+      "theme": "gbc"
+    },
+    {
+      "id": "wiiu",
+      "name": "Nintendo Wii U",
+      "extensions": [
+        "elf",
+        "rpx",
+        "tmd",
+        "wua",
+        "wud",
+        "wuhb",
+        "wux"
+      ],
+      "retroArchCore": "cemu",
+      "theme": "wiiu"
     }
   ]
 }

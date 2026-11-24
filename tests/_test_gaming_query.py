@@ -13,17 +13,44 @@ setup_test_environment()
 SUBSET = Path(__file__).resolve().parent / "fixtures" / "platforms-database-subset.json"
 
 
+# What Lutris, Pythia's runners and libretro's map write as a game's platform, and the droidtop-platforms system each is.
+COMMON_PLATFORMS = {
+    "Nintendo Entertainment System": "nes",
+    "Nintendo NES": "nes",
+    "Super Nintendo Entertainment System": "snes",
+    "Nintendo SNES": "snes",
+    "Sony PlayStation": "psx",
+    "Sony PlayStation 2": "ps2",
+    "Sega Genesis": "genesis",
+    "Sega Genesis/Mega Drive": "genesis",
+    "Windows": "windows",
+    "Linux": "pc",
+    "MS-DOS": "dos",
+    "MSX, MSX2, MSX2+, MSX turboR": "msx",
+    "Microsoft MSX": "msx",
+    "Atari 8bit computers": "atari800",
+    "Apple IIe": "apple2",
+    "NEC PC Engine TurboGrafx-16": "pcengine",
+    "Nintendo Game Boy (Color)": "gbc",
+    "Wii U": "wiiu",
+    "Magnavox Odyssey²": "odyssey2",
+    "Phillips Videopac+": "videopac",
+}
+
+
 class SystemsTest(TestCase):
-    def test_a_platform_name_is_a_droidtop_system_by_its_name_or_id_ignoring_case_and_punctuation(self):
+    def test_a_platform_name_is_a_droidtop_system_by_its_name_id_or_alias_ignoring_case_and_punctuation(self):
         ps2 = platform_systems.system_of("Sony PlayStation 2", SUBSET)
         self.assertEqual(ps2, {"id": "ps2", "name": "Sony PlayStation 2", "known": True})
         self.assertEqual(platform_systems.system_of("sony playstation-2", SUBSET)["id"], "ps2")
         self.assertEqual(platform_systems.system_of("NES", SUBSET)["id"], "nes")
-        self.assertEqual(platform_systems.system_of("Nintendo Entertainment System", SUBSET)["id"], "nes")
+        self.assertEqual(platform_systems.system_of("super nintendo entertainment system", SUBSET)["id"], "snes")
 
-    def test_the_operating_systems_a_pc_game_is_listed_under_are_the_one_pc_system(self):
-        for name in ("Windows", "Linux", "macOS"):
-            self.assertEqual(platform_systems.system_of(name, SUBSET), {"id": "pc", "name": "PC", "known": True})
+    def test_the_names_the_launchers_and_runners_write_are_their_systems(self):
+        for name, ident in COMMON_PLATFORMS.items():
+            with self.subTest(name):
+                found = platform_systems.system_of(name, SUBSET)
+                self.assertEqual((found["id"], found["known"]), (ident, True))
 
     def test_a_name_with_no_system_is_not_guessed_at(self):
         self.assertEqual(
@@ -37,12 +64,12 @@ class SystemsTest(TestCase):
         self.assertEqual(len(platform_systems.load(missing)), 0)
 
     @skipUnless(platform_systems.PINNED.is_file(), "the droidtop-platforms submodule is not checked out")
-    def test_the_pinned_droidtop_platforms_data_knows_the_names_pythia_uses(self):
+    def test_the_pinned_droidtop_platforms_data_has_every_name_pythia_uses(self):
         systems = platform_systems.load()
         self.assertGreater(len(systems), 100)
-        self.assertEqual(systems.system_of("Sony PlayStation 2")["id"], "ps2")
-        self.assertEqual(systems.system_of("Sega Genesis")["id"], "genesis")
-        self.assertEqual(systems.system_of("Windows")["id"], "pc")
+        for name, ident in COMMON_PLATFORMS.items():
+            with self.subTest(name):
+                self.assertEqual(systems.system_of(name)["id"], ident)
 
 
 class QueryCase(LibraryCase):
@@ -109,7 +136,7 @@ class QueryCase(LibraryCase):
 class CardTest(QueryCase):
     def test_a_card_has_its_systems_and_how_often_it_was_played(self):
         by_id = {c["id"]: c for c in self.cards}
-        self.assertEqual(by_id["g1"]["systems"], ["pc"])
+        self.assertEqual((by_id["g1"]["systems"], by_id["g2"]["systems"]), (["windows"], ["pc"]))
         self.assertEqual(by_id["g1"]["playcount"], 3)
         self.assertEqual((by_id["g3"]["systems"], by_id["g4"]["systems"]), (["psx"], ["ps2"]))
         self.assertEqual(by_id["g6"]["systems"], ["strange-box-9000"])
@@ -123,7 +150,7 @@ class CardTest(QueryCase):
     def test_the_game_systems_say_the_droidtop_system_beside_the_platform(self):
         listed = {s["name"]: s for s in gaming_api.systems(self.cards)}
         # The id and name that get_game_systems always had stay; the droidtop system comes beside them.
-        self.assertEqual((listed["Windows"]["id"], listed["Windows"]["system_id"]), ("windows", "pc"))
+        self.assertEqual((listed["Windows"]["id"], listed["Windows"]["system_id"]), ("windows", "windows"))
         self.assertEqual((listed["Linux"]["system_id"], listed["Linux"]["system_name"]), ("pc", "PC"))
         self.assertEqual(listed["Sony PlayStation 2"]["system_id"], "ps2")
         self.assertEqual(listed["Strange Box 9000"]["known"], False)
@@ -161,12 +188,12 @@ class QueryTest(QueryCase):
         self.assertEqual(self.run_query({"text": "nothing like it"})["total"], 0)
 
     def test_a_facet_counts_leave_out_its_own_filter_and_keep_the_others(self):
-        answer = self.run_query({"system": "pc", "runner": "wine"})
+        answer = self.run_query({"system": "windows", "runner": "wine"})
         self.assertEqual(self.ids(answer), ["g1"])
-        # What each runner would give with the system filter kept: Linux and Windows games are both on pc.
-        self.assertEqual({r["value"]: r["count"] for r in answer["facets"]["runner"]}, {"linux": 1, "wine": 1})
-        # And the system counts keep the runner filter and leave their own out: only wine's game, on pc.
-        self.assertEqual({r["id"]: r["count"] for r in answer["facets"]["system"]}, {"pc": 1})
+        # What each runner would give with the system filter kept: only wine has a game on Windows.
+        self.assertEqual({r["value"]: r["count"] for r in answer["facets"]["runner"]}, {"wine": 1})
+        # And the system counts keep the runner filter and leave their own out: only wine's game, on Windows.
+        self.assertEqual({r["id"]: r["count"] for r in answer["facets"]["system"]}, {"windows": 1})
 
     def test_text_narrows_every_facet(self):
         answer = self.run_query({"text": "crash"})
@@ -191,7 +218,8 @@ class QueryTest(QueryCase):
     def test_store_and_system_take_a_list_and_match_any(self):
         self.assertEqual(self.ids(self.run_query({"store": ["gog", "nothing"]})), ["g5"])
         self.assertEqual(self.ids(self.run_query({"system": ["psx", "ps2"]})), ["g3", "g4"])
-        self.assertEqual(self.ids(self.run_query({"system": "pc"})), ["g5", "g2", "g1"])
+        self.assertEqual(self.ids(self.run_query({"system": "pc"})), ["g2"])
+        self.assertEqual(self.ids(self.run_query({"system": ["windows", "pc"]})), ["g5", "g2", "g1"])
 
     def test_a_collection_is_a_filter_by_its_members(self):
         answer = self.run_query({"sort": "title"}, members={"g1", "g3"})

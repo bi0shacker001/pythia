@@ -279,9 +279,11 @@ the droidtop coordinator for this lane. Later sections follow them.
       store, installed, favourite, decade of year), each facet's counts leaving
       out its own filter (`pythia.gaming_query`). A card has `systems` (the
       droidtop-platforms system of each platform, `pythia.platform_systems`,
-      from the data pinned as the submodule `vendor/droidtop-platforms`, never
-      a table copied here; a name with no system keeps its own slug and says
-      `known: false`) and `playcount`, counted where Pythia records a play (a
+      from the data pinned as the submodule `pythia/data/droidtop-platforms`, never
+      a table copied here: a name is matched to a system's name, id or `aliases`,
+      and a name Pythia uses that the data lacks is added there; every build
+      carries the one file it reads, and `packaging/check_standalone.py` checks
+      it; a name with no system keeps its own slug and says `known: false`) and `playcount`, counted where Pythia records a play (a
       folder game's start; a Lutris-path game's end). `get_game_systems` gains
       `system_id`, `system_name` and `known` beside the `id` and `name` it had.
       The person's collections (`get_collections`, `create_collection`,

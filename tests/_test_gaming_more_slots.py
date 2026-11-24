@@ -87,7 +87,7 @@ class MoreGamingSlotsTest(TestCase):
         self.assertEqual([g["id"] for g in answer["games"]], ["g2", "g1"])
         self.assertEqual(answer["total"], 2)
         self.assertEqual(answer["version"], self.backend.get_games()["version"])
-        self.assertEqual({f["id"]: f["count"] for f in answer["facets"]["system"]}, {"pc": 2})
+        self.assertEqual({f["id"]: f["count"] for f in answer["facets"]["system"]}, {"windows": 1, "pc": 1})
 
     def test_no_query_and_an_empty_one_give_the_whole_library(self):
         self.library()

@@ -9,6 +9,7 @@ set -euo pipefail
 
 BIN=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 WINDOW=${2:-}
+chmod +x "$BIN"
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 TMP=${RUNNER_TEMP:-/tmp}
 OUT=${OUT:-$PWD/integration-out}

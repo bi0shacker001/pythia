@@ -163,9 +163,15 @@ class QueryTest(QueryCase):
         self.assertEqual(answer["total"], 6)
         self.assertEqual(self.ids(answer), ["g5", "g3", "g4", "g2", "g1", "g6"])
         facets = answer["facets"]
-        self.assertEqual({r["value"]: r["count"] for r in facets["runner"]}, {
-            "duckstation": 1, "linux": 1, "pcsx2": 1, "wine": 1,
-        })
+        self.assertEqual(
+            {r["value"]: r["count"] for r in facets["runner"]},
+            {
+                "duckstation": 1,
+                "linux": 1,
+                "pcsx2": 1,
+                "wine": 1,
+            },
+        )
         self.assertEqual({r["value"]: r["count"] for r in facets["store"]}, {"gog": 1, "steam": 2})
         self.assertEqual({r["value"]: r["count"] for r in facets["installed"]}, {True: 5, False: 1})
         self.assertEqual({r["value"]: r["count"] for r in facets["favourite"]}, {False: 6})

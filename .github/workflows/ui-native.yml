@@ -291,6 +291,16 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Fetch the patched compose-native repository (mytop-project/compose-native)
+        run: |
+          set -euo pipefail
+          temp="$RUNNER_TEMP"
+          mkdir -p "$temp/cn-maven"
+          base="https://github.com/mytop-project/compose-native/releases/download/v$CN_VERSION"
+          curl --fail --location --silent --show-error --output "$temp/cn-maven.tar.gz" "$base/compose-native-maven-$CN_VERSION.tar.gz"
+          echo "$CN_SHA256  $temp/cn-maven.tar.gz" | shasum -a 256 --check
+          tar -xzf "$temp/cn-maven.tar.gz" -C "$temp/cn-maven"
+          echo "CN_REPO=$temp/cn-maven" >> "$GITHUB_ENV"
       - name: Unit tests and the window-less client
         working-directory: ui-native
         run: ./gradlew --no-daemon --stacktrace :core:macosArm64Test :core:linkReleaseExecutableMacosArm64

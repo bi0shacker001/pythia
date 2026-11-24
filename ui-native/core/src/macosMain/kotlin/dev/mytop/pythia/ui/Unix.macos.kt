@@ -12,6 +12,7 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
+import platform.darwin.sockaddr_un
 import platform.posix.AF_UNIX
 import platform.posix.SOCK_STREAM
 import platform.posix.SOL_SOCKET
@@ -20,7 +21,7 @@ import platform.posix.connect
 import platform.posix.memcpy
 import platform.posix.memset
 import platform.posix.setsockopt
-import platform.posix.sockaddr_un
+
 import platform.posix.socket
 
 // macOS has no MSG_NOSIGNAL; the socket option SO_NOSIGPIPE does the same for the whole socket.

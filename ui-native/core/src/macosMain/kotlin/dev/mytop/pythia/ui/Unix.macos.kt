@@ -24,9 +24,9 @@ import platform.posix.sockaddr_un
 import platform.posix.socket
 
 // macOS has no MSG_NOSIGNAL; the socket option SO_NOSIGPIPE does the same for the whole socket.
-internal actual val sendFlags: Int = 0
+internal val sendFlags: Int = 0
 
-internal actual fun connectUnixSocket(address: String): Int = memScoped {
+internal fun connectUnixSocket(address: String): Int = memScoped {
     val bytes = address.encodeToByteArray()
     val addr = alloc<sockaddr_un>()
     val fd = socket(AF_UNIX, SOCK_STREAM.convert(), 0)

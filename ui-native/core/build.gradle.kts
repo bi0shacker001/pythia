@@ -1,5 +1,4 @@
 import groovy.json.JsonSlurper
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
     kotlin("multiplatform")
@@ -128,15 +127,11 @@ kotlin {
     macosX64()
     macosArm64()
 
-    // Linux and macOS share the Unix socket code (posixMain); Windows has its own (mingwX64Main).
-    @OptIn(ExperimentalKotlinGradlePluginApi::class)
-    applyDefaultHierarchyTemplate {
-        common {
-            group("posix") {
-                withLinux()
-                withApple()
-            }
-        }
+    // Linux and macOS compile the one posix transport (src/posixShared) into both of their source sets; only the connect
+    // call differs, in each of them (sockaddr_un is platform.linux's on Linux, platform.posix's, with sun_len, on macOS).
+    sourceSets {
+        named("linuxMain") { kotlin.srcDir("src/posixShared/kotlin") }
+        named("macosMain") { kotlin.srcDir("src/posixShared/kotlin") }
     }
 
     sourceSets {

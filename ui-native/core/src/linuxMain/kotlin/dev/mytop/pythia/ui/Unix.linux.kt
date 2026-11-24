@@ -20,9 +20,9 @@ import platform.posix.memcpy
 import platform.posix.memset
 import platform.posix.socket
 
-internal actual val sendFlags: Int = MSG_NOSIGNAL.convert()
+internal val sendFlags: Int = MSG_NOSIGNAL.convert()
 
-internal actual fun connectUnixSocket(address: String): Int = memScoped {
+internal fun connectUnixSocket(address: String): Int = memScoped {
     val bytes = address.encodeToByteArray()
     val addr = alloc<sockaddr_un>()
     val fd = socket(AF_UNIX, SOCK_STREAM.convert(), 0)

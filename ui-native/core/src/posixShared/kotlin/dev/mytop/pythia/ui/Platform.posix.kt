@@ -26,11 +26,8 @@ import platform.posix.send
 import platform.posix.shutdown
 import platform.posix.strerror
 
-/** The shared part of the Unix transport (Linux and macOS): a connected stream socket for [address]; throws [StreamException] with the reason. */
-internal expect fun connectUnixSocket(address: String): Int
-
-/** The flags of `send` that keep a vanished peer from ending this program with SIGPIPE (the socket option does it where there is no flag). */
-internal expect val sendFlags: Int
+// Compiled into linuxMain and macosMain alike. Each has its own `sendFlags` and `connectUnixSocket` (a connected stream
+// socket for an address, or a StreamException with the reason); the rest is the same.
 
 actual val blockingDispatcher: CoroutineDispatcher = Dispatchers.IO
 

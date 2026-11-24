@@ -255,6 +255,7 @@ def _play_folder(game_id: str, name: str) -> dict:
         return {"status": "error", "message": f"{name} did not start: {ex}"}
     running.TRACKER.track(game_id, proc, "folder")
     variant["lastplayed"] = folder_launch.now()
+    variant["playcount"] = int(variant.get("playcount") or 0) + 1
     games_db.save_entry_and_sync_cache(own)
     logger.info("Started %s from its folder", name)
     return {"status": "ok", "via": "folder"}

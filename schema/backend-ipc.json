@@ -45,6 +45,20 @@
       "returns": "answer"
     },
     {
+      "name": "add_to_collection",
+      "params": [
+        {
+          "name": "collection_id",
+          "type": "string"
+        },
+        {
+          "name": "game_ids",
+          "type": "any"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
       "name": "apply_update",
       "params": [
         {
@@ -117,6 +131,26 @@
       ],
       "returns": "answer",
       "async": true
+    },
+    {
+      "name": "create_collection",
+      "params": [
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "delete_collection",
+      "params": [
+        {
+          "name": "collection_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
     },
     {
       "name": "describe_store_links",
@@ -280,6 +314,11 @@
       "async": true
     },
     {
+      "name": "get_collections",
+      "params": [],
+      "returns": "answer"
+    },
+    {
       "name": "get_downloader_plugins",
       "params": [],
       "returns": "answer"
@@ -299,6 +338,31 @@
         {
           "name": "role",
           "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true
+    },
+    {
+      "name": "get_game_art_data",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        },
+        {
+          "name": "role",
+          "type": "string"
+        },
+        {
+          "name": "offset",
+          "type": "integer",
+          "optional": true
+        },
+        {
+          "name": "length",
+          "type": "integer",
+          "optional": true
         }
       ],
       "returns": "answer",
@@ -692,6 +756,16 @@
       "async": true
     },
     {
+      "name": "query_games",
+      "params": [
+        {
+          "name": "query",
+          "type": "any"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
       "name": "quit_app",
       "params": [],
       "returns": "none"
@@ -748,6 +822,20 @@
       "returns": "answer"
     },
     {
+      "name": "remove_from_collection",
+      "params": [
+        {
+          "name": "collection_id",
+          "type": "string"
+        },
+        {
+          "name": "game_ids",
+          "type": "any"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
       "name": "remove_library_folder",
       "params": [
         {
@@ -770,6 +858,20 @@
         },
         {
           "name": "platform",
+          "type": "string"
+        }
+      ],
+      "returns": "answer"
+    },
+    {
+      "name": "rename_collection",
+      "params": [
+        {
+          "name": "collection_id",
+          "type": "string"
+        },
+        {
+          "name": "name",
           "type": "string"
         }
       ],
@@ -1253,6 +1355,14 @@
     },
     {
       "name": "asyncResult",
+      "params": [
+        {
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "collectionsChanged",
       "params": [
         {
           "type": "any"

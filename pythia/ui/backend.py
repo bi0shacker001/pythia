@@ -36,7 +36,17 @@ from typing import Any
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
-from pythia import datadir, downloads, gaming_api, onboarding, reconciliation, running, scanning
+from pythia import (
+    datadir,
+    downloads,
+    game_collections,
+    gaming_api,
+    gaming_query,
+    onboarding,
+    reconciliation,
+    running,
+    scanning,
+)
 from pythia.database import games as games_db
 from pythia.identity import get_system_uuid
 from pythia.util.log import logger
@@ -174,6 +184,10 @@ class Backend(QObject):
     gamesVersionChanged = Signal(str)  # the library was read again; the version get_games answers with now
     gameStarted = Signal("QVariant")  # a game Pythia started is running: {"game_id", "via", "started_at", "pid"}
     gameStopped = Signal("QVariant")  # it ended: the same, and "exit_code" (None when not known)
+    # The person's collections changed here or on another computer: {"kind": "created" | "renamed" |
+    # "deleted" | "members" | "synced", "id" (the collection; absent for "synced"), "version"}
+    # (pythia.game_collections).
+    collectionsChanged = Signal("QVariant")
 
     def __init__(self, error_console: bool = False):
         super().__init__()
@@ -186,6 +200,7 @@ class Backend(QObject):
         self._games = []
         self._cards: list[dict] = []
         self._games_version = ""
+        self._collections_version = ""
         self._lock = threading.Lock()
         self._ui_log: list[dict] = []
         self._jobs: list[dict] = []
@@ -446,6 +461,11 @@ class Backend(QObject):
             version = self._games_version
         self.gamesChanged.emit()
         self.gamesVersionChanged.emit(version)
+        # A collection another computer changed arrives with the library folder, as its games do.
+        collections_version = game_collections.version()
+        if self._collections_version and collections_version != self._collections_version:
+            self.collectionsChanged.emit({"kind": "synced", "version": collections_version})
+        self._collections_version = collections_version
         # While this process serves droidtop handhelds, the library is theirs too.
         from pythia.droidtop import library as droidtop_library
 
@@ -2744,6 +2764,142 @@ class Backend(QObject):
         if game is None:
             return ui_contract.error(f"No game {game_id} in the library", slot="get_game_art", code="no-such-game")
         return gaming_api.art(game.get("entries") or [], role)
+
+    @Slot(str, str, int, int, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    def get_game_art_data(self, game_id: str, role: str, offset: int = 0, length: int = gaming_api.DEFAULT_CHUNK):
+        """The bytes of a game's art file for ``role``, for a client on another computer that cannot open the file
+        get_game_art names: ``length`` bytes from ``offset`` (at most 1 MiB) as ``data`` (base64), with ``mime``, the
+        file's whole ``size``, this chunk's ``length`` and ``eof``. A client asks again from offset + length until
+        ``eof``. ``unavailable`` with the reason when there is no such art."""
+        from pythia.ipc import ui_contract
+
+        game = self._game_of(game_id)
+        if game is None:
+            return ui_contract.error(
+                f"No game {game_id} in the library", slot="get_game_art_data", code="no-such-game"
+            )
+        return gaming_api.art_bytes(game.get("entries") or [], role, offset, length)
+
+    @Slot("QVariant", result="QVariant")
+    @_guarded
+    def query_games(self, query):
+        """The library filtered and ordered as ``query`` says, in one pass over the cards held in memory
+        (pythia.gaming_query): ``games`` (one page of cards), ``total`` (all that match) and ``facets``, how many
+        games each system (droidtop-platforms id and name), runner, store, installed, favourite and decade of
+        year has, each facet's counts leaving out its own filter. ``version`` is get_games's. An unusable query
+        is an error that says which part."""
+        from pythia.ipc import ui_contract
+
+        with self._lock:
+            version, cards = self._games_version, self._cards
+        if query in (None, ""):
+            query = {}
+        members = None
+        try:
+            if isinstance(query, dict) and query.get("collection") not in (None, ""):
+                found = next((c for c in game_collections.merged() if c["id"] == query["collection"]), None)
+                if found is None:
+                    return ui_contract.error(
+                        f"No collection {query['collection']}", slot="query_games", code="no-such-collection"
+                    )
+                members = set(found["game_ids"])
+            answer = gaming_query.run(cards, query, members)
+        except gaming_query.QueryError as ex:
+            return ui_contract.error(str(ex), slot="query_games", code="bad-query")
+        return _jsonable(ui_contract.ok("query_games", version=version, **answer))
+
+    # ---- collections ------------------------------------------------------------------------------------------------
+    def _collections_changed(self, kind: str, collection_id: str) -> None:
+        version = game_collections.version()
+        self._collections_version = version
+        self.collectionsChanged.emit({"kind": kind, "id": collection_id, "version": version})
+
+    @Slot(result="QVariant")
+    @_guarded
+    def get_collections(self):
+        """The person's collections, each with its ``id``, ``name``, ``game_ids`` and ``count``, by name. They are
+        kept in the library folder with the games (pythia.game_collections), so they are the same on every
+        computer sharing it. ``version`` changes when any collection does."""
+        from pythia.ipc import ui_contract
+
+        collections = game_collections.merged()
+        return ui_contract.ok(
+            "get_collections", version=game_collections.version(collections), collections=collections
+        )
+
+    def _collection_call(self, slot: str, change, kind: str, collection_id: str | None = None, **fields):
+        from pythia.ipc import ui_contract
+
+        try:
+            result = change()
+        except game_collections.CollectionError as ex:
+            return ui_contract.error(str(ex), slot=slot, code=ex.code)
+        collection = result[0] if isinstance(result, tuple) else result
+        changed = collection["id"] if isinstance(collection, dict) else collection_id
+        self._collections_changed(kind, changed)
+        extra = {"changed": result[1]} if isinstance(result, tuple) else {}
+        return ui_contract.ok(
+            slot, collection=collection if isinstance(collection, dict) else None, **extra, **fields
+        )
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def create_collection(self, name: str):
+        """Makes an empty collection called ``name`` (no other has that name, ignoring case); answers it."""
+        return self._collection_call("create_collection", lambda: game_collections.create(name), "created")
+
+    @Slot(str, str, result="QVariant")
+    @_guarded
+    def rename_collection(self, collection_id: str, name: str):
+        """Renames a collection; the newest name wins on every computer."""
+        return self._collection_call(
+            "rename_collection", lambda: game_collections.rename(collection_id, name), "renamed", collection_id
+        )
+
+    @Slot(str, result="QVariant")
+    @_guarded
+    def delete_collection(self, collection_id: str):
+        """Deletes a collection (its games stay in the library) on every computer."""
+
+        def change():
+            game_collections.delete(collection_id)
+            return collection_id
+
+        return self._collection_call("delete_collection", change, "deleted", collection_id, deleted=True)
+
+    @Slot(str, "QVariant", result="QVariant")
+    @_guarded
+    def add_to_collection(self, collection_id: str, game_ids):
+        """Adds games (a list of game ids) to a collection. ``changed`` lists those that were not in it already,
+        ``unknown`` those the library does not have (and that were not added)."""
+        known, unknown = self._known_games(game_ids)
+        return self._collection_call(
+            "add_to_collection",
+            lambda: game_collections.add_games(collection_id, known),
+            "members",
+            collection_id,
+            unknown=unknown,
+        )
+
+    @Slot(str, "QVariant", result="QVariant")
+    @_guarded
+    def remove_from_collection(self, collection_id: str, game_ids):
+        """Takes games (a list of game ids) out of a collection; ``changed`` lists those that were in it."""
+        ids = [g for g in game_ids if isinstance(g, str)] if isinstance(game_ids, list) else []
+        return self._collection_call(
+            "remove_from_collection",
+            lambda: game_collections.remove_games(collection_id, ids),
+            "members",
+            collection_id,
+        )
+
+    def _known_games(self, game_ids) -> tuple[list[str], list[str]]:
+        ids = [g for g in game_ids if isinstance(g, str)] if isinstance(game_ids, list) else []
+        with self._lock:
+            have = {g.get("game_id") for g in self._games}
+        return [g for g in ids if g in have], [g for g in ids if g not in have]
 
     # ---- running games ----------------------------------------------------------------------------------------------
     def _on_running_game(self, kind: str, info: dict):

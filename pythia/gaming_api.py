@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from pythia import platform_systems
 from pythia.util.strings import slugify
 
 # What a game page reads that Pythia's records do not carry (docs: the entry shape in pythia.datadir has the name,
@@ -53,6 +54,13 @@ def _epoch(value: Any) -> int | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=datetime.timezone.utc)
     return int(parsed.timestamp())
+
+
+def _count(value: Any) -> int:
+    try:
+        return max(int(value or 0), 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _hours(value: Any) -> float:
@@ -119,16 +127,22 @@ def card(game: dict, system_uuid: str) -> dict:
             str(v["source"]["kind"]) for v in variants if isinstance(v.get("source"), dict) and v["source"].get("kind")
         )
     )
+    platforms = _platforms(entries)
+    systems = list(dict.fromkeys(platform_systems.system_of(name)["id"] for name in platforms))
     return {
         "id": game["game_id"],
         "title": title,
         "sort_name": sortname or title.lower(),
-        "platforms": _platforms(entries),
+        "platforms": platforms,
+        # The droidtop-platforms system of each platform (pythia.platform_systems), what a shelf is grouped by.
+        "systems": systems or ["unknown"],
         "runner": runners[0] if runners else None,
         "runners": runners,
         "installed": _installed_here(entries, system_uuid),
         "last_played": max(played) if played else None,
         "playtime_hours": round(sum(_hours(v.get("playtime")) for v in variants), 4),
+        # How many times it was played, recorded with each play (a game never played here has none).
+        "playcount": sum(_count(v.get("playcount")) for v in variants),
         "favourite": bool(game.get("favourite")),
         # The roles known without touching the disk again: the cover was looked up when the library was read.
         # The others are asked for one game at a time (get_game_art).
@@ -151,6 +165,14 @@ def version(card_list: list[dict]) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]  # noqa: S324 -- a change marker, not a secret
 
 
+def _droidtop_system(name: str) -> dict:
+    """The platform as a droidtop-platforms system: ``system_id``, ``system_name`` and whether it is ``known`` there."""
+    if name == NO_PLATFORM:
+        return {"system_id": "unknown", "system_name": NO_PLATFORM, "known": False}
+    found = platform_systems.system_of(name)
+    return {"system_id": found["id"], "system_name": found["name"], "known": found["known"]}
+
+
 def systems(card_list: list[dict]) -> list[dict]:
     """The platforms the library has, each with the games on it, in one pass: ``id``, ``name``, ``count``,
     ``installed``, ``favourites``, ``last_played``. A game on several platforms counts under each."""
@@ -162,6 +184,7 @@ def systems(card_list: list[dict]) -> list[dict]:
                 {
                     "id": slugify(name) if name != NO_PLATFORM else "unknown",
                     "name": name,
+                    **_droidtop_system(name),
                     "count": 0,
                     "installed": 0,
                     "favourites": 0,
@@ -214,6 +237,7 @@ def detail(game: dict, system_uuid: str) -> dict:
         "installed": summary["installed"],
         "last_played": summary["last_played"],
         "playtime_hours": summary["playtime_hours"],
+        "playcount": summary["playcount"],
         "favourite": summary["favourite"],
         "sources": summary["sources"],
         "added": summary["added"],
@@ -304,4 +328,50 @@ def art(entries: list[dict], role: str) -> dict:
         uri=path.as_uri(),
         mime=_MIME.get(path.suffix.lower(), "application/octet-stream"),
         size=os.path.getsize(path),
+    )
+
+
+# A client on another computer cannot open the file ``art`` names, so the bytes are read in chunks it asks for
+# (base64 in the answer), each well inside the channel's frame limit.
+DEFAULT_CHUNK = 256 * 1024
+MAX_CHUNK = 1024 * 1024
+
+
+def art_bytes(entries: list[dict], role: str, offset: int = 0, length: int = DEFAULT_CHUNK) -> dict:
+    """``length`` bytes of the art file of ``role`` from ``offset``, as ``data`` (base64) with the file's ``mime``
+    and whole ``size``, how many bytes this chunk holds (``length``) and whether it ends the file (``eof``)."""
+    import base64  # noqa: PLC0415
+
+    from pythia.ipc import ui_contract  # noqa: PLC0415
+
+    path, reason = art_path(entries, role)
+    if path is None:
+        return ui_contract.unavailable(reason or "No art.", slot="get_game_art_data")
+    if offset < 0 or length < 1:
+        return ui_contract.error(
+            "The offset cannot be negative and the length must be at least 1.",
+            slot="get_game_art_data",
+            code="bad-range",
+        )
+    length = min(length, MAX_CHUNK)
+    try:
+        size = os.path.getsize(path)
+        with open(path, "rb") as handle:
+            handle.seek(offset)
+            chunk = handle.read(length)
+    except OSError as ex:
+        return ui_contract.error(f"The art file could not be read: {ex}", slot="get_game_art_data", code="unreadable")
+    if offset > size:
+        return ui_contract.error(
+            f"The offset {offset} is past the end of the {size} byte file.", slot="get_game_art_data", code="bad-range"
+        )
+    return ui_contract.ok(
+        slot="get_game_art_data",
+        role=role,
+        mime=_MIME.get(path.suffix.lower(), "application/octet-stream"),
+        size=size,
+        offset=offset,
+        length=len(chunk),
+        eof=offset + len(chunk) >= size,
+        data=base64.b64encode(chunk).decode("ascii"),
     )

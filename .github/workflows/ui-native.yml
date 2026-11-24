@@ -307,7 +307,7 @@ jobs:
       - name: Size
         working-directory: ui-native
         run: |
-          bin=$(find core/build/bin/macosArm64 -type f -path '*releaseExecutable*' -name '*.kexe' | head -n1)
+          bin=$(find core/build/bin/macosArm64/releaseExecutable -maxdepth 1 -type f -name '*.kexe' | head -n1)
           echo "binary: $bin"
           mkdir -p out
           cp "$bin" out/pythia-probe

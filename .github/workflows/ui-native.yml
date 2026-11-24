@@ -23,6 +23,7 @@ permissions:
   contents: read
 
 env:
+  DEBIAN_FRONTEND: noninteractive
   # The patched compose-native: release v<CN_VERSION> of mytop-project/compose-native, its sha256 pinned here.
   CN_VERSION: 1.13.0-beta01-mytop.1
   CN_SHA256: 5ace9958184fa4a1a5d331cda484a908696506a9bcab54d966d5260332bae3c1

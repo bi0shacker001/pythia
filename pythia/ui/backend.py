@@ -2684,7 +2684,7 @@ class Backend(QObject):
     def get_storage_roles(self):
         return self._unavailable("get_storage_roles", "Storage roles arrive with save backups and game transfer.")
 
-    # ---- the library as a gaming front end reads it (pythia.gaming_api; mytop-project/tracker#920) ---------------------
+    # ---- the library as a gaming front end reads it (pythia.gaming_api; mytop-project/tracker#920) -----------------
     @Slot(result="QVariant")
     @_guarded
     def get_games(self, since_version: str = ""):

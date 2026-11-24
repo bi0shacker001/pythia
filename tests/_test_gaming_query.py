@@ -227,7 +227,8 @@ class QueryTest(QueryCase):
         self.assertEqual({r["value"]: r["count"] for r in answer["facets"]["runner"]}, {"duckstation": 1, "wine": 1})
 
     def test_the_order_and_the_page(self):
-        self.assertEqual(self.ids(self.run_query({"sort": "title", "descending": True})), ["g6", "g1", "g2", "g4", "g3", "g5"])
+        backwards = self.run_query({"sort": "title", "descending": True})
+        self.assertEqual(self.ids(backwards), ["g6", "g1", "g2", "g4", "g3", "g5"])
         self.assertEqual(self.ids(self.run_query({"sort": "playcount", "descending": True}))[0], "g1")
         self.assertEqual(self.ids(self.run_query({"sort": "last_played", "descending": True}))[0], "g2")
         # Games with no value for the sort come last whichever way it runs.

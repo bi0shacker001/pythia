@@ -128,7 +128,9 @@ def run(cards: list[dict], query: dict[str, Any] | None, collection_ids: set[str
         # The card names the platforms and their systems in the same order (gaming_api.card), shortest way to a name.
         if ident not in system_names:
             for platform in card["platforms"]:
-                found = system_cache.get(platform) or system_cache.setdefault(platform, platform_systems.system_of(platform))
+                if platform not in system_cache:
+                    system_cache[platform] = platform_systems.system_of(platform)
+                found = system_cache[platform]
                 system_names.setdefault(found["id"], found["name"])
             system_names.setdefault(ident, "Unknown platform" if ident == "unknown" else ident)
         return system_names[ident]
@@ -165,7 +167,7 @@ def run(cards: list[dict], query: dict[str, Any] | None, collection_ids: set[str
             for value in values:
                 counts[facet][value] = counts[facet].get(value, 0) + 1
                 if facet == "system":
-                    system_name(card, value)
+                    system_name(card, str(value))
 
     ordered = _ordered(matching, sort, bool(descending))
     answer: dict[str, Any] = {

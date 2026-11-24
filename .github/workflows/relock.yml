@@ -1,0 +1,36 @@
+name: Relock
+
+# One-off: regenerates every Cargo.lock after a dependency move, in CI because nothing is built locally.
+# Lives only on ci/relock-* branches and is never landed.
+on:
+  push:
+    branches: ['ci/relock-**']
+
+permissions:
+  contents: write
+
+jobs:
+  relock:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - name: cargo update --workspace in every directory with a lock
+        run: |
+          set -eu
+          for lock in $(git ls-files | grep -E '(^|/)Cargo\.lock$' | grep -v '^vendor/'); do
+            dir=$(dirname "$lock")
+            echo "== $dir"
+            (cd "$dir" && { cargo update --workspace || cargo update; })
+          done
+      - name: Commit the locks
+        run: |
+          set -eu
+          git config user.name "relock"
+          git config user.email "relock@users.noreply.github.com"
+          git add -A -- '*Cargo.lock'
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -q -m "Cargo.lock: regenerated in CI after the dependency move" -m "Changelog: none"
+          git push origin HEAD:"$GITHUB_REF_NAME"

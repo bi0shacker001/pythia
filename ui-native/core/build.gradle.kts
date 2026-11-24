@@ -130,8 +130,9 @@ kotlin {
     // Linux and macOS compile the one posix transport (src/posixShared) into both of their source sets; only the connect
     // call differs, in each of them (sockaddr_un is platform.linux's on Linux, platform.posix's, with sun_len, on macOS).
     sourceSets {
-        named("linuxMain") { kotlin.srcDir("src/posixShared/kotlin") }
-        named("macosMain") { kotlin.srcDir("src/posixShared/kotlin") }
+        configureEach {
+            if (name == "linuxMain" || name == "macosMain") kotlin.srcDir("src/posixShared/kotlin")
+        }
     }
 
     sourceSets {

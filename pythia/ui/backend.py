@@ -2777,9 +2777,7 @@ class Backend(QObject):
 
         game = self._game_of(game_id)
         if game is None:
-            return ui_contract.error(
-                f"No game {game_id} in the library", slot="get_game_art_data", code="no-such-game"
-            )
+            return ui_contract.error(f"No game {game_id} in the library", slot="get_game_art_data", code="no-such-game")
         return gaming_api.art_bytes(game.get("entries") or [], role, offset, length)
 
     @Slot("QVariant", result="QVariant")
@@ -2825,9 +2823,7 @@ class Backend(QObject):
         from pythia.ipc import ui_contract
 
         collections = game_collections.merged()
-        return ui_contract.ok(
-            "get_collections", version=game_collections.version(collections), collections=collections
-        )
+        return ui_contract.ok("get_collections", version=game_collections.version(collections), collections=collections)
 
     def _collection_call(self, slot: str, change, kind: str, collection_id: str | None = None, **fields):
         from pythia.ipc import ui_contract
@@ -2840,9 +2836,7 @@ class Backend(QObject):
         changed = collection["id"] if isinstance(collection, dict) else collection_id
         self._collections_changed(kind, str(changed or ""))
         extra = {"changed": result[1]} if isinstance(result, tuple) else {}
-        return ui_contract.ok(
-            slot, collection=collection if isinstance(collection, dict) else None, **extra, **fields
-        )
+        return ui_contract.ok(slot, collection=collection if isinstance(collection, dict) else None, **extra, **fields)
 
     @Slot(str, result="QVariant")
     @_guarded

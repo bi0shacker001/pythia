@@ -22,6 +22,7 @@ import os
 import tempfile
 import threading
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -85,7 +86,7 @@ def _write_own(collections: dict[str, dict]) -> None:
         raise
 
 
-def _newest(marks: list[dict | None]) -> dict | None:
+def _newest(marks: Sequence[dict | None]) -> dict | None:
     marks = [m for m in marks if isinstance(m, dict) and m.get("at")]
     return max(marks, key=lambda m: m["at"]) if marks else None
 

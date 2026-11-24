@@ -2838,7 +2838,7 @@ class Backend(QObject):
             return ui_contract.error(str(ex), slot=slot, code=ex.code)
         collection = result[0] if isinstance(result, tuple) else result
         changed = collection["id"] if isinstance(collection, dict) else collection_id
-        self._collections_changed(kind, changed)
+        self._collections_changed(kind, str(changed or ""))
         extra = {"changed": result[1]} if isinstance(result, tuple) else {}
         return ui_contract.ok(
             slot, collection=collection if isinstance(collection, dict) else None, **extra, **fields

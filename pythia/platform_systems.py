@@ -72,7 +72,11 @@ class Systems:
         found = self._by_key.get(key)
         if found is not None:
             return {"id": found["id"], "name": found["name"], "known": True}
-        return {"id": slugify(platform) if platform else "unknown", "name": platform or "Unknown platform", "known": False}
+        return {
+            "id": slugify(platform) if platform else "unknown",
+            "name": platform or "Unknown platform",
+            "known": False,
+        }
 
 
 def load(path: Path | None = None) -> Systems:

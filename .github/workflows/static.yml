@@ -122,7 +122,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: The pinned droidtop-platforms data
         # pythia.platform_systems maps platform names to droidtop's systems from this submodule.
-        run: git submodule update --init vendor/droidtop-platforms
+        run: git submodule update --init pythia/data/droidtop-platforms
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

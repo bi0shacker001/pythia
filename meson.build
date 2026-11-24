@@ -41,8 +41,15 @@ install_data(
 install_subdir(
   'pythia',
   install_dir: pylibdir,
-  # A module built in the tree (pip install -e .) is not this build's.
+  # A module built in the tree (pip install -e .) is not this build's. The pinned droidtop-platforms checkout is
+  # a whole repository; only the file pythia.platform_systems reads is installed, below.
   exclude_files: ['_native.abi3.so', '_native.pyd'],
+  exclude_directories: ['data/droidtop-platforms'],
+)
+
+install_data(
+  files('pythia/data/droidtop-platforms/platforms-database.json'),
+  install_dir: join_paths(pylibdir, 'pythia', 'data', 'droidtop-platforms'),
 )
 
 # Pythia's droidtop side, pythia._native (native/), built with cargo.

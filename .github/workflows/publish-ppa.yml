@@ -40,6 +40,9 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
+      - name: The pinned droidtop-platforms data
+        run: git submodule update --init pythia/data/droidtop-platforms
+
       - name: Install build dependencies
         run: |
           ./.github/scripts/install-ubuntu.sh

@@ -468,6 +468,7 @@ class SingleGameActions(GameActions):
         db_game["slug"] = slugify(new_name) if new_name != game.name else game.slug
         db_game["lastplayed"] = None
         db_game["playtime"] = 0.0
+        db_game["playcount"] = 0
         db_game["configpath"] = new_config_id
         db_game.pop("id")
         # Disconnect duplicate from service- there should be at most 1 database game for a service game.

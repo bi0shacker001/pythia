@@ -113,6 +113,16 @@ class PlayFolderTest(TestCase):
         self.assertEqual(popen.call_args.args[0], [str(self.root / "Tiny.exe")])
         self.assertEqual(popen.call_args.kwargs["cwd"], str(self.root))
         self.assertTrue(save.call_args.args[0]["versions"][0]["variants"][0]["lastplayed"])
+        self.assertEqual(save.call_args.args[0]["versions"][0]["variants"][0]["playcount"], 1)
+
+    def test_each_play_adds_one_to_the_play_count(self):
+        with (
+            mock.patch.object(folder_launch.subprocess, "Popen"),
+            mock.patch("pythia.database.games.save_entry_and_sync_cache") as save,
+        ):
+            play.play("g1")
+            play.play("g1")
+        self.assertEqual(save.call_args.args[0]["versions"][0]["variants"][0]["playcount"], 2)
 
     def test_an_epic_game_is_sent_to_its_launcher(self):
         self.entry["platform_ids"] = [{"platform": "egs", "id": "Fortnite"}]

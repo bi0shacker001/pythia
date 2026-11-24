@@ -273,6 +273,26 @@ the droidtop coordinator for this lane. Later sections follow them.
       games Pythia started itself; a Steam launch is Steam's), and
       `cancel_job` (only the folder watch can be stopped). `gamesChanged` and
       the HTML UI's slots are unchanged.
+    - **Querying, collections, art bytes (batch 2).** `query_games(query)`
+      filters and orders the cards in one pass over the library held in
+      memory and answers a page, the `total` and the `facets` (system, runner,
+      store, installed, favourite, decade of year), each facet's counts leaving
+      out its own filter (`pythia.gaming_query`). A card has `systems` (the
+      droidtop-platforms system of each platform, `pythia.platform_systems`,
+      from the data pinned as the submodule `vendor/droidtop-platforms`, never
+      a table copied here; a name with no system keeps its own slug and says
+      `known: false`) and `playcount`, counted where Pythia records a play (a
+      folder game's start; a Lutris-path game's end). `get_game_systems` gains
+      `system_id`, `system_name` and `known` beside the `id` and `name` it had.
+      The person's collections (`get_collections`, `create_collection`,
+      `rename_collection`, `delete_collection`, `add_to_collection`,
+      `remove_from_collection`, event `collectionsChanged`) are kept in the
+      library folder, `datadir/collections/<system-uuid>.json`, one file per
+      computer under datadir's single-writer rule, merged by the newest
+      change per name, deletion and member (`pythia.game_collections`), so
+      they are the person's on every computer. `get_game_art_data` reads a
+      game's art file in chunks of at most 1 MiB, base64 in the answer, for a
+      client on another computer; `get_game_art` is unchanged.
 
 16. **The native front end starts as `ui-native/` (mytop-project/tracker#958,
     step 5).** A self-contained Gradle build in this repo: Kotlin 2.4.20,

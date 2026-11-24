@@ -120,6 +120,7 @@ class Game:
             logger.exception("Unable to parse playtime '%s' for game %s: %s", game_data.get("playtime"), self.slug, ex)
             self.playtime = 0.0
 
+        self.playcount = int(game_data.get("playcount") or 0)
         self.discord_id = game_data.get("discord_id")  # Discord App ID for RPC
 
         self._runner = None
@@ -525,6 +526,7 @@ class Game:
             "configpath": configpath,
             "id": self.id,
             "playtime": self.playtime,
+            "playcount": self.playcount,
             "service": self.service,
             "service_id": self.appid,
             "discord_id": self.discord_id,
@@ -545,7 +547,13 @@ class Game:
     def save_lastplayed(self) -> None:
         """Save only the lastplayed field- do not restore any other values the user may have changed
         in another window."""
-        games_db.update_existing(id=self.id, slug=self.slug, lastplayed=self.lastplayed, playtime=self.playtime)
+        games_db.update_existing(
+            id=self.id,
+            slug=self.slug,
+            lastplayed=self.lastplayed,
+            playtime=self.playtime,
+            playcount=self.playcount,
+        )
         GAME_UPDATED.fire(self)
 
     def check_launchable(self) -> bool:
@@ -1094,6 +1102,7 @@ class Game:
         quit_time = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
         logger.debug("%s stopped at %s", self.name, quit_time)
         self.lastplayed = int(time.time())
+        self.playcount += 1  # one more play, as lastplayed is now
         self.save_lastplayed()
 
         os.chdir(os.path.expanduser("~"))

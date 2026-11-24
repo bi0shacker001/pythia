@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "source": "ES-DE es_systems.xml (linux), MIT -- regenerate with generator/from_esde_systems.py (a subset of the pinned file, for the tests)",
+  "platforms": [
+    {
+      "id": "dos",
+      "name": "DOS (PC)",
+      "extensions": [
+        "7z",
+        "bat",
+        "com",
+        "conf",
+        "cue",
+        "dosz",
+        "exe",
+        "img",
+        "iso",
+        "zip"
+      ],
+      "retroArchCore": "dosbox_pure",
+      "theme": "dos"
+    },
+    {
+      "id": "genesis",
+      "name": "Sega Genesis",
+      "extensions": [
+        "32x",
+        "68k",
+        "7z",
+        "bin",
+        "bms",
+        "chd",
+        "cue",
+        "gen",
+        "gg",
+        "iso",
+        "m3u",
+        "md",
+        "mdx",
+        "sg",
+        "sgd",
+        "smd",
+        "sms",
+        "zip"
+      ],
+      "retroArchCore": "genesis_plus_gx",
+      "theme": "genesis"
+    },
+    {
+      "id": "nes",
+      "name": "Nintendo Entertainment System",
+      "extensions": [
+        "3dsen",
+        "7z",
+        "fds",
+        "nes",
+        "unf",
+        "unif",
+        "zip"
+      ],
+      "retroArchCore": "mesen",
+      "theme": "nes"
+    },
+    {
+      "id": "pc",
+      "name": "PC",
+      "extensions": [
+        "7z",
+        "bat",
+        "com",
+        "conf",
+        "cue",
+        "dosz",
+        "exe",
+        "img",
+        "iso",
+        "zip"
+      ],
+      "retroArchCore": "dosbox_pure",
+      "theme": "pc"
+    },
+    {
+      "id": "ps2",
+      "name": "Sony PlayStation 2",
+      "extensions": [
+        "bin",
+        "chd",
+        "ciso",
+        "cso",
+        "desktop",
+        "dump",
+        "elf",
+        "gz",
+        "img",
+        "iso",
+        "isz",
+        "m3u",
+        "mdf",
+        "ngr",
+        "nrg",
+        "zso"
+      ],
+      "retroArchCore": "pcee2",
+      "theme": "ps2"
+    },
+    {
+      "id": "psx",
+      "name": "Sony PlayStation",
+      "extensions": [
+        "7z",
+        "bin",
+        "cbn",
+        "ccd",
+        "chd",
+        "cue",
+        "ecm",
+        "exe",
+        "img",
+        "iso",
+        "m3u",
+        "mdf",
+        "mds",
+        "minipsf",
+        "pbp",
+        "psexe",
+        "psf",
+        "toc",
+        "z",
+        "zip",
+        "znx"
+      ],
+      "retroArchCore": "mednafen_psx",
+      "theme": "psx"
+    },
+    {
+      "id": "snes",
+      "name": "Nintendo SNES (Super Nintendo)",
+      "extensions": [
+        "7z",
+        "bin",
+        "bml",
+        "bs",
+        "bsx",
+        "dx2",
+        "fig",
+        "gd3",
+        "gd7",
+        "mgd",
+        "sfc",
+        "smc",
+        "st",
+        "swc",
+        "zip"
+      ],
+      "retroArchCore": "snes9x",
+      "theme": "snes"
+    }
+  ]
+}

@@ -55,6 +55,7 @@ _VARIANT_FIELDS = {
     "has_custom_icon",
     "has_custom_coverart_big",
     "playtime",
+    "playcount",
     "service",
     "service_id",
 }

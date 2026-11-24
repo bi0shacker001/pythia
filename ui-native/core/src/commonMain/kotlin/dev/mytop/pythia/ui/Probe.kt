@@ -8,6 +8,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.system.exitProcess
 
 /**
  * `--probe`: connects to the running Pythia the way the window does, calls `hello` and `get_system_info`, prints the
@@ -71,4 +72,9 @@ private fun describe(state: PythiaState): String = when (state) {
     is PythiaState.Connecting -> "connecting"
     is PythiaState.Ready -> "ready"
     is PythiaState.Unavailable -> "unavailable: ${state.reason}"
+}
+
+/** The entry point of the window-less client: `--watch`, or else `--probe`. */
+fun probeMain(args: Array<String>) {
+    exitProcess(if ("--watch" in args) watch() else probe())
 }

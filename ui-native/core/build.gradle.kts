@@ -1,4 +1,5 @@
 import groovy.json.JsonSlurper
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     kotlin("multiplatform")
@@ -126,6 +127,15 @@ kotlin {
     mingwX64()
     macosX64()
     macosArm64()
+
+    // A command-line client with no window, for every target: --probe and --watch (the integration job runs it on macOS,
+    // where the compose-native fork has no artifacts yet).
+    targets.withType<KotlinNativeTarget>().configureEach {
+        binaries.executable {
+            entryPoint = "dev.mytop.pythia.ui.probeMain"
+            baseName = "pythia-probe"
+        }
+    }
 
     // Linux and macOS compile the one posix transport (src/posixShared) into both of their source sets; only the connect
     // call differs, in each of them (sockaddr_un is platform.linux's on Linux, platform.posix's, with sun_len, on macOS).

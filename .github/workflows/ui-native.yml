@@ -277,7 +277,9 @@ jobs:
           grep -q '^unavailable: Pythia has not run on this computer yet' probe.txt
 
   macos:
-    name: macOS (build, test, integration)
+    name: macOS (core build, test, integration)
+    # The compose-native fork (CN_VERSION) publishes no macOS artifacts, so the window is not built here; the window-less
+    # client (core's pythia-probe) is, and runs the same probe and reconnect checks against the real Backend.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -289,33 +291,20 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Fetch the patched compose-native repository (mytop-project/compose-native)
-        shell: bash
-        run: |
-          set -euo pipefail
-          temp="$(cygpath -m "$RUNNER_TEMP" 2>/dev/null || echo "$RUNNER_TEMP")"
-          mkdir -p "$temp/cn-maven"
-          base="https://github.com/mytop-project/compose-native/releases/download/v$CN_VERSION"
-          curl --fail --location --silent --show-error --output "$temp/cn-maven.tar.gz" "$base/compose-native-maven-$CN_VERSION.tar.gz"
-          echo "$CN_SHA256  $temp/cn-maven.tar.gz" | shasum -a 256 --check
-          tar -xzf "$temp/cn-maven.tar.gz" -C "$temp/cn-maven"
-          echo "CN_REPO=$temp/cn-maven" >> "$GITHUB_ENV"
-      - name: SDL3
-        run: brew install sdl3
-      - name: Unit tests and release executable
+      - name: Unit tests and the window-less client
         working-directory: ui-native
-        run: ./gradlew --no-daemon --stacktrace macosArm64Test linkReleaseExecutableMacosArm64
+        run: ./gradlew --no-daemon --stacktrace :core:macosArm64Test :core:linkReleaseExecutableMacosArm64
       - name: Size
         working-directory: ui-native
         run: |
-          bin=$(find build/bin/macosArm64 -type f -path '*releaseExecutable*' -perm -u+x | head -n1)
+          bin=$(find core/build/bin/macosArm64 -type f -path '*releaseExecutable*' -name '*.kexe' | head -n1)
           echo "binary: $bin"
           mkdir -p out
-          cp "$bin" out/pythia-ui
+          cp "$bin" out/pythia-probe
           {
-            echo "### macosArm64"
-            echo "$(stat -f %z out/pythia-ui) bytes"
-            otool -L out/pythia-ui
+            echo "### macosArm64 pythia-probe"
+            echo "$(stat -f %z out/pythia-probe) bytes"
+            otool -L out/pythia-probe
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-python@v5
         with:
@@ -331,13 +320,13 @@ jobs:
           OUT: ${{ github.workspace }}/integration-out
         run: |
           . .venv/bin/activate
-          ui-native/ci/integration.sh ui-native/out/pythia-ui
+          ui-native/ci/integration.sh ui-native/out/pythia-probe
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pythia-ui-macosArm64
+          name: pythia-probe-macosArm64
           path: |
-            ui-native/out/pythia-ui
+            ui-native/out/pythia-probe
             integration-out
           retention-days: 7
 

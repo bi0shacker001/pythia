@@ -32,7 +32,7 @@ import urllib.request
 from pythia import _build
 from pythia.util.log import logger
 
-REPO = "bi0shacker001/pythia"
+REPO = "mytop-project/pythia"
 LANES = ("stable", "testing", "unstable")
 LANE_NAMES = {"stable": "Stable", "testing": "Testing", "unstable": "Unstable"}
 SETTING = "update_lane"

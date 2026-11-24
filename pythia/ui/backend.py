@@ -213,7 +213,7 @@ class Backend(QObject):
         # folder gets it too while the agent is off (pythia.droidtop.takeover).
         self.handheldsChanged.connect(self._sync_with_agent)
 
-    # ---- KDE Connect (docs/SPEC.md 6.1, Droidtop/tracker#645) -----------------------------------------------
+    # ---- KDE Connect (docs/SPEC.md 6.1, mytop-project/tracker#645) -----------------------------------------------
     def _follow_kdeconnect(self):
         """KDE Connect's events reach the GUI thread through kdeconnectEvent (a signal emitted from the follower's
         thread is queued), where the clipboard is written and what happened goes to the event log. This computer's
@@ -705,7 +705,7 @@ class Backend(QObject):
     @Slot(str, str, str)
     def start_watch_for(self, plugin_id: str, command_str: str, watch_dir_str: str):
         """start_watch for one downloader plugin: only that plugin's card and
-        row say Watching (Droidtop/tracker#538 retest D4)."""
+        row say Watching (mytop-project/tracker#538 retest D4)."""
         self.start_watch(command_str, watch_dir_str, plugin_id)
 
     @Slot(str, str)
@@ -1195,7 +1195,7 @@ class Backend(QObject):
     @_guarded
     def open_account_login(self, plugin_id: str):
         """Opens a store's own sign-in page in the person's browser (GOG, Epic;
-        Droidtop/tracker#630): they sign in there, then paste back what it shows."""
+        mytop-project/tracker#630): they sign in there, then paste back what it shows."""
         from PySide6.QtGui import QDesktopServices
 
         from pythia.plugins import library as library_plugins
@@ -1409,7 +1409,7 @@ class Backend(QObject):
     @Slot(result="QVariant")
     @_guarded
     def get_wine_setup(self):
-        """Windows games on Linux (Droidtop/tracker#629): whether Pythia sets up
+        """Windows games on Linux (mytop-project/tracker#629): whether Pythia sets up
         Wine here, the builds it set up (newest first), and the system's Wine."""
         import shutil
 
@@ -1767,8 +1767,8 @@ class Backend(QObject):
             "schema_version": datadir.SCHEMA_VERSION,
             "log_file": LOG_FILENAME,
             "config_file": settings.CONFIG_FILE,
-            "issues_url": "https://github.com/bi0shacker001/pythia/issues",
-            "docs_url": "https://github.com/bi0shacker001/pythia#readme",
+            "issues_url": "https://github.com/mytop-project/pythia/issues",
+            "docs_url": "https://github.com/mytop-project/pythia#readme",
         }
 
     @Slot(result="QVariant")
@@ -2684,7 +2684,7 @@ class Backend(QObject):
     def get_storage_roles(self):
         return self._unavailable("get_storage_roles", "Storage roles arrive with save backups and game transfer.")
 
-    # ---- the library as a gaming front end reads it (pythia.gaming_api; Droidtop/tracker#920) ---------------------
+    # ---- the library as a gaming front end reads it (pythia.gaming_api; mytop-project/tracker#920) ---------------------
     @Slot(result="QVariant")
     @_guarded
     def get_games(self, since_version: str = ""):

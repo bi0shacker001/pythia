@@ -466,13 +466,13 @@ function fillPrimarySlot(g, slot, cls) {
     slot.innerHTML = `<button class="${cls}" type="button" ${p.enabled ? '' : 'disabled'} data-reason="${esc(p.reason || '')}">${label}${p.enabled && p.via === 'steam' ? ' <span class="reason">· Steam</span>' : ''}${p.enabled && p.via === 'folder' && p.launch?.via === 'wine' ? ' <span class="reason">· Wine</span>' : ''}${p.enabled && p.action === 'install' ? ` <span class="reason">· ${esc(p.store)}</span>` : ''}</button>`;
     const b = $('button', slot);
     if (!p.enabled) { b.title = ''; slot.insertAdjacentElement('beforeend', el(`<small class="slot-reason">${esc(p.reason || '')}</small>`)); }
-    // No Wine for a Windows game on Linux: Pythia sets it up with one button (Droidtop/tracker#629).
+    // No Wine for a Windows game on Linux: Pythia sets it up with one button (mytop-project/tracker#629).
     if (p.fix === 'wine') {
       const fix = el('<button class="btn small primary" type="button">Set up Windows games…</button>');
       fix.onclick = () => setUpWindowsGames();
       slot.appendChild(fix);
     }
-    // A folder game (Droidtop/tracker#629): what Play starts is Pythia's pick, which the person can change.
+    // A folder game (mytop-project/tracker#629): what Play starts is Pythia's pick, which the person can change.
     if (p.choose) {
       const choose = el(`<button class="btn small ghost choose-run" type="button">Choose how it runs…</button>`);
       choose.onclick = () => chooseLaunch(g, () => fillPrimarySlot(g, slot, cls));
@@ -481,7 +481,7 @@ function fillPrimarySlot(g, slot, cls) {
     const start = async () => {
       const r2 = await act('play_game', [g.id], null, { what: p.action === 'install' ? `Installing ${g.name}` : `Starting ${g.name}` });
       if (!ok(r2)) return;
-      // Installing is the store's (Droidtop/tracker#630): it downloads the game; Find store games then adds it here.
+      // Installing is the store's (mytop-project/tracker#630): it downloads the game; Find store games then adds it here.
       if (r2.install) flash(`${p.store} opens to install ${g.name}. Once it is installed, File > Find store games adds it here.`);
       else flash(`Started ${g.name}${r2.via === 'steam' ? ' in Steam' : ''}`);
     };
@@ -491,7 +491,7 @@ function fillPrimarySlot(g, slot, cls) {
     if (state.shell === 'handheld') hhKeepDisabledReachable();
   });
 }
-// Set up Windows games (Droidtop/tracker#629): a Wine build for Pythia's own use, fetched into its runners folder.
+// Set up Windows games (mytop-project/tracker#629): a Wine build for Pythia's own use, fetched into its runners folder.
 async function setUpWindowsGames() {
   if (!(await confirm({ title: 'Set up Windows games?', body: 'Pythia downloads a Wine build (Wine Staging from Kron4ek\u2019s Wine-Builds on GitHub, about 100 MB) and unpacks it into its own folder. Nothing is installed on the system. Windows games then play through it, each in a Wine prefix of its own.', proceed: 'Set up' }))) return;
   pythia.set_up_windows_games();
@@ -507,7 +507,7 @@ function renderWindowsGames(host) {
     h.appendChild(row);
   }, { what: 'Windows games' });
 }
-// "Choose how it runs" (Droidtop/tracker#629): the programs in the game's folder, likeliest first, and on
+// "Choose how it runs" (mytop-project/tracker#629): the programs in the game's folder, likeliest first, and on
 // Linux whether it runs natively or through Wine. The choice stays on this computer's record.
 async function chooseLaunch(g, redraw) {
   const r = await call('get_launch_choices', g.id);
@@ -575,7 +575,7 @@ function renderSavesTab(g, fetch = false, pane = $('#gameDetail [data-pane="save
       host.appendChild(stateBlock({ title: 'Where its saves are is not known', body: `Pythia knows where Ren'Py games keep their saves by the engine's own rule. For other games it looks in the Ludusavi manifest, by the game's store id or title. ${fetch ? 'The manifest has no entry for it, or it could not be downloaded (see the log).' : 'Download the manifest to look it up.'}`, actions: fetch ? [] : [{ label: 'Download the manifest and look', run: () => renderSavesTab(g, true, pane) }] }));
       return;
     }
-    // Save locations the Syncthing here already syncs are left to it (Droidtop/tracker#538): said first.
+    // Save locations the Syncthing here already syncs are left to it (mytop-project/tracker#538): said first.
     const st = r.syncthing || [];
     if (st.length) {
       const labels = [...new Set(st.map((x) => x.label))].join(', ');
@@ -725,7 +725,7 @@ function renderDownloads() {
     const ds = Array.isArray(list) ? list : [];
     if (!ds.length) { host.appendChild(stateBlock({ title: 'No downloader plugins', body: 'A downloader plugin adds a card here.' })); return; }
     ds.forEach((d) => {
-      // Only the downloader that started the watch is watching (Droidtop/tracker#538 retest D4).
+      // Only the downloader that started the watch is watching (mytop-project/tracker#538 retest D4).
       const watching = !!watcher && d.enabled && watcher.plugin === d.id;
       const card = el(`<div class="card"><div class="card-head"><div class="card-icon">${esc(d.display_name.slice(0, 2).toUpperCase())}</div><div><strong>${esc(d.display_name)}</strong><small>${esc(d.headless ? 'Can fetch without a window' : 'Opens its own window; Pythia watches the folder')}</small></div></div><div class="card-body"><p>${esc(watching ? `Watching ${watcher.folder}${watcher.program ? ` while ${fileName(watcher.program)} runs` : ''}.` : d.enabled ? 'Not watching a folder right now.' : 'Turned off in Settings > Downloaders.')}</p></div><div class="card-foot">${watching ? routineStatus('Watching') : d.enabled ? visibleStatus('Idle', 'neutral', '–') : visibleStatus('Turned off', 'neutral', '–')}<span class="spacer"></span><button class="btn small" data-watch>${watching ? 'Stop' : 'Watch a folder'}</button></div></div>`);
       $('[data-watch]', card).onclick = () => (watching ? stopWatching() : watchFolder(d.id));
@@ -1244,7 +1244,7 @@ async function accountDialog(pluginId) {
   const a = model.accounts.find((x) => x.id === pluginId);
   if (!a) { infoSheet({ title: 'No account for this source', details: 'This source has no account fields.' }); return; }
   const body = el(`<div></div>`);
-  // A store that signs in on its own page (GOG, Epic; Droidtop/tracker#630): two steps, both here.
+  // A store that signs in on its own page (GOG, Epic; mytop-project/tracker#630): two steps, both here.
   if (a.browser) {
     body.appendChild(el(`<p>${esc(a.connected ? `Connected to ${a.display_name}. Sign in again to use another account.` : `Connect ${a.display_name} so Pythia can list the games you own there.`)}</p>`));
     const steps = el(`<ol class="connect-steps"><li><button class="btn small" type="button" data-open-login>Sign in to ${esc(a.display_name)} in your browser</button></li><li><span>Copy ${esc(a.browser.paste)}, then </span><button class="btn small primary" type="button" data-paste-login>Paste it here…</button></li></ol>`);
@@ -1726,7 +1726,7 @@ function renderHHPlan(g) {
   const u = g.updates[0];
   $('#hhContent').innerHTML = `<section class="hh-decision"><div class="hh-state pending">Seen, not applied</div><h1 style="margin:5px 0 0;font:500 1.625rem var(--serif)">Available update · ${esc(g.name)}</h1><div class="hh-plan">${u ? `<div class="hh-plan-row"><b>Installed</b><span>${esc(versionText(g))}</span></div><div class="hh-plan-row"><b>Available</b><span>${esc(u.version || '?')} · ${esc(platformName(u.platform))}</span></div><div class="hh-plan-row"><b>Seen via</b><span>${esc(u.source || '?')}${u.detected_at ? ` on ${esc(fmt.date(u.detected_at))}` : ''}</span></div><div class="hh-plan-row"><b>Files</b><span>Pythia records updates; it does not download or apply them yet.</span></div>` : '<div class="hh-plan-row"><b>Update</b><span>No update is recorded for this game.</span></div>'}</div><div class="actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="hh-action" data-hh-plan-back>Back</button><button class="hh-action primary" data-hh-apply data-reason="No newer version has been seen for this game." ${u ? '' : 'disabled'}>Apply update</button></div></section>`;
 }
-// ---- Handheld pages the desktop has (Droidtop/tracker#538): the same slots, drawn for the handheld -------------
+// ---- Handheld pages the desktop has (mytop-project/tracker#538): the same slots, drawn for the handheld -------------
 function hhList(rows) { return `<div class="hh-summary-list">${rows.join('')}</div>`; }
 function hhRow({ art = '', title, sub = '', status = '', actions = '' }) { return `<div class="hh-summary" style="cursor:default"><span class="art">${esc(art)}</span><span><strong>${esc(title)}</strong>${sub ? `<small>${esc(sub)}</small>` : ''}</span>${status}${actions}</div>`; }
 function renderHHActivity() {
@@ -1810,7 +1810,7 @@ function bindHandheldActions() {
   $('#hhSettingsDesktop')?.addEventListener('click', () => leaveHandheld());
 }
 function rescanHH(g) { if (!g || !g.path) return; pythia.start_onboard(g.path); flash('Rescanning'); navigateHandheld('home', false); }
-// Handheld focus (Droidtop/tracker#538): the D-pad moves within one zone (the rail, the top bar, the page, or an open
+// Handheld focus (mytop-project/tracker#538): the D-pad moves within one zone (the rail, the top bar, the page, or an open
 // dialog or menu) and crosses to the next zone only at its edge, so Down from the top bar enters the page, not the rail.
 // ---- The pad model (docs/SPEC.md, section 2; UX review A7) -----------------------------------
 // Zones: the rail, the strip (the top bar and the page's own toolbar), the content, and an open dialog or
@@ -1997,8 +1997,8 @@ async function menuAction(a) {
   if (a === 'rebuild-cache') act('rebuild_index', [], 'Index rebuilt', { what: 'Rebuilding the index' });
   if (a === 'tools') { const r = await call('get_tools'); infoSheet({ title: 'Downloadable tools', node: fromResult(r, { what: 'Downloadable tools' }) }); }
   if (a === 'about') { const app = model.app || {}; infoSheet({ title: 'About Pythia', details: [`Pythia ${app.version || ''}`, app.platform || '', `Python ${app.python || ''}`, `Schema v${app.schema_version || ''}`, '', 'Pythia is largely based on Lutris. License: GPL-3.0-or-later.', `Log file: ${app.log_file || ''}`, `Config: ${app.config_file || ''}`].join('\n') }); }
-  if (a === 'issue') handOff({ kind: 'link', title: 'Open the issue tracker?', body: 'Your web browser opens.', run: () => act('open_url', [model.app?.issues_url || 'https://github.com/bi0shacker001/pythia/issues'], 'Opened the issue tracker', { what: 'Opening the browser' }) });
-  if (a === 'docs') handOff({ kind: 'link', title: 'Open the documentation?', body: 'Your web browser opens.', run: () => act('open_url', [model.app?.docs_url || 'https://github.com/bi0shacker001/pythia#readme'], 'Opened the documentation', { what: 'Opening the browser' }) });
+  if (a === 'issue') handOff({ kind: 'link', title: 'Open the issue tracker?', body: 'Your web browser opens.', run: () => act('open_url', [model.app?.issues_url || 'https://github.com/mytop-project/pythia/issues'], 'Opened the issue tracker', { what: 'Opening the browser' }) });
+  if (a === 'docs') handOff({ kind: 'link', title: 'Open the documentation?', body: 'Your web browser opens.', run: () => act('open_url', [model.app?.docs_url || 'https://github.com/mytop-project/pythia#readme'], 'Opened the documentation', { what: 'Opening the browser' }) });
 }
 const prefs = { get(k, d) { try { return localStorage.getItem(`pythia-${k}`) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(`pythia-${k}`, v); } catch (e) { /* storage may be unavailable */ } } };
 function applyTheme(theme) { const next = ['ink', 'parchment', 'cobalt'].includes(theme) ? theme : 'ink'; document.documentElement.dataset.theme = next; prefs.set('theme', next); const select = $('#themeSelect'); if (select) select.value = next; $$('[data-theme-choice]').forEach((b) => b.classList.toggle('active', b.dataset.themeChoice === next)); }

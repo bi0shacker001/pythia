@@ -1,6 +1,6 @@
-"""This computer's own Tailscale node (Droidtop/tracker#645), through ``pythia._native.tailscale``.
+"""This computer's own Tailscale node (mytop-project/tracker#645), through ``pythia._native.tailscale``.
 
-lib-net's ``net-tailscale`` asks tailscaled's LocalAPI for its status, the way ktailctl and the ``tailscale`` CLI do:
+mytop-net's ``net-tailscale`` asks tailscaled's LocalAPI for its status, the way ktailctl and the ``tailscale`` CLI do:
 no account token and no control server. Owner, 2026-11-05: "Tailscale applications do it too. Look at the tailscale
 code, ktailctl ... We're building a local tailscale control plugin". A tailnet is used when there is one and never
 required: without tailscaled, ``status()`` says ``{"present": False}``.

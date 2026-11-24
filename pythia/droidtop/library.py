@@ -31,7 +31,7 @@ NOT_ENGINES = {"unknown", "steam", "gog", "egs", "itch", "f95", "amazon", "dlsit
 
 def title_key(title: str) -> str:
     """The key every device gives a game without a store id: `title2:` and the
-    title's Lutris slug, so "Being a DIK" is `title2:being-a-dik` (Droidtop/tracker#870;
+    title's Lutris slug, so "Being a DIK" is `title2:being-a-dik` (mytop-project/tracker#870;
     the owner, 2026-11-05: "letters and digits only, but with space-to-hyphen
     conversion. Lutris's standard"). droidtop-agent's games-scan (`titles::slug`)
     and droidtop (`TitleKeys.slug`) are the same function as `slugify` here."""
@@ -108,7 +108,7 @@ def scanned_games(entries: list[dict], system_uuid: str) -> list[dict]:
             install["version"] = version
         game = {"key": game_key(entry), "title": title, "platform": "pc", "install": install, "base": variant["path"]}
         # The engine Pythia identified: the agent's save lookup asks the engine's own rule first
-        # (Ren'Py's save folders need no Ludusavi manifest; Droidtop/tracker#538).
+        # (Ren'Py's save folders need no Ludusavi manifest; mytop-project/tracker#538).
         engine = (variant.get("source") or {}).get("kind")
         if engine and engine not in NOT_ENGINES:
             game["engine"] = engine

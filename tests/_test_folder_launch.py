@@ -1,5 +1,5 @@
 """Play for a game added from a folder (pythia.folder_launch and pythia.play;
-Droidtop/tracker#629): Pythia picks the game's own program, natively on
+mytop-project/tracker#629): Pythia picks the game's own program, natively on
 Windows, natively or through Wine elsewhere, and the person can change it."""
 
 import os

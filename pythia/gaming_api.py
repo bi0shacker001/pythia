@@ -1,5 +1,5 @@
 """What a gaming front end reads of the library: the card of every game in one snapshot, the systems they
-belong to, one game's detail and its art (Droidtop/tracker#920 step 3; the Gaming UI's library interfaces).
+belong to, one game's detail and its art (mytop-project/tracker#920 step 3; the Gaming UI's library interfaces).
 
 Everything here is computed from the records the backend already holds in memory (Backend.refresh_games), so a
 list is one pass over them and never a query or a disk read per game. The art lookups are the only disk reads and

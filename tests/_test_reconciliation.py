@@ -1,5 +1,5 @@
 """reconciliation.find_merge_candidates: which pairs are one game by
-droidtop's rule and which are only alike (Droidtop/tracker#538 retest B2)."""
+droidtop's rule and which are only alike (mytop-project/tracker#538 retest B2)."""
 
 from unittest import TestCase, mock
 

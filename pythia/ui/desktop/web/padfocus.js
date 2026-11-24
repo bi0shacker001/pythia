@@ -3,7 +3,7 @@
 
    nearest(items, from, direction) is the item nearest to `from` in that direction,
    measured edge to edge rather than centre to centre, so a narrow choice under a
-   full-width button counts as below it (Droidtop/tracker#538 retest B1: Down from
+   full-width button counts as below it (mytop-project/tracker#538 retest B1: Down from
    "‹ Settings" skipped every choice on Settings > Interface). Up and Down take any
    item on a later row, preferring the one straight below or above; Left and Right
    stay in the row. Each item only needs getBoundingClientRect().

@@ -1,6 +1,6 @@
-"""This computer as a KDE Connect device (Droidtop/tracker#645), through ``pythia._native.kdeconnect``.
+"""This computer as a KDE Connect device (mytop-project/tracker#645), through ``pythia._native.kdeconnect``.
 
-The device is Droidtop/lib-kdeconnect's, the same one droidtop runs on a handheld: phones and computers with the
+The device is mytop-project/mytop-kdeconnect's, the same one droidtop runs on a handheld: phones and computers with the
 official KDE Connect apps, and droidtop handhelds, find this computer, pair with it (both screens show the same
 8-character code), and share files, links, text and the clipboard with it. It runs while the person has it on
 (``kdeconnect_on``, off until turned on) and Pythia runs. Files others share land in ``~/Downloads``. Its state
@@ -30,7 +30,7 @@ _handlers: list[Callable[[dict[str, Any]], None]] = []
 
 
 def call(op: str, **args: Any) -> dict[str, Any]:
-    """Runs lib-kdeconnect operation ``op`` (its ``crates/service/src/ops.rs``). Raises AgentError."""
+    """Runs mytop-kdeconnect operation ``op`` (its ``crates/service/src/ops.rs``). Raises AgentError."""
     return submodule("kdeconnect").call(op, **args)
 
 

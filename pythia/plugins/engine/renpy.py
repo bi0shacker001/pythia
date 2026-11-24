@@ -74,7 +74,7 @@ class RenpyEnginePlugin(EnginePlugin):
 
     def detect(self, game_root: Path) -> dict | None:
         """Identify a Ren'Py install: structural marker plus engine version,
-        lib-naming convention, and installed platforms. Same detection renpy_patch
+        mytop-naming convention, and installed platforms. Same detection renpy_patch
         already does, just exposed as an EnginePlugin."""
         game_root = Path(game_root)
         if not self.is_root(game_root):

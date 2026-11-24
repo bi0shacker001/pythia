@@ -3,7 +3,7 @@
 # carries its own Python and Qt and pythia._native, built with cargo. A green build of main is published as
 # an Unstable pre-release (packaging/release_channel.py, docs/SPEC.md, decision 13); Testing and Stable are promoted
 # from those by release-promote.yml. No wheels are built here: Pythia's core is moving away from Python
-# (Droidtop/tracker#958), and a wheel can still be built from the repository by hand (python -m build).
+# (mytop-project/tracker#958), and a wheel can still be built from the repository by hand (python -m build).
 # Static Analysis (static.yml) checks the code.
 name: Build
 
@@ -36,7 +36,7 @@ jobs:
           # windowcast native/Cargo.toml pins, carried in the app.
           $rev = (Select-String -Path native\Cargo.toml -Pattern 'windowcast-identity = .*rev = "([0-9a-f]+)"').Matches[0].Groups[1].Value
           if (-not $rev) { throw "no windowcast rev in native/Cargo.toml" }
-          cargo install --locked --git https://github.com/Droidtop/windowcast --rev $rev windowcast-secure-helper --root "$env:RUNNER_TEMP\helper"
+          cargo install --locked --git https://github.com/mytop-project/windowcast --rev $rev windowcast-secure-helper --root "$env:RUNNER_TEMP\helper"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:RUNNER_TEMP\helper\bin\windowcast-secure-helper.exe" pythia\windowcast-secure-helper.exe
           python packaging\freeze_requirements.py > "$env:RUNNER_TEMP\requirements.txt"

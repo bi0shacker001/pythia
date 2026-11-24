@@ -13,9 +13,9 @@ Build-Depends: debhelper-compat (= 12),
                pkg-config,
 Rules-Requires-Root: no
 Standards-Version: 4.5.0
-Homepage: https://github.com/bi0shacker001/pythia
-Vcs-Browser: https://github.com/bi0shacker001/pythia
-Vcs-Git: https://github.com/bi0shacker001/pythia.git
+Homepage: https://github.com/mytop-project/pythia
+Vcs-Browser: https://github.com/mytop-project/pythia
+Vcs-Git: https://github.com/mytop-project/pythia.git
 
 Package: pythia
 Architecture: any

@@ -1,5 +1,5 @@
-//! `pythia._native.tailscale`: the computer's own Tailscale node, read through tailscaled's LocalAPI with lib-net's
-//! `net-tailscale` (Droidtop/tracker#645), the way ktailctl and the `tailscale` CLI read it. No account token and no
+//! `pythia._native.tailscale`: the computer's own Tailscale node, read through tailscaled's LocalAPI with mytop-net's
+//! `net-tailscale` (mytop-project/tracker#645), the way ktailctl and the `tailscale` CLI read it. No account token and no
 //! control server: when tailscaled is not running, there is no tailnet and nothing else changes.
 
 use pyo3::prelude::*;

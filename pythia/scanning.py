@@ -80,7 +80,7 @@ def _generic_roots(path: Path, generic):
 def _hidden(folder: Path) -> bool:
     """A folder no person puts a game in: a dot-folder (Syncthing's `.stfolder`
     and `.stversions`, `.git`, `.Trash-1000`...) or Windows' own
-    (`$RECYCLE.BIN`, `System Volume Information`). Droidtop/tracker#538: a
+    (`$RECYCLE.BIN`, `System Volume Information`). mytop-project/tracker#538: a
     scan took `.stfolder` for a game."""
     name = folder.name
     return name.startswith((".", "$")) or name.casefold() == "system volume information"

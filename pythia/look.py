@@ -214,7 +214,7 @@ class LookSlot:
     """The one Look the page shows. Only the newest Look started is the
     page's: a Look started after another replaces it, and the older one's
     progress and result are then dropped rather than written over the newer
-    one's (Droidtop/tracker#538 retest: a second Look while one ran had the
+    one's (mytop-project/tracker#538 retest: a second Look while one ran had the
     first's progress and result overwrite the page and the stored result)."""
 
     def __init__(self) -> None:

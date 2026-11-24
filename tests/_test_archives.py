@@ -1,4 +1,4 @@
-"""Adding a downloaded archive (Droidtop/tracker#538: a watched .zip could
+"""Adding a downloaded archive (mytop-project/tracker#538: a watched .zip could
 not be added)."""
 
 import tempfile

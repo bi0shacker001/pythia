@@ -1,5 +1,5 @@
 """Steam's folders on Windows, and the Steam plugin's SteamID lookup
-(Droidtop/tracker#538: --list-steam-folders found nothing on Windows)."""
+(mytop-project/tracker#538: --list-steam-folders found nothing on Windows)."""
 
 import os
 import tempfile

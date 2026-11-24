@@ -112,7 +112,7 @@ def _raise_api_error(res: bytes | dict):
 
 
 def _fetch(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "Pythia (github.com/bi0shacker001/pythia)"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Pythia (github.com/mytop-project/pythia)"})
     retries = _REQUEST_RETRIES
     while True:
         try:
@@ -283,7 +283,7 @@ def full_check(thread_id: int, last_changed: int) -> dict | None:
     the real client treats as "thread not found", left for the caller to decide
     what to do about rather than assumed here)."""
     url = API_FULL_CHECK_URL.format(id=thread_id, ts=last_changed)
-    req = urllib.request.Request(url, headers={"User-Agent": "Pythia (github.com/bi0shacker001/pythia)"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Pythia (github.com/mytop-project/pythia)"})
     try:
         with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT) as resp:
             res = resp.read()

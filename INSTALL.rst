@@ -64,7 +64,7 @@ Installation
 Pythia is not packaged or distributed anywhere -- it's a personal project you
 run from source::
 
-    git clone https://github.com/bi0shacker001/pythia
+    git clone https://github.com/mytop-project/pythia
     cd pythia
     ./bin/pythia
 

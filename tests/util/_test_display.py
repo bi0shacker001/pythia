@@ -1,5 +1,5 @@
 """pythia.util.display's compositor checks where their programs are missing
-(Droidtop/tracker#538 retest W3: "Unable to run command, pgrep not found" on
+(mytop-project/tracker#538 retest W3: "Unable to run command, pgrep not found" on
 every start on Windows)."""
 
 from unittest import TestCase, mock

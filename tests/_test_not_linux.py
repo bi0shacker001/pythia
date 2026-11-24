@@ -1,5 +1,5 @@
 """Pythia on Windows: the Linux-only start-up probes stay quiet, and the
-architecture is known (Droidtop/tracker#538)."""
+architecture is known (mytop-project/tracker#538)."""
 
 from unittest import TestCase, mock
 

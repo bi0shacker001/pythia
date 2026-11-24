@@ -27,7 +27,7 @@ the droidtop coordinator for this lane. Later sections follow them.
    recognise it later. An install's identity is its entry in Pythia's own
    data. Markers an earlier Pythia wrote are read and left alone.
 5. **Pairing.** Pairing is mutual TLS through droidtop-agent's crates, the
-   same as droidtop-agent's own pairing (Droidtop/tracker#556): each device
+   same as droidtop-agent's own pairing (mytop-project/tracker#556): each device
    has a self-signed certificate over its key, pairing pins the other's
    certificate fingerprint, and every session is mutual TLS 1.3 with those
    certificates. A computer can also pair with another computer (owner,
@@ -37,7 +37,7 @@ the droidtop coordinator for this lane. Later sections follow them.
    pin a handheld (droidtop-agent 377b92d, which Pythia's native module
    is built from).
 6. **One entry per game across stores.** A game owned on several stores is
-   one library entry with several store ids (Droidtop/tracker#133, droidtop
+   one library entry with several store ids (mytop-project/tracker#133, droidtop
    SPEC 7m), not one entry per store.
    - Which records are one game follows droidtop SPEC 7m, "What merges,
      and what only suggests": names equal once case and punctuation are
@@ -45,9 +45,9 @@ the droidtop coordinator for this lane. Later sections follow them.
      side, are one game. Names at least 0.6 alike only suggest, one pair
      at a time. Review's Possible duplicates groups the first kind and
      lists each alike pair on its own, so a common word never chains
-     unrelated games together (Droidtop/tracker#538, retest B2).
+     unrelated games together (mytop-project/tracker#538, retest B2).
 7. **Sync with droidtop starts on only where droidtop is in use.** Owner,
-   2026-10-16, on the Windows retest's B3 (Droidtop/tracker#538): "Pythia
+   2026-10-16, on the Windows retest's B3 (mytop-project/tracker#538): "Pythia
    isn't necessarily used with droidtop. It's a game library manager, I
    just happen to be taking advantage of it already knowing the library to
    make it a more convenient agent for droidtop". The owner also called
@@ -99,7 +99,7 @@ the droidtop coordinator for this lane. Later sections follow them.
    doesn't. We use the standard syncthing config location regardless, to
    make sure the user can switch to or from a dedicated instance if they
    want". droidtop's Syncthing plugin (`droidtop.syncthing`,
-   Droidtop/tracker#553) accepts exactly the Syncthing IDs its paired
+   mytop-project/tracker#553) accepts exactly the Syncthing IDs its paired
    counterparts announce, and names Pythia as one. While Pythia serves, the
    service it runs from droidtop-agent's crates (droidtop-agent DESIGN.md
    section 18) does this: it uses the Syncthing answering in Syncthing's
@@ -216,11 +216,11 @@ the droidtop coordinator for this lane. Later sections follow them.
     - Only a release build updates itself. A copy run from the repository,
       or Pythia from a distribution or the Launchpad PPA, is updated the way
       it was installed, and the tray says so.
-13. **The shared UI and a Rust core (Droidtop/tracker#958).** Owner,
+13. **The shared UI and a Rust core (mytop-project/tracker#958).** Owner,
     2026-11-20: "let's migrate pythia to the shared UI", "Can we also move
     away from python for our core?", and, after weighing C, "I guess we'll
     stick with rust". Pythia moves, in place and one piece at a time, onto
-    lib-ui's Compose Multiplatform components over a Rust core built from
+    mytop-ui's Compose Multiplatform components over a Rust core built from
     the shared library families; Python goes when the last piece has moved.
 
 14. **Library folders, scanned on their own.** Owner, 2026-11-21: "game
@@ -235,7 +235,7 @@ the droidtop coordinator for this lane. Later sections follow them.
       what is identified is added, what Pythia is unsure of waits in Review.
       One pass runs at a time. Removing a folder leaves its games and files.
 15. **Pythia keeps its Python core; its backend is reachable from another
-    process (Droidtop/tracker#958).** Owner, 2026-11-23: Pythia keeps its
+    process (mytop-project/tracker#958).** Owner, 2026-11-23: Pythia keeps its
     Python core; its three front ends are removed later and replaced by the
     shared Compose UI built with compose-native, which talks to the existing
     core. This amends decision 13's Rust core for now: nothing is rewritten.
@@ -262,7 +262,7 @@ the droidtop coordinator for this lane. Later sections follow them.
       dicts.
     - A call runs on the Qt thread, as over QWebChannel, so a slot behaves
       the same whoever calls it.
-    - **The library as cards (Droidtop/tracker#920).** For a front end that
+    - **The library as cards (mytop-project/tracker#920).** For a front end that
       shows the library as shelves and lists, not as the HTML UI's records:
       `get_games` (every game's card in one answer from the library held in
       memory, with a `version`; `gamesVersionChanged` carries the new one),
@@ -274,7 +274,7 @@ the droidtop coordinator for this lane. Later sections follow them.
       `cancel_job` (only the folder watch can be stopped). `gamesChanged` and
       the HTML UI's slots are unchanged.
 
-16. **The native front end starts as `ui-native/` (Droidtop/tracker#958,
+16. **The native front end starts as `ui-native/` (mytop-project/tracker#958,
     step 5).** A self-contained Gradle build in this repo: Kotlin 2.4.20,
     Compose Multiplatform and compose-native 1.13.0-beta01 (Kotlin/Native,
     no JVM at runtime), for linuxX64, linuxArm64 and mingwX64.
@@ -327,7 +327,7 @@ It crosses to another zone only at the zone's edge:
 - Down from the strip reaches the content item nearest below it.
 
 "Nearest" is measured edge to edge, not centre to centre, so a narrow
-choice under a full-width button is below it (Droidtop/tracker#538, retest
+choice under a full-width button is below it (mytop-project/tracker#538, retest
 B1: Down from "‹ Settings" skipped every choice on Settings > Interface).
 
 Each zone remembers its place on each page, by item: a game, a settings
@@ -493,14 +493,14 @@ What syncs with a device is shown on that device's own page, generated
 from the sync model. It says that game files never sync (UX review AG6).
 Pairing is not released without that page (C1).
 
-### 6.1 KDE Connect (Droidtop/tracker#645, 2026-11-05)
+### 6.1 KDE Connect (mytop-project/tracker#645, 2026-11-05)
 
 Owner, 2026-11-05: "We want to get kde connect and tailscale integrated more closely. File transfer, keyboard
 input, and etc are good first things", and "Remember we wanted to implement the kde connect protocol and stuff
-internally". Library home, owner: "lib-kdeconnect implements explicitly kde-connect as a programmatic module".
+internally". Library home, owner: "mytop-kdeconnect implements explicitly kde-connect as a programmatic module".
 
-- This computer can be a KDE Connect device: Droidtop/lib-kdeconnect's device, the same one droidtop runs, in
-  `pythia._native.kdeconnect` (one call, `call(op, **kwargs)`, over lib-kdeconnect's operation table) and
+- This computer can be a KDE Connect device: mytop-project/mytop-kdeconnect's device, the same one droidtop runs, in
+  `pythia._native.kdeconnect` (one call, `call(op, **kwargs)`, over mytop-kdeconnect's operation table) and
   `pythia.droidtop.kdeconnect`. Phones and computers with the official KDE Connect apps, and droidtop handhelds,
   find it, pair with it (both screens show the same 8-character code), ping it, share files, links and text with it
   both ways, share the clipboard, and type into it.
@@ -515,7 +515,7 @@ internally". Library home, owner: "lib-kdeconnect implements explicitly kde-conn
   that just came); a pairing request (with its code), a received or failed file, a shared link or text, a
   notification, a ping and a ring (with a beep) go to the event log.
 - Over a tailnet: while KDE Connect runs, `pythia.droidtop.tailscale` asks this computer's own Tailscale node for
-  its peers every 30 seconds (`pythia._native.tailscale.status`, lib-net's `net-tailscale`: tailscaled's LocalAPI
+  its peers every 30 seconds (`pythia._native.tailscale.status`, mytop-net's `net-tailscale`: tailscaled's LocalAPI
   `GET /localapi/v0/status` over its socket or Windows pipe, as ktailctl and the `tailscale` CLI do) and gives
   KDE Connect the addresses of the online ones (its `addresses` op), so a phone on the tailnet away from home is
   reachable. No account token and no control server. Owner, 2026-11-05: "Tailscale applications do it too. Look at
@@ -641,7 +641,7 @@ on and pair", or "Pair only").
   there), "Share saves" (needs the library) and "Let it start games
   here". There is no "its saves win": for saves nobody wins, and when both
   sides changed the handheld asks which copy to keep (owner, 2026-10-30,
-  Droidtop/tracker#814; droidtop-agent removed the primary device). A
+  mytop-project/tracker#814; droidtop-agent removed the primary device). A
   handheld starts with the library and saves, a computer with nothing.
   "Its games" and "What syncs" are beside the name; its ID and Forget are
   under More.
@@ -681,7 +681,7 @@ syncs with that device and why, generated from the sync model as it is
 
 From the owner's review of 0.5.23 ("no clear path for pairing", "very full",
 "no Devices page", "two systems and sync tabs") and the coordinator's round
-(Droidtop/tracker#538). One rule: **each thing has one place**. A new
+(mytop-project/tracker#538). One rule: **each thing has one place**. A new
 feature picks its place first; a page does not grow a panel for it. Pythia
 learns from droidtop (places, shelves, capsules, one action per screen) but
 the desktop stays a desktop application in Lutris's tradition; the handheld
@@ -772,7 +772,7 @@ tab says "Synced by Syncthing (folder <label>)". Ren'Py's two places are
 known by the engine's rule, with no Ludusavi manifest (droidtop-agent
 `saves::engines`).
 
-### 8.8 Play for a game added from a folder (Droidtop/tracker#629)
+### 8.8 Play for a game added from a folder (mytop-project/tracker#629)
 
 A folder game has no Lutris runner. Play starts its own program, picked
 from its folder (`pythia/folder_launch.py`): on Windows its `.exe`,
@@ -796,7 +796,7 @@ installed on the system. Play then uses the newest build Pythia set up, else
 the system's `wine`. It is a job on the Activity page with its progress.
 DXVK and VKD3D (Direct3D through Vulkan) are not set up yet.
 
-### 8.9 Owned games and Install (Droidtop/tracker#630)
+### 8.9 Owned games and Install (mytop-project/tracker#630)
 
 The library's **Owned** view lists the games owned in a connected store and
 not installed here. Install hands the game to its store's own installer, by

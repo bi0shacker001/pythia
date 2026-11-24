@@ -1,4 +1,4 @@
-"""Connecting GOG and Epic in the app (Droidtop/tracker#630): the store's own
+"""Connecting GOG and Epic in the app (mytop-project/tracker#630): the store's own
 sign-in page in the person's browser, then what it shows pasted back."""
 
 from unittest import TestCase, mock

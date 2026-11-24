@@ -2,7 +2,7 @@
 Amazon, itch, Battle.net and the Linux launchers (Lutris, Bottles,
 Minigalaxy), wherever their folders are, without scanning a folder tree.
 
-Droidtop/tracker#538, the Windows UI test: Pythia found a store's games only
+mytop-project/tracker#538, the Windows UI test: Pythia found a store's games only
 inside folders the person scanned, and had no local-install detection for
 GOG, itch or Epic. droidtop-agent's scanner reads each store's own records on
 every system (Steam's library folders, Epic's manifests, GOG Galaxy and the

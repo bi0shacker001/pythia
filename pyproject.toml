@@ -43,9 +43,9 @@ dependencies = [
 pythia = "pythia.launch:main"
 
 [project.urls]
-Homepage = "https://github.com/bi0shacker001/pythia"
-Repository = "https://github.com/bi0shacker001/pythia"
-Issues = "https://github.com/bi0shacker001/pythia/issues"
+Homepage = "https://github.com/mytop-project/pythia"
+Repository = "https://github.com/mytop-project/pythia"
+Issues = "https://github.com/mytop-project/pythia/issues"
 Lutris = "https://github.com/lutris/lutris"
 
 [dependency-groups]

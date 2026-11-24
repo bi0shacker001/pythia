@@ -1,4 +1,4 @@
-"""Onboarding never writes into a game's folder (Droidtop/tracker#538, the
+"""Onboarding never writes into a game's folder (mytop-project/tracker#538, the
 Windows UI test: onboarding wrote `.pythia-instance` into every game folder).
 The install's identity is its entry in Pythia's own data."""
 

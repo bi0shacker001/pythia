@@ -1,4 +1,4 @@
-"""Starting a game added from a folder (Droidtop/tracker#629): the person
+"""Starting a game added from a folder (mytop-project/tracker#629): the person
 presses Play and it runs.
 
 A folder game has no Lutris runner. Pythia picks the program to start from

@@ -64,7 +64,7 @@ Windows support is in progress alongside the UI rework.
 Handhelds running droidtop
 ==========================
 
-While Pythia runs, it is this computer's `droidtop <https://github.com/Droidtop/droidtop>`_
+While Pythia runs, it is this computer's `droidtop <https://github.com/mytop-project/droidtop>`_
 agent. Paired handhelds see the computer's games, Pythia's own tracked games
 among them, and keep their saves in step with it. Pythia does not talk to a
 separate agent program. It is built from droidtop-agent's crates, loaded as
@@ -83,7 +83,7 @@ start games here, and Forget under More. Save backups lists the copies kept on t
 when a sync would have overwritten saves that differ.
 
 Install the ``droidtop_agent`` wheel for your system from
-`droidtop-agent's releases <https://github.com/Droidtop/droidtop-agent/releases>`_
+`droidtop-agent's releases <https://github.com/mytop-project/droidtop-agent/releases>`_
 (``pip install droidtop_agent-*.whl``). Without it, Pythia works as before.
 
 * ``pythia --droidtop-pair 123456``: pair with the handheld showing that code

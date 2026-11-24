@@ -651,7 +651,7 @@ class TestResumeProgressCreation(TestCase):
 
     def test_chunks_queued_before_a_stop_are_still_written_and_recorded(self):
         """Another range failing sets stop_request; what was already downloaded is
-        still written, so its range is recorded for the resume (Droidtop/tracker#538)."""
+        still written, so its range is recorded for the resume (mytop-project/tracker#538)."""
         dest = str(self.tmp_path / "stopped.bin")
         with open(dest, "wb") as f:
             f.truncate(2000)

@@ -52,7 +52,7 @@ def launch_for_handheld(key: str, title: str = "") -> dict | None:
     ctx = PluginContext(log=lambda message: logger.info("%s", message))
     usable = [(p, d) for p, d in manager_plugins.find_for_game(entries) if p.is_available(ctx)]
     if not usable:
-        # A folder game's own program (Droidtop/tracker#629), as Play on this computer starts it; a
+        # A folder game's own program (mytop-project/tracker#629), as Play on this computer starts it; a
         # store game goes through its launcher first, which keeps its sign-in and DRM.
         from pythia import play  # noqa: PLC0415
 
@@ -110,7 +110,7 @@ def supported() -> bool:
 def register() -> bool:
     """Hands launch_for_handheld to the agent's service; False (and Steam
     games only) when the native module has no set_launcher, as builds before
-    droidtop-agent's bindings took it in did not (Droidtop/tracker#867)."""
+    droidtop-agent's bindings took it in did not (mytop-project/tracker#867)."""
     if not supported():
         logger.info("Handhelds can start only Steam games here: this build cannot start Pythia's own for them yet")
         return False

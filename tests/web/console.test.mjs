@@ -1,4 +1,4 @@
-// The page's errors reach Pythia's log with the error console off (Droidtop/tracker#538 D6).
+// The page's errors reach Pythia's log with the error console off (mytop-project/tracker#538 D6).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

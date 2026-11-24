@@ -1,4 +1,4 @@
-// The D-pad's nearest item (docs/SPEC.md 2.1; Droidtop/tracker#538 retest B1): node --test tests/web/*.test.mjs
+// The D-pad's nearest item (docs/SPEC.md 2.1; mytop-project/tracker#538 retest B1): node --test tests/web/*.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';

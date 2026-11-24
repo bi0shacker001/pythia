@@ -165,7 +165,7 @@ class GOGDownloader(BaseDownloader):
                     # (a cancel, or another range failing), so the ranges they
                     # finish are recorded for the resume; the sentinel that
                     # async_download always sends ends the loop. Stopping at
-                    # stop_request dropped them (Droidtop/tracker#538 retest:
+                    # stop_request dropped them (mytop-project/tracker#538 retest:
                     # test_progress_file_records_completed_ranges on Windows).
                     try:
                         item = self._write_queue.get(timeout=0.5)

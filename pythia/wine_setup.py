@@ -1,4 +1,4 @@
-"""Setting up Windows games on Linux (Droidtop/tracker#629): a Wine build for
+"""Setting up Windows games on Linux (mytop-project/tracker#629): a Wine build for
 Pythia's own use, fetched when the person asks ("Set up Windows games"), so
 Play works without installing anything from the system's package manager.
 

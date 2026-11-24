@@ -19,7 +19,7 @@ cross-referencing the corresponding synced `datadir/*.json` entry, and safe to
 read manually if something needs debugging.
 
 **Pythia no longer writes them (2026-10-16).** Owner direction for the
-Windows test (Droidtop/tracker#538): Pythia never writes into a person's game
+Windows test (mytop-project/tracker#538): Pythia never writes into a person's game
 folders. An install's identity lives in Pythia's own data: the entry's
 `game_uuid` and the variant's `path` in `datadir/`. A marker written by an
 earlier Pythia is still read as evidence (read_marker), since reading writes

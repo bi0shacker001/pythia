@@ -1,5 +1,5 @@
 """A scan's decisions (pythia.scanning): the folder ends up in the library once,
-and the decision card shows what was detected (Droidtop/tracker#538, the
+and the decision card shows what was detected (mytop-project/tracker#538, the
 Windows UI test: a resolved decision left a duplicate record, and the card
 read "Engine: Not identified, Version: none" for a Ren'Py 1.2 folder)."""
 

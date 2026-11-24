@@ -36,7 +36,7 @@ def name_key(name: str) -> str:
     """droidtop's GameNaming.nameKey: the name in lower case with only letters
     and digits. Records with equal keys are one game (droidtop SPEC 7m, "What
     merges, and what only suggests"); names only alike are a suggestion about
-    that one pair, and never join others (Droidtop/tracker#538 retest B2)."""
+    that one pair, and never join others (mytop-project/tracker#538 retest B2)."""
     return "".join(ch for ch in name.lower() if ch.isalnum())
 
 

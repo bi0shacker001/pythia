@@ -13,9 +13,9 @@
     <p>Pythia tracks which versions of which games exist on which of your computers and handhelds, where you own them, and what each one needs to run. While it runs, it is the droidtop agent of this computer: paired droidtop handhelds sync their library and saves with it.</p>
     <p>Pythia is largely based on Lutris, by Mathieu Comandon and the Lutris contributors.</p>
   </description>
-  <url type="homepage">https://github.com/bi0shacker001/pythia</url>
-  <url type="bugtracker">https://github.com/bi0shacker001/pythia/issues</url>
-  <url type="vcs-browser">https://github.com/bi0shacker001/pythia</url>
+  <url type="homepage">https://github.com/mytop-project/pythia</url>
+  <url type="bugtracker">https://github.com/mytop-project/pythia/issues</url>
+  <url type="vcs-browser">https://github.com/mytop-project/pythia</url>
   <launchable type="desktop-id">net.pythia.Pythia.desktop</launchable>
   <provides>
     <binary>pythia</binary>

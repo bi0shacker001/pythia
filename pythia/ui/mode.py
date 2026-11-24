@@ -8,7 +8,7 @@ Precedence: an explicit --ui hint > a saved choice of Big Picture (local.db, via
 identity.get_setting -- not synced) > the web UI.
 
 The web UI (pythia/ui/webview/app.py) is what Pythia starts in (UI review
-2026-10-23, U1 and U3, Droidtop/tracker#538): it holds both the desktop and the
+2026-10-23, U1 and U3, mytop-project/tracker#538): it holds both the desktop and the
 handheld shell and picks between them itself, by the device and the person's
 "Start in" setting (pythia.start_shell). The QtWidgets "desktop" front end is
 still a placeholder and Big Picture is the older handheld UI; each starts only

@@ -81,7 +81,7 @@
   /* Notice tones. Info follows the accent unless it would collide with caution
      (here it does: amber accent vs amber caution), so info uses neutral ink and
      the circle-i glyph tells it apart. Caution (orange here, ochre in Parchment)
-     and danger are hues of their own, never the accent's (Droidtop/tracker#538,
+     and danger are hues of their own, never the accent's (mytop-project/tracker#538,
      UX review A1); only their lightness moves per theme to keep contrast. */
   --info-ink:#eeeaf5;--info-plate:#262433;--on-info:#d7d2e4;
   --caution-ink:#ffa066;--caution-plate:#36231a;--on-caution:#f6dccb;

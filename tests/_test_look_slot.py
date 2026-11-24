@@ -1,5 +1,5 @@
 """A second Look does not have the first's progress or result written over
-it (Droidtop/tracker#538 retest: "starting a second Look while one runs makes
+it (mytop-project/tracker#538 retest: "starting a second Look while one runs makes
 the first's progress and result overwrite the page and the stored result")."""
 
 from unittest import TestCase

@@ -12,7 +12,7 @@ from pythia.droidtop import launch, library, native, scan, service, store, takeo
 
 class TitleKeyTest(TestCase):
     def test_is_the_lutris_slug_every_device_writes(self):
-        # Droidtop/tracker#870: games-scan's titles::slug and droidtop's TitleKeys.slug give the same.
+        # mytop-project/tracker#870: games-scan's titles::slug and droidtop's TitleKeys.slug give the same.
         self.assertEqual(library.title_key("Being a DIK"), "title2:being-a-dik")
         self.assertEqual(library.title_key("The Game: Deluxe!"), "title2:the-game-deluxe")
         self.assertEqual(library.title_key("the  game deluxe"), "title2:the-game-deluxe")
@@ -306,7 +306,7 @@ class TakeoverTest(TestCase):
         self.assertEqual(done["entries"], ["desktop"])
 
     def test_turning_sync_off_without_a_takeover_leaves_the_agents_folder_alone(self):
-        """Droidtop/tracker#538 retest B3: droidtop-agent's folder is written only after Pythia took its place."""
+        """mytop-project/tracker#538 retest B3: droidtop-agent's folder is written only after Pythia took its place."""
         fake = self.agent()
         with (
             mock.patch.object(native, "_module", fake),
@@ -477,7 +477,7 @@ class HandheldLaunchTest(TestCase):
 
 
 class ProfileFoldersTest(TestCase):
-    """Droidtop/tracker#538 retest B3: with APPDATA and LOCALAPPDATA moved, the native side
+    """mytop-project/tracker#538 retest B3: with APPDATA and LOCALAPPDATA moved, the native side
     looks for droidtop-agent's folders there, never in the profile the system names."""
 
     def test_the_agent_folders_follow_the_overridden_profile(self):
@@ -495,7 +495,7 @@ class ProfileFoldersTest(TestCase):
 
 
 class PlainPathTest(TestCase):
-    """Windows paths from the native side without the \\\\?\\ prefix (Droidtop/tracker#538 retest S1, S2)."""
+    """Windows paths from the native side without the \\\\?\\ prefix (mytop-project/tracker#538 retest S1, S2)."""
 
     def test_the_extended_length_prefix_is_dropped(self):
         self.assertEqual(native.plain_path("\\\\?\\G:\\games\\Tiny"), "G:\\games\\Tiny")

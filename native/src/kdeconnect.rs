@@ -1,5 +1,5 @@
-//! `pythia._native.kdeconnect`: this computer as a KDE Connect device (Droidtop/tracker#645), the same device
-//! droidtop runs, through lib-kdeconnect's one operation table (`kdeconnect_service::ops`). Phones and computers with
+//! `pythia._native.kdeconnect`: this computer as a KDE Connect device (mytop-project/tracker#645), the same device
+//! droidtop runs, through mytop-kdeconnect's one operation table (`kdeconnect_service::ops`). Phones and computers with
 //! the official KDE Connect apps, and droidtop handhelds, find it, pair with it, share files, links and text with it,
 //! share the clipboard and type into it.
 
@@ -17,7 +17,7 @@ pub fn fill(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// `call("start", state_dir=..., receive_dir=..., name="Living room PC", type="desktop")`,
 /// `call("devices")`, `call("event", timeout_ms=30000)`, `call("pair", id=...)`,
 /// `call("share_file", id=..., path=...)`, `call("clipboard_set", text=...)`.
-/// The operations and their replies are lib-kdeconnect's (`crates/service/src/ops.rs`). A refusal raises
+/// The operations and their replies are mytop-kdeconnect's (`crates/service/src/ops.rs`). A refusal raises
 /// AgentError with words a screen can show. `event` waits without holding the interpreter.
 #[pyfunction]
 #[pyo3(signature = (op, **kwargs))]

@@ -27,7 +27,7 @@ STORE_PAGES = {
     "dlsite": "https://www.dlsite.com/maniax/work/=/product_id/{id}.html",
 }
 NO_INSTALL = "Pythia knows no store to install it from. Install it with its store or launcher, then add its folder."
-# Each store's own installer, by its link (Droidtop/tracker#630): the store downloads and installs the
+# Each store's own installer, by its link (mytop-project/tracker#630): the store downloads and installs the
 # game, and "Find store games" then adds it here. The person's account and DRM stay the store's.
 # GOG Galaxy and the Epic Games Launcher exist on Windows (and macOS) only.
 WINDOWS_ONLY_INSTALLERS = ("gog", "egs")
@@ -181,7 +181,7 @@ def state(game_id: str, entries: list[dict] | None = None) -> dict:
         refused = _runner_check(game_id)
         primary = {"action": "play", "enabled": refused is None, "via": "runner", "reason": refused}
     else:
-        # A folder game (Droidtop/tracker#629): its own program, natively or through Wine.
+        # A folder game (mytop-project/tracker#629): its own program, natively or through Wine.
         from pythia import folder_launch  # noqa: PLC0415
 
         variant, launch = launch_of(own)
@@ -197,7 +197,7 @@ def state(game_id: str, entries: list[dict] | None = None) -> dict:
                 else NO_RUNNER
             )
             primary = {"action": "play", "enabled": False, "via": None, "reason": reason}
-            # Without Wine, the fix is one button (Droidtop/tracker#629): Pythia sets it up.
+            # Without Wine, the fix is one button (mytop-project/tracker#629): Pythia sets it up.
             from pythia import wine_setup  # noqa: PLC0415
 
             if reason == folder_launch.NO_WINE and wine_setup.supported():

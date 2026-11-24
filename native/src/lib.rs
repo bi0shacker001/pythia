@@ -7,7 +7,7 @@
 //! `.remote` and `.service`) are droidtop-agent's Python bindings
 //! (droidtop-agent `crates/python`, its docs/DESIGN.md section 16), built into
 //! this module with `register` after `configure` names Pythia, its folder and
-//! this module (Droidtop/tracker#867: one set of bindings, Pythia's own module
+//! this module (mytop-project/tracker#867: one set of bindings, Pythia's own module
 //! over them). Pythia's own submodules are `agent`, `pad` and `secure_screen`.
 //! One module and not one per crate: each extension module links its own copy
 //! of the Rust code, and one process must hold one agent.
@@ -53,7 +53,7 @@ const PYTHIA: Embedder = Embedder { program: "pythia", title: "Pythia", open: op
 /// the system for the profile's folder and ignores an APPDATA the caller
 /// set; Pythia honours it, so a profile moved with APPDATA and LOCALAPPDATA
 /// (a test profile, a portable install) is never written outside
-/// (Droidtop/tracker#538, retest B3).
+/// (mytop-project/tracker#538, retest B3).
 pub(crate) fn config_dir() -> Option<PathBuf> {
     env_dir("APPDATA").or_else(dirs::config_dir)
 }

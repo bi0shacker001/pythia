@@ -1,4 +1,4 @@
-"""The web UI's colour roles and status wording (UX review A1, Droidtop/tracker
+"""The web UI's colour roles and status wording (UX review A1, mytop-project/tracker
 #538): accent, caution and critical are three different colours in every
 theme, and the top bar never claims success."""
 

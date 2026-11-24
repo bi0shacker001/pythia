@@ -1,4 +1,4 @@
-"""Set up Windows games on Linux (pythia.wine_setup; Droidtop/tracker#629): the
+"""Set up Windows games on Linux (pythia.wine_setup; mytop-project/tracker#629): the
 latest Wine build fetched into Pythia's runners folder and used by Play."""
 
 import io

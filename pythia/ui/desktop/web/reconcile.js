@@ -22,7 +22,7 @@
   // once case and punctuation are dropped (droidtop's GameNaming.nameKey), or part folders side by side, are
   // one game, and that joins them into one cluster. Similar names (0.6 alike) only suggest, one pair at a time:
   // they never join clusters, or "Game" alike to "Alpha Game" and "Beta Game" would chain unrelated games
-  // together through a common word (Droidtop/tracker#538 retest B2).
+  // together through a common word (mytop-project/tracker#538 retest B2).
   const sameGame = (p) => p.reason === 'parts' || p.reason === 'same' || (norm(p.a.name) !== '' && norm(p.a.name) === norm(p.b.name));
 
   function clusters(pairs, isDismissed = () => false) {

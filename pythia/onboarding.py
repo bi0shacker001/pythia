@@ -46,7 +46,7 @@ NAME_SIMILARITY_THRESHOLD = 0.6
 # finding). This won't catch every real case either (a bare build number like
 # "Bunnycop-049" now just stays part of the name) -- best-effort, not exhaustive.
 # A version's tail may be letters then digits ("0.8.09r1", "1.0b2", "2.0rc3"):
-# Droidtop/tracker#538, "0.8.09r1" was cut to "0.8.09r" with "1" as a mod.
+# mytop-project/tracker#538, "0.8.09r1" was cut to "0.8.09r" with "1" as a mod.
 _NAME_VERSION_RE = re.compile(
     r"^(.*?)[-_ ](?:(?:v|(?i:ver(?:sion)?)\.?)(\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?)"
     r"|(\d+[._]\d+(?:[._]\d+)*(?:[a-zA-Z]+\d*)?))(.*)$"

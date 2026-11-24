@@ -1,4 +1,4 @@
-"""Detection quirks from the Windows UI test (Droidtop/tracker#538):
+"""Detection quirks from the Windows UI test (mytop-project/tracker#538):
 `.stfolder` was taken as a game, and "0.8.09r1" lost its "1"."""
 
 import tempfile

@@ -27,7 +27,7 @@
     updateBadge();
   }
 
-  // The page's own errors always go to Pythia's log, console on or off (Droidtop/tracker#538:
+  // The page's own errors always go to Pythia's log, console on or off (mytop-project/tracker#538:
   // with the console off they were dropped), and come back through uiLog when it is on.
   // Until the channel connects they wait here, and are shown locally too.
   const waiting = [];

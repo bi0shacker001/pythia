@@ -20,7 +20,7 @@ dependencyResolutionManagement {
 }
 
 // The shared UI library (tokens, format, the backend contract) is consumed from source, at the tag the submodule is
-// pinned to, so nothing of it is copied here (Droidtop/tracker#958).
+// pinned to, so nothing of it is copied here (mytop-project/tracker#958).
 includeBuild("vendor/mytop-ui") {
     dependencySubstitution {
         for (name in listOf("contract", "tokens", "format", "notices")) {

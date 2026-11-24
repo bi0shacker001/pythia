@@ -1,5 +1,5 @@
 """A game Pythia onboarded from a folder reads as installed, with its folder,
-platform and a slug (Droidtop/tracker#538: `pythia -l` showed them empty)."""
+platform and a slug (mytop-project/tracker#538: `pythia -l` showed them empty)."""
 
 from unittest import TestCase
 

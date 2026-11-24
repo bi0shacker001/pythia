@@ -33,7 +33,7 @@ import subprocess
 import sys
 import tempfile
 
-REPO = os.environ.get("GITHUB_REPOSITORY", "bi0shacker001/pythia")
+REPO = os.environ.get("GITHUB_REPOSITORY", "mytop-project/pythia")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHANNELS = ("testing", "stable")
 STAGED_PREFIX = "next."

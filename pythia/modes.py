@@ -4,7 +4,7 @@
   agent (owner, 2026-10-14: "If it's running, it will BE our agent"): its
   droidtop module is built and serving is on (``pythia.droidtop.takeover``,
   setting ``droidtop_serve``).
-- **Manager mode:** the library and version manager of Droidtop/tracker#214
+- **Manager mode:** the library and version manager of mytop-project/tracker#214
   (owner, 2026-10-01: "We want a library and version manager [...] we should
   be able to tag game folders, keep a local database like with f95checker
   [...] a user can tap a link, tag a download with the game it relates to and

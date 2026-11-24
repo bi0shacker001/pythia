@@ -40,7 +40,7 @@ test('pairs marked not the same do not join clusters', () => {
   assert.equal(R.clusters(pairsOf([a, b]), () => true).length, 0);
 });
 
-test('alike names never chain unrelated games through a common word (Droidtop/tracker#538 retest B2)', () => {
+test('alike names never chain unrelated games through a common word (mytop-project/tracker#538 retest B2)', () => {
   const game = rec('g', 'Game', ['1.0']), alpha = rec('a', 'Alpha Game', ['1.0']), beta = rec('b', 'Beta Game', ['1.0']);
   const odd = rec('o', 'Odd Game', ['1.0']), thing = rec('t', 'Beta Thing', ['1.0']);
   const alike = [[game, alpha], [game, beta], [game, odd], [beta, thing], [alpha, beta]].map(([a, b]) => ({ a, b, reason: 'name', score: 0.67 }));

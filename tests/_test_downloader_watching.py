@@ -1,5 +1,5 @@
 """Only the downloader that started a watch says Watching
-(Droidtop/tracker#538 retest D4)."""
+(mytop-project/tracker#538 retest D4)."""
 
 from unittest import TestCase
 

@@ -1,6 +1,6 @@
 """Unpacking a downloaded game archive so it can be added like a folder.
 
-Droidtop/tracker#538, the Windows UI test: a .zip that arrived in a watched
+mytop-project/tracker#538, the Windows UI test: a .zip that arrived in a watched
 download folder could not be added (onboarding takes folders only). Adding
 one now unpacks it beside itself, into a folder named after it, and adds that
 folder. The archive is the person's download, not a game folder Pythia

@@ -1,5 +1,5 @@
 """Store games found from the stores' own records (pythia.store_installs), and
-Steam's and Epic's availability (Droidtop/tracker#538, the Windows UI test:
+Steam's and Epic's availability (mytop-project/tracker#538, the Windows UI test:
 is_available was always False, and GOG, itch and Epic installs were never
 found outside a scanned folder)."""
 

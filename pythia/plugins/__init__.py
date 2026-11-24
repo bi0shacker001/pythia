@@ -124,7 +124,7 @@ class PluginMeta:
     config_schema: list = []
     credential_fields: list = []
     # A store that connects through its own sign-in page in the person's browser
-    # (Droidtop/tracker#630): ``paste`` says what to copy back once signed in.
+    # (mytop-project/tracker#630): ``paste`` says what to copy back once signed in.
     # Such a plugin defines browser_login_url() and connect_with(pasted).
     browser_connect: dict | None = None
 

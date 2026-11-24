@@ -22,7 +22,7 @@ description: |
   handhelds, where you own them, and what each one needs to run, and serves them to
   droidtop handhelds. Largely based on Lutris. This build carries its own Python and Qt.
 vendor: Pythia
-homepage: https://github.com/bi0shacker001/pythia
+homepage: https://github.com/mytop-project/pythia
 license: GPL-3.0-or-later
 
 contents:

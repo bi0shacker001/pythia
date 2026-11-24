@@ -1,4 +1,4 @@
-"""Pythia's backend over a local socket (docs/SPEC.md, decision 15; Droidtop/tracker#958).
+"""Pythia's backend over a local socket (docs/SPEC.md, decision 15; mytop-project/tracker#958).
 
 A second front end (the shared Compose UI) is another process, so it reaches the same `Backend` slots the HTML
 UI calls, over a local channel: a Unix socket on Linux and macOS, a named pipe on Windows, never TCP.

@@ -79,7 +79,7 @@ class PlayTest(TestCase):
 
 
 class InstallTest(TestCase):
-    """Install hands the game to its store's own installer (Droidtop/tracker#630)."""
+    """Install hands the game to its store's own installer (mytop-project/tracker#630)."""
 
     def entries(self, ids=(), owned=()):
         e = entry(ids=ids)

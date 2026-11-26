@@ -10,8 +10,12 @@ Kotlin client is generated from that file, and tests/_test_ipc_schema.py fails w
 What the file says about results: every call is answered with a backend-contract answer (`status` ok,
 unavailable, error or pending; pythia/ipc/ui_contract.py). A slot that returns a bare string is wrapped as
 `{"status": "ok", "value": "..."}` and one that returns nothing as `{"status": "ok"}`. The fields beside `status`
-are the slot's own and are not in the Slot declarations, so the schema does not type them (`returns` says only
-`answer`, `string` or `none`); typing them is the Kotlin client's job, slot by slot.
+are the slot's own. The Slot declarations do not carry them (`returns` says only `answer`, `string` or `none`),
+so a slot that builds them declares their type with `@results.returns(Type)` (pythia/ipc/results.py): the method
+then has `result`, the name of a type, and the file's `types` describe every such type field by field, read off
+the TypedDicts with `typing`'s own introspection. `envelope` is what every answer has, whatever its status. An event
+whose payload is declared in `results.EVENT_PAYLOADS` has `payload`, a type name. A slot without a declared type
+has an answer this file does not type.
 """
 
 import inspect
@@ -20,7 +24,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pythia.ipc import CONTRACT_PIN, PROTOCOL
+from pythia.ipc import CONTRACT_PIN, PROTOCOL, results, ui_contract
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "backend-ipc.json"
 
@@ -67,6 +71,15 @@ def _params(cls: type, name: str, qt_types: list[str]) -> list[dict[str, Any]]:
     return params
 
 
+def _envelope() -> dict[str, Any]:
+    """What every answer has beside the slot's own fields, from the contract's own list of them."""
+    fields: dict[str, Any] = {"status": {"type": {"enum": list(ui_contract.STATUSES)}}}
+    for name in ui_contract._OWN:  # noqa: SLF001 -- the contract's list of its own fields
+        if name != "status":
+            fields[name] = {"type": "string", "optional": True}
+    return {"fields": fields}
+
+
 def describe(cls: type) -> dict[str, Any]:
     """The schema of a QObject class: its slots as methods, its signals as events, each sorted by name."""
     from PySide6.QtCore import QMetaMethod  # noqa: PLC0415
@@ -74,6 +87,7 @@ def describe(cls: type) -> dict[str, Any]:
     meta = cls.staticMetaObject  # type: ignore[attr-defined]
     methods: list[dict[str, Any]] = []
     events: list[dict[str, Any]] = []
+    roots: list[type] = []
     for index in range(meta.methodOffset(), meta.methodCount()):
         method = meta.method(index)
         name = _text(method.name())
@@ -85,14 +99,24 @@ def describe(cls: type) -> dict[str, Any]:
             entry: dict[str, Any] = {"name": name, "params": _params(cls, name, qt_types), "returns": _RETURNS[returns]}
             if _answers_later(getattr(cls, name)):
                 entry["async"] = True
+            result_type = results.result_type_of(getattr(cls, name))
+            if result_type is not None:
+                entry["result"] = result_type.__name__
+                roots.append(result_type)
             methods.append(entry)
         elif method.methodType() == QMetaMethod.MethodType.Signal:
-            events.append({"name": name, "params": [{"type": _wire_type(t)} for t in qt_types]})
+            event: dict[str, Any] = {"name": name, "params": [{"type": _wire_type(t)} for t in qt_types]}
+            if name in results.EVENT_PAYLOADS:
+                event["payload"] = results.EVENT_PAYLOADS[name].__name__
+                roots.append(results.EVENT_PAYLOADS[name])
+            events.append(event)
     methods.sort(key=lambda m: m["name"])
     events.sort(key=lambda e: e["name"])
     return {
         "protocol": PROTOCOL,
         "contract": CONTRACT_PIN,
+        "envelope": _envelope(),
+        "types": results.describe_all(roots),
         "methods": methods,
         "events": events,
     }

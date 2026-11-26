@@ -1,0 +1,49 @@
+name: Regenerate (temporary)
+
+# Formats the Python and writes schema/backend-ipc.json on this branch, then commits what changed.
+# Removed again before the branch lands.
+on:
+  push:
+    branches: [ci/backend-gaming4]
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The pinned droidtop-platforms data
+        run: git submodule update --init pythia/data/droidtop-platforms
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Ubuntu dependencies
+        run: |
+          sudo apt update
+          sudo apt-get install libdbus-1-dev libudev-dev pkg-config libgirepository-2.0-dev python3-gi-cairo libcairo2-dev libgtk-3-dev libgdk-pixbuf-2.0-dev libgnome-desktop-3-dev libwebkit2gtk-4.1-dev
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m venv .venv
+          . .venv/bin/activate
+          make req-python
+          make dev
+          pip install PySide6 ruff==0.12.1
+      - name: Format
+        run: |
+          . .venv/bin/activate
+          ruff format pythia tests
+      - name: Schema
+        run: |
+          . .venv/bin/activate
+          QT_QPA_PLATFORM=offscreen python -m pythia.ipc.schema
+      - name: Commit what changed
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A pythia tests schema
+          if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
+          git commit -m "Ruff's format and the regenerated schema for batch 3" -m "Changelog: none"
+          git push origin HEAD:${GITHUB_REF_NAME}

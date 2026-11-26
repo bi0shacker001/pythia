@@ -295,6 +295,25 @@ the droidtop coordinator for this lane. Later sections follow them.
       they are the person's on every computer. `get_game_art_data` reads a
       game's art file in chunks of at most 1 MiB, base64 in the answer, for a
       client on another computer; `get_game_art` is unchanged.
+    - **Batch 3: stopping, running, art, typed answers.** `cancel_job` stops
+      a scan, a look, adding a reviewed look, a store scan, a sync, an update
+      check and combining records between two items (each worker checks the
+      job's flag; what it did stays, and the job ends `done` with `cancelled`
+      true); any other job answers `unavailable` with the reason.
+      `get_running_games` and `quit_game` also cover a game Steam started,
+      read from Steam's own running-app state (`RunningAppID` and
+      `Apps/<id>/Running`, in `registry.vdf` or the Windows registry), and a
+      game found running by the program in its folder (so one already running
+      when Pythia starts), read from `/proc`, `ps` or the process list of
+      Windows (`pythia.running_external`). A game of Steam's is not
+      quittable: Steam has no route that ends one game, and Pythia does not
+      end what Steam owns. `get_game_art_list` answers every art role in one
+      call, and `screenshot:<n>` is Steam's screenshot folder of the game,
+      newest first. Every slot added since batch 1 declares the fields of its
+      `ok` answer with `@returns(Type)` (`pythia.ipc.results`), and the
+      schema's `types`, each method's `result` and each event's `payload` are
+      read from those TypedDicts, not written by hand; the tests check what
+      the slots really answer against them.
 
 16. **The native front end starts as `ui-native/` (mytop-project/tracker#958,
     step 5).** A self-contained Gradle build in this repo: Kotlin 2.4.20,

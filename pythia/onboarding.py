@@ -835,12 +835,13 @@ def record_ownership(detection: dict, own: list[dict] | None = None) -> tuple[di
     return entry, created
 
 
-def sync_owned(plugin) -> dict:
+def sync_owned(plugin, should_cancel=None) -> dict:
     """Pull `plugin.list_owned()` (an account-level ownership listing, independent of
     any local install -- e.g. ItchLibraryPlugin's real API-key-based itch.io pull,
     2026-08-03) and fold it into this system's tracked games via record_ownership().
     Returns {"status": "ok", "linked": N, "created": N} or an error if the plugin has
-    no real list_owned() implementation."""
+    no real list_owned() implementation. ``should_cancel``, when it answers True between two games, ends the
+    folding there (``cancelled`` is then true): the games folded stay."""
     owned = plugin.list_owned()
     if owned is None:
         return {
@@ -851,14 +852,18 @@ def sync_owned(plugin) -> dict:
     own = _own_entries()
     linked = 0
     created = 0
+    cancelled = False
     for detection in owned:
+        if should_cancel is not None and should_cancel():
+            cancelled = True
+            break
         _entry, was_created = record_ownership(detection, own)
         if was_created:
             created += 1
         else:
             linked += 1
 
-    return {"status": "ok", "linked": linked, "created": created}
+    return {"status": "ok", "linked": linked, "created": created, "cancelled": cancelled}
 
 
 def _update_platform_ids_and_ownership(entry: dict, detection: dict):

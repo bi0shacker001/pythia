@@ -92,14 +92,25 @@ def _keep_store_id(entry_file: str, key: str) -> None:
         games_db.save_entry_and_sync_cache(entry)
 
 
-def record_new() -> dict:
+def record_new(should_cancel=None) -> dict:
     """Records every store game whose folder is not tracked yet. Returns the
     counts (``found``, ``recorded``, ``already``, ``failed``) and each
-    ``failure``'s folder and message."""
+    ``failure``'s folder and message. ``should_cancel``, when it answers True between two games, ends it there
+    (``cancelled`` is then true)."""
     found = find()
     tracked = _tracked_folders()
-    counts: dict[str, Any] = {"found": len(found), "recorded": 0, "already": 0, "failed": 0, "failures": []}
+    counts: dict[str, Any] = {
+        "found": len(found),
+        "recorded": 0,
+        "already": 0,
+        "failed": 0,
+        "failures": [],
+        "cancelled": False,
+    }
     for game in found:
+        if should_cancel is not None and should_cancel():
+            counts["cancelled"] = True
+            break
         if str(Path(game["folder"]).resolve()) in tracked:
             counts["already"] += 1
             continue

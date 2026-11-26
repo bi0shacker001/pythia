@@ -45,10 +45,12 @@ from pythia import (
     onboarding,
     reconciliation,
     running,
+    running_external,
     scanning,
 )
 from pythia.database import games as games_db
 from pythia.identity import get_system_uuid
+from pythia.ipc import results as ipc_results
 from pythia.util.log import logger
 
 _UI_LOG_LIMIT = 500
@@ -204,6 +206,7 @@ class Backend(QObject):
         self._lock = threading.Lock()
         self._ui_log: list[dict] = []
         self._jobs: list[dict] = []
+        self._cancels: dict[str, threading.Event] = {}  # a job's cancel flag, set by cancel_job
         self._detected: list[dict] = []
         # Scan decisions waiting survive a restart (pythia.intake_store; UX review A16).
         from pythia import intake_store
@@ -218,6 +221,9 @@ class Backend(QObject):
         logger.addHandler(self._log_handler)
         self.refresh_games()
         running.TRACKER.subscribe(self._on_running_game)
+        # Games running that Pythia did not start (Steam's, or already running when Pythia came up) are read from
+        # Steam's own state and the operating system's processes, and told like the ones it started.
+        self._running_observer = running_external.watch(self._library_records, get_system_uuid(), running.TRACKER)
         # The library folders are scanned on their own, a minute after start and then every scan_minutes.
         self._library_scan_stop = threading.Event()
         self._library_scan_running = threading.Lock()
@@ -399,7 +405,7 @@ class Backend(QObject):
         return {"status": "pending", "slot": slot, "request": request}
 
     # ---- jobs: the backend's own operations, start to finish -------------------
-    def _job_start(self, kind: str, title: str, detail: str = "") -> str:
+    def _job_start(self, kind: str, title: str, detail: str = "", cancellable: bool = False) -> str:
         job = {
             "id": f"{kind}-{len(self._jobs) + 1}-{int(datetime.datetime.now().timestamp() * 1000)}",
             "kind": kind,
@@ -410,10 +416,15 @@ class Backend(QObject):
             "ended_at": None,
             "summary": "",
             "log": [],
+            # Whether cancel_job can stop it between two items (its worker checks the flag), and whether it did.
+            "cancellable": cancellable,
+            "cancelled": False,
         }
         with self._lock:
             self._jobs.insert(0, job)
             del self._jobs[_JOB_LIMIT:]
+            if cancellable:
+                self._cancels[str(job["id"])] = threading.Event()
         self.jobsChanged.emit(_jsonable(self._jobs))
         return str(job["id"])
 
@@ -424,13 +435,21 @@ class Backend(QObject):
                 job["log"].append(line)
         self._log(line)
 
-    def _job_finish(self, job_id: str, summary: str, ok: bool = True):
+    def _cancel_flag(self, job_id: str):
+        """What a worker asks between two items: has cancel_job asked this job to stop?"""
+        event = self._cancels.get(job_id)
+        return event.is_set if event is not None else (lambda: False)
+
+    def _job_finish(self, job_id: str, summary: str, ok: bool = True, cancelled: bool = False):
+        """Ends a job. A job that was cancelled ends as "done" (what it did stays) with ``cancelled`` true."""
         with self._lock:
             job = next((j for j in self._jobs if j["id"] == job_id), None)
             if job is not None:
                 job["state"] = "done" if ok else "failed"
                 job["summary"] = summary
                 job["ended_at"] = _now()
+                job["cancelled"] = cancelled
+            self._cancels.pop(job_id, None)
         self.jobsChanged.emit(_jsonable(self._jobs))
         self._record("info" if ok else "warn", "pythia", summary)
 
@@ -523,7 +542,7 @@ class Backend(QObject):
         scan (bigpicture/qml/HomeScreen.qml). The web UI looks first
         (start_look) and adds what the person keeps."""
         path_str = _normalize_path(path_str)
-        job = self._job_start("scan", f"Scan {path_str}", "Finds every game folder inside")
+        job = self._job_start("scan", f"Scan {path_str}", "Finds every game folder inside", cancellable=True)
         threading.Thread(target=self._scan_worker, args=(path_str, job), daemon=True).start()
 
     # ---- Look, Review, Add (pythia.look; UX review A16) ------------------------
@@ -534,7 +553,9 @@ class Backend(QObject):
         proposals arrive as lookChanged, with live counts while it walks. A
         Look started while another runs replaces it (pythia.look.LookSlot)."""
         path_str = _normalize_path(path_str)
-        job = self._job_start("scan", f"Look in {Path(path_str).name or path_str}", "Nothing is added until you Add")
+        job = self._job_start(
+            "scan", f"Look in {Path(path_str).name or path_str}", "Nothing is added until you Add", cancellable=True
+        )
         self.lookChanged.emit(_jsonable(self._look.start(job, path_str)))
         threading.Thread(target=self._look_worker, args=(path_str, job), daemon=True).start()
         return {"status": "ok", "job": job}
@@ -548,11 +569,16 @@ class Backend(QObject):
                 self.lookChanged.emit(_jsonable(shown))
 
         try:
-            result = look.look(path_str, progress=progress)
+            result = look.look(path_str, progress=progress, should_cancel=self._cancel_flag(job))
         except OSError as exc:
             self._job_finish(job, f"Could not look in {path_str}: {exc}", ok=False)
             if self._look.fail(job):
                 self.lookChanged.emit({"status": "error", "message": str(exc)})
+            return
+        if result.get("status") == "cancelled":
+            if self._look.fail(job):
+                self.lookChanged.emit({"status": "none"})
+            self._job_finish(job, "Look stopped; nothing was added", cancelled=True)
             return
         result["job"] = job
         if not self._look.finish(job, result):
@@ -574,14 +600,14 @@ class Backend(QObject):
         rows = [dict(r) for r in rows or []]
         kept = [r for r in rows if r.get("keep", True)]
         title = f"Add {len(kept)} game{'s' if len(kept) != 1 else ''}"
-        job = self._job_start("onboard", title, "From the reviewed Look")
+        job = self._job_start("onboard", title, "From the reviewed Look", cancellable=True)
         threading.Thread(target=self._add_worker, args=(rows, job), daemon=True).start()
         return {"status": "ok", "job": job}
 
     def _add_worker(self, rows, job):
         from pythia import look
 
-        result = look.add(rows)
+        result = look.add(rows, should_cancel=self._cancel_flag(job))
         for f in result["failures"]:
             self._job_log(job, f"not added: {f['name']} {f['path']}: {f['message']}")
         self.refresh_games()
@@ -589,7 +615,11 @@ class Backend(QObject):
         text = f"Added {result['games']} game{'s' if result['games'] != 1 else ''} ({result['folders']} folders)"
         if result["failures"]:
             text += f", {len(result['failures'])} not added"
-        self._job_finish(job, text, ok=not result["failures"] or bool(result["games"]))
+        if result.get("cancelled"):
+            text = "Stopped: " + text
+        self._job_finish(
+            job, text, ok=not result["failures"] or bool(result["games"]), cancelled=bool(result.get("cancelled"))
+        )
         self.lookChanged.emit(_jsonable({**result, "status": "added", "summary": text}))
 
     @Slot()
@@ -607,7 +637,9 @@ class Backend(QObject):
 
         if not droidtop.available():
             return self._agent_unavailable("start_store_scan")
-        job = self._job_start("scan", "Store games", "Finds the games each store on this computer has installed")
+        job = self._job_start(
+            "scan", "Store games", "Finds the games each store on this computer has installed", cancellable=True
+        )
         threading.Thread(target=self._store_scan_worker, args=(job,), daemon=True).start()
         return {"status": "ok", "job": job}
 
@@ -616,7 +648,7 @@ class Backend(QObject):
         from pythia.droidtop import AgentError
 
         try:
-            counts = store_installs.record_new()
+            counts = store_installs.record_new(should_cancel=self._cancel_flag(job))
         except AgentError as ex:
             self._job_finish(job, f"Could not ask the stores: {ex}", ok=False)
             return
@@ -629,12 +661,14 @@ class Backend(QObject):
         )
         if counts["failed"]:
             summary += f", {counts['failed']} failed"
-        self._job_finish(job, summary, ok=not counts["failed"])
+        if counts["cancelled"]:
+            summary = "Stopped: " + summary
+        self._job_finish(job, summary, ok=not counts["failed"], cancelled=counts["cancelled"])
 
     def _scan_worker(self, path_str: str, job: str):
         self._job_log(job, f"Scanning '{path_str}' ...")
         try:
-            results = scanning.scan_library(path_str)
+            results = scanning.scan_library(path_str, should_cancel=self._cancel_flag(job))
         except OSError as exc:
             self._job_finish(job, f"Could not scan {path_str}: {exc}", ok=False)
             self.scanComplete.emit([])
@@ -650,11 +684,14 @@ class Backend(QObject):
         ok = sum(1 for r in results if r["status"] == "ok")
         skipped = sum(1 for r in results if r["status"] == "skipped")
         bad = len(results) - ok - skipped
+        stopped = self._cancel_flag(job)()
         self._job_finish(
             job,
-            f"{ok} game{'s' if ok != 1 else ''} found"
+            ("Stopped: " if stopped else "")
+            + f"{ok} game{'s' if ok != 1 else ''} found"
             + (f", {skipped} folder{'s' if skipped != 1 else ''} left out (ROMs or a launcher)" if skipped else "")
             + (f", {bad} not identified" if bad else ""),
+            cancelled=stopped,
         )
         self.scanComplete.emit(_jsonable(results))
 
@@ -820,20 +857,30 @@ class Backend(QObject):
         """Folds every record of a Reconciliation cluster into one, one after
         another in one job (UX review A16: "Combine as versions")."""
         retired = [str(r) for r in retired_ids or [] if str(r) != surviving_id]
-        job = self._job_start("merge", f"Combine {len(retired) + 1} records", f"into {surviving_id}")
+        job = self._job_start(
+            "merge", f"Combine {len(retired) + 1} records", f"into {surviving_id}", cancellable=True
+        )
         threading.Thread(target=self._merge_cluster_worker, args=(surviving_id, retired, job), daemon=True).start()
 
     def _merge_cluster_worker(self, surviving_id, retired, job):
         failed = []
+        stop = self._cancel_flag(job)
+        folded = 0
         for retired_id in retired:
+            if stop():
+                break
+            folded += 1
             result = reconciliation.merge(surviving_id, retired_id)
             if result.get("status") != "ok":
                 failed.append(result.get("message", retired_id))
                 self._job_log(job, f"not folded {retired_id}: {result.get('message')}")
         self.refresh_games()
-        done = len(retired) - len(failed)
+        done = folded - len(failed)
         text = f"Combined {done + 1} records into one" + (f", {len(failed)} not" if failed else "")
-        self._job_finish(job, text, not failed)
+        stopped = folded < len(retired)
+        if stopped:
+            text = "Stopped: " + text
+        self._job_finish(job, text, not failed, cancelled=stopped)
         self.mergeComplete.emit({"status": "ok" if not failed else "error", "message": "; ".join(failed)})
 
     # ---- notes ------------------------------------------------------------------
@@ -1258,7 +1305,7 @@ class Backend(QObject):
 
     @Slot(str)
     def sync_account(self, plugin_id: str):
-        job = self._job_start(f"sync:{plugin_id}", f"Sync {plugin_id}", "Owned games")
+        job = self._job_start(f"sync:{plugin_id}", f"Sync {plugin_id}", "Owned games", cancellable=True)
         threading.Thread(target=self._sync_account_worker, args=(plugin_id, job), daemon=True).start()
 
     def _sync_account_worker(self, plugin_id: str, job: str):
@@ -1272,7 +1319,7 @@ class Backend(QObject):
             )
             return
         try:
-            result = onboarding.sync_owned(plugin)
+            result = onboarding.sync_owned(plugin, should_cancel=self._cancel_flag(job))
         except Exception as exc:  # noqa: BLE001 -- a store's failure is the job's result
             self._record("error", "python", f"sync_account({plugin_id}) failed: {exc}", "sync_account")
             logger.exception("sync_account(%s) failed", plugin_id)
@@ -1307,7 +1354,7 @@ class Backend(QObject):
         desktop UI at all until now. Reuses accountSyncComplete since the
         result shape (linked/created/status) is identical to a real account
         sync's, even though F95's import isn't an ongoing sync."""
-        job = self._job_start("sync:f95", "Import from F95Checker", db_path)
+        job = self._job_start("sync:f95", "Import from F95Checker", db_path, cancellable=True)
         threading.Thread(target=self._import_f95_worker, args=(db_path, job), daemon=True).start()
 
     def _import_f95_worker(self, db_path: str, job: str):
@@ -1317,7 +1364,7 @@ class Backend(QObject):
         if db_path:
             f95_module.set_db_path(db_path)
         try:
-            result = onboarding.sync_owned(f95_plugin)
+            result = onboarding.sync_owned(f95_plugin, should_cancel=self._cancel_flag(job))
         except Exception as exc:  # noqa: BLE001
             self._record("error", "python", f"import_f95 failed: {exc}", "import_f95")
             logger.exception("import_f95 failed")
@@ -1336,14 +1383,16 @@ class Backend(QObject):
         """Library > Check all updates: the real F95zone pass (plugins/library/
         f95_updates.run_update_check) over every game with an F95zone id. Other
         stores have no update check yet; the result says how many were checked."""
-        job = self._job_start("updates", "Check for updates", "Games with an F95zone id")
+        job = self._job_start("updates", "Check for updates", "Games with an F95zone id", cancellable=True)
         threading.Thread(target=self._check_updates_worker, args=(job,), daemon=True).start()
 
     def _check_updates_worker(self, job: str):
         from pythia.plugins.library import f95_updates
 
         try:
-            result = f95_updates.run_update_check(log=lambda line: self._job_log(job, line))
+            result = f95_updates.run_update_check(
+                log=lambda line: self._job_log(job, line), should_cancel=self._cancel_flag(job)
+            )
         except Exception as exc:  # noqa: BLE001
             self._record("error", "python", f"check_updates failed: {exc}", "check_updates")
             logger.exception("check_updates failed")
@@ -1355,7 +1404,9 @@ class Backend(QObject):
         summary = f"{result.get('checked', 0)} checked, {result.get('updated', 0)} with an update"
         if errors:
             summary += f", {len(errors)} failed"
-        self._job_finish(job, summary, ok=not errors)
+        if result.get("cancelled"):
+            summary = "Stopped: " + summary
+        self._job_finish(job, summary, ok=not errors, cancelled=bool(result.get("cancelled")))
         self.updateCheckComplete.emit(_jsonable({"status": "ok", **result}))
 
     @Slot(result=str)
@@ -2707,6 +2758,7 @@ class Backend(QObject):
     # ---- the library as a gaming front end reads it (pythia.gaming_api; mytop-project/tracker#920) -----------------
     @Slot(result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.GetGamesResult)
     def get_games(self, since_version: str = ""):
         """Every game as one card, from the library as it is held in memory: ``version`` (changes when any card
         does) and ``games`` (id, title, sort_name, platforms, runner, installed, last_played in epoch seconds,
@@ -2723,6 +2775,7 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.GetGameSystemsResult)
     def get_game_systems(self):
         """The platforms the library has: ``id``, ``name``, ``count`` (games), ``installed``, ``favourites`` and
         ``last_played`` each; a game on several platforms counts under each, one without any under "Unknown
@@ -2733,12 +2786,17 @@ class Backend(QObject):
             version, cards = self._games_version, self._cards
         return ui_contract.ok("get_game_systems", version=version, systems=gaming_api.systems(cards))
 
+    def _library_records(self) -> list[dict]:
+        with self._lock:
+            return list(self._games)
+
     def _game_of(self, game_id: str) -> dict | None:
         with self._lock:
             return next((g for g in self._games if g.get("game_id") == game_id), None)
 
     @Slot(str, result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.GetGameDetailResult)
     def get_game_detail(self, game_id: str):
         """One game's page from the library held in memory: ``fields`` is what Pythia records (title, year, notes,
         platforms, runners, store ids, ownership, versions, updates, play facts) and ``missing`` names, as an
@@ -2754,6 +2812,7 @@ class Backend(QObject):
     @Slot(str, str, result="QVariant")
     @_guarded
     @_off_the_main_thread
+    @ipc_results.returns(ipc_results.GetGameArtResult)
     def get_game_art(self, game_id: str, role: str):
         """The local file of a game's art for ``role`` (cover, banner, logo, background, icon, screenshot): ``path``,
         ``uri``, ``mime`` and ``size``, from the art already on this computer (Lutris's folders, Steam's library
@@ -2768,6 +2827,7 @@ class Backend(QObject):
     @Slot(str, str, int, int, result="QVariant")
     @_guarded
     @_off_the_main_thread
+    @ipc_results.returns(ipc_results.GetGameArtDataResult)
     def get_game_art_data(self, game_id: str, role: str, offset: int = 0, length: int = gaming_api.DEFAULT_CHUNK):
         """The bytes of a game's art file for ``role``, for a client on another computer that cannot open the file
         get_game_art names: ``length`` bytes from ``offset`` (at most 1 MiB) as ``data`` (base64), with ``mime``, the
@@ -2780,8 +2840,27 @@ class Backend(QObject):
             return ui_contract.error(f"No game {game_id} in the library", slot="get_game_art_data", code="no-such-game")
         return gaming_api.art_bytes(game.get("entries") or [], role, offset, length)
 
+    @Slot(str, result="QVariant")
+    @_guarded
+    @_off_the_main_thread
+    @ipc_results.returns(ipc_results.GetGameArtListResult)
+    def get_game_art_list(self, game_id: str):
+        """Every art role a game has on this computer in one answer: ``roles`` (cover, banner, logo, background, icon,
+        each its file's ``path``, ``uri``, ``mime`` and ``size``, or None), ``missing`` (why, for each that is None) and
+        ``screenshots`` (Steam's, newest first; ``screenshot:<index>`` is the role get_game_art and get_game_art_data
+        take for one). Nothing is downloaded."""
+        from pythia.ipc import ui_contract
+
+        game = self._game_of(game_id)
+        if game is None:
+            return ui_contract.error(
+                f"No game {game_id} in the library", slot="get_game_art_list", code="no-such-game"
+            )
+        return _jsonable(ui_contract.ok("get_game_art_list", **gaming_api.art_list(game.get("entries") or [])))
+
     @Slot("QVariant", result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.QueryGamesResult)
     def query_games(self, query):
         """The library filtered and ordered as ``query`` says, in one pass over the cards held in memory
         (pythia.gaming_query): ``games`` (one page of cards), ``total`` (all that match) and ``facets``, how many
@@ -2816,6 +2895,7 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.GetCollectionsResult)
     def get_collections(self):
         """The person's collections, each with its ``id``, ``name``, ``game_ids`` and ``count``, by name. They are
         kept in the library folder with the games (pythia.game_collections), so they are the same on every
@@ -2840,12 +2920,14 @@ class Backend(QObject):
 
     @Slot(str, result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.CollectionResult)
     def create_collection(self, name: str):
         """Makes an empty collection called ``name`` (no other has that name, ignoring case); answers it."""
         return self._collection_call("create_collection", lambda: game_collections.create(name), "created")
 
     @Slot(str, str, result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.CollectionResult)
     def rename_collection(self, collection_id: str, name: str):
         """Renames a collection; the newest name wins on every computer."""
         return self._collection_call(
@@ -2854,6 +2936,7 @@ class Backend(QObject):
 
     @Slot(str, result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.DeleteCollectionResult)
     def delete_collection(self, collection_id: str):
         """Deletes a collection (its games stay in the library) on every computer."""
 
@@ -2865,6 +2948,7 @@ class Backend(QObject):
 
     @Slot(str, "QVariant", result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.CollectionMembersResult)
     def add_to_collection(self, collection_id: str, game_ids):
         """Adds games (a list of game ids) to a collection. ``changed`` lists those that were not in it already,
         ``unknown`` those the library does not have (and that were not added)."""
@@ -2879,6 +2963,7 @@ class Backend(QObject):
 
     @Slot(str, "QVariant", result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.CollectionMembersResult)
     def remove_from_collection(self, collection_id: str, game_ids):
         """Takes games (a list of game ids) out of a collection; ``changed`` lists those that were in it."""
         ids = [g for g in game_ids if isinstance(g, str)] if isinstance(game_ids, list) else []
@@ -2901,35 +2986,45 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.GetRunningGamesResult)
     def get_running_games(self):
-        """The games Pythia started that are still running (``game_id``, ``via``, ``started_at``, ``pid``), oldest
-        first. A game started by Steam's link or another launcher is not here: that process is theirs."""
+        """The games of the library that are running, oldest first: ``game_id``, ``via`` ("folder" and "runner" are
+        games Pythia started; "steam" a game Steam started, read from Steam's own running-app state; "process" a game
+        found running by its folder, already running when Pythia came up or started by another program), ``started_at``
+        (epoch seconds, None when Pythia did not see it start), ``pid`` and ``quittable``. A game of Steam's is not
+        quittable: Steam ends it, and has no route that ends one game from outside."""
         from pythia.ipc import ui_contract
 
         return ui_contract.ok(
             "get_running_games",
             games=running.TRACKER.games(),
-            scope="Games Pythia started itself (a folder or a runner)",
+            scope="Games Pythia started, games Steam says it is running, and games found running by their folder",
         )
 
     @Slot(str, result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.QuitGameResult)
     def quit_game(self, game_id: str):
-        """Asks a game Pythia started to end (its process group gets SIGTERM; taskkill on Windows). The end is told
-        as gameStopped. ``unavailable`` for a game this Pythia did not start or has lost track of."""
+        """Asks a running game to end (its process group gets SIGTERM; taskkill on Windows): one Pythia started, or one
+        found running by its folder. The end is told as gameStopped. ``unavailable`` with the reason for a game
+        Steam started (Steam ends it), and for one Pythia has no hold of."""
         from pythia.ipc import ui_contract
 
         if not running.TRACKER.quit(game_id):
-            return self._unavailable("quit_game", running.NOT_STARTED_HERE)
+            return self._unavailable("quit_game", running.TRACKER.why_not(game_id))
         self._record("info", "pythia", f"Asked {game_id} to end", "quit_game")
         return ui_contract.ok("quit_game", game_id=game_id, asked=True)
 
     # ---- jobs ------------------------------------------------------------------------------------------------------
     @Slot(str, result="QVariant")
     @_guarded
+    @ipc_results.returns(ipc_results.CancelJobResult)
     def cancel_job(self, job_id: str):
-        """Stops a running job where Pythia can: the folder watch (stop_watch). A scan, a look, a sync or a merge
-        runs to its end, and the answer says so (``unavailable``); a job that already ended says that."""
+        """Stops a running job where Pythia can. The folder watch stops (stop_watch). A scan, a look, adding a
+        reviewed look, a store scan, a sync, an update check and combining records stop between two items: the
+        job's flag is set and its worker ends at the next item, what it did staying done (the job then ends with
+        ``cancelled`` true). Any other job (one write, a download, a pairing) cannot be stopped half way and
+        the answer says so (``unavailable``); a job that already ended says that."""
         from pythia.ipc import ui_contract
 
         with self._lock:
@@ -2942,8 +3037,12 @@ class Backend(QObject):
         if watching:
             self.stop_watch()
             return ui_contract.ok("cancel_job", job=job_id, stopping=True)
+        flag = self._cancels.get(job_id)
+        if job.get("cancellable") and flag is not None:
+            flag.set()
+            return ui_contract.ok("cancel_job", job=job_id, stopping=True)
         return self._unavailable(
             "cancel_job",
             f"Pythia cannot stop a {job['kind']} job half way; it runs to its end. "
-            "Only the folder watch can be stopped.",
+            "The folder watch, scans, looks, store scans, syncs, update checks and combining records can be stopped.",
         )

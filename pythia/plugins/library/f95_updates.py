@@ -147,7 +147,7 @@ def fast_check(thread_ids: list[int]) -> dict[int, int]:
     return results
 
 
-def run_update_check(log=None) -> dict:
+def run_update_check(log=None, should_cancel=None) -> dict:
     """Real update-check pass over every f95-sourced game this system tracks,
     populating the datadir schema's `available_updates[]` field (reserved for
     exactly this since Milestone 3, previously unpopulated). Only ever writes
@@ -156,7 +156,10 @@ def run_update_check(log=None) -> dict:
     Skips full_check() for a thread when fast_check() shows nothing has
     changed since the last full check recorded here (`f95_last_full_check`,
     a new, additive top-level entry field) -- same optimization the real
-    client makes, avoiding a full_check call per game on every run."""
+    client makes, avoiding a full_check call per game on every run.
+
+    ``should_cancel``, when it answers True between two threads, ends the pass there (``cancelled`` is then true):
+    what was checked stays recorded."""
     from pythia import datadir
     from pythia.database.games import save_entry_and_sync_cache
     from pythia.identity import get_system_uuid
@@ -210,7 +213,11 @@ def run_update_check(log=None) -> dict:
     except (F95ApiError, OSError) as exc:
         return {"checked": 0, "updated": 0, "errors": [f"fast_check failed: {exc}"]}
 
+    cancelled = False
     for thread_id, targets in targets_by_thread.items():
+        if should_cancel is not None and should_cancel():
+            cancelled = True
+            break
         last_changed = last_changes.get(thread_id)
         if last_changed is None:
             continue
@@ -256,7 +263,7 @@ def run_update_check(log=None) -> dict:
             entry["available_updates"] = available_updates
             save_entry_and_sync_cache(entry)
 
-    return {"checked": checked, "updated": updated, "errors": errors}
+    return {"checked": checked, "updated": updated, "errors": errors, "cancelled": cancelled}
 
 
 def _last_check(entry: dict, thread_id: int) -> int:

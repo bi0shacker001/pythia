@@ -122,9 +122,10 @@ def _container_roots(path: Path, plugins, generic, skipped: list | None):
                 skipped.append((child, "no game found in it"))
 
 
-def scan_library(root: Path | str):
+def scan_library(root: Path | str, should_cancel=None):
     """Discover and onboard every game root under `root`. Returns the list of
-    onboarding result dicts (see onboarding.onboard)."""
+    onboarding result dicts (see onboarding.onboard). ``should_cancel``, when it answers True between two
+    folders, ends the scan there: what was recorded stays, and the list is what was done."""
     root = Path(root).resolve()
     # Library AND engine plugins can both contribute structural boundaries (see
     # module docstring) -- is_root()/shortcut_roots() are the same shape on both
@@ -140,6 +141,8 @@ def scan_library(root: Path | str):
     is_launcher = _launcher_rule()
     results = []
     for discovered in _discover_roots(root, enabled, generic):
+        if should_cancel is not None and should_cancel():
+            break
         # The walk can go below a launcher's folder (Epic's Launcher/Portal):
         # it, or any folder between it and the scanned one, counts.
         launcher = next(

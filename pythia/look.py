@@ -99,9 +99,10 @@ def group(folders: list[dict]) -> list[dict]:
     return sorted(proposals, key=lambda p: p["name"].casefold())
 
 
-def look(root: Path | str, progress=None) -> dict:
+def look(root: Path | str, progress=None, should_cancel=None) -> dict:
     """What scanning ``root`` would add, without writing anything. ``progress``
-    gets the live counts (``folders``, ``games``) as the walk goes."""
+    gets the live counts (``folders``, ``games``) as the walk goes. ``should_cancel``, when it answers True between
+    two folders, ends the Look with ``{"status": "cancelled"}``: nothing was written, so nothing is left."""
     root = Path(root).resolve()
     enabled = library.enabled_plugins() + engine.enabled_plugins()
     generic = library.generic_plugin if library.generic_plugin in library.enabled_plugins() else None
@@ -111,6 +112,8 @@ def look(root: Path | str, progress=None) -> dict:
     titles: set[str] = set()
     empty: list = []
     for discovered in scanning._discover_roots(root, enabled, generic, empty):
+        if should_cancel is not None and should_cancel():
+            return {"status": "cancelled", "root": str(root)}
         launcher = next(
             (f for f in (discovered, *discovered.parents) if f != root and root in f.parents and is_launcher(f)), None
         )
@@ -159,15 +162,20 @@ def _own_entry(game_id: str) -> tuple[Path, dict] | None:
     return (path, datadir.load_entry(path)) if path else None
 
 
-def add(rows: list[dict]) -> dict:
+def add(rows: list[dict], should_cancel=None) -> dict:
     """Writes the reviewed games: each row is a proposal as Review left it, with
     ``keep`` (false rows are left out), ``link_to`` (a game id, or None for a
     new game), ``store_link`` (text, optional) and its folders' ``kind`` and
-    ``language``. Returns the counts and each failure."""
+    ``language``. Returns the counts and each failure. ``should_cancel``, when it answers True between two games,
+    ends it there (``cancelled`` is then true): the games added stay added, each complete."""
     from pythia.database import games as games_db  # noqa: PLC0415
 
     added, folders_added, failures = 0, 0, []
+    cancelled = False
     for row in rows:
+        if should_cancel is not None and should_cancel():
+            cancelled = True
+            break
         if not row.get("keep", True):
             continue
         game_id = row.get("link_to") or None
@@ -207,7 +215,7 @@ def add(rows: list[dict]) -> dict:
         added += 1
         folders_added += len(ok_paths)
         logger.info("Added %s (%d folders) from a reviewed scan", row["name"], len(ok_paths))
-    return {"status": "ok", "games": added, "folders": folders_added, "failures": failures}
+    return {"status": "ok", "games": added, "folders": folders_added, "failures": failures, "cancelled": cancelled}
 
 
 class LookSlot:

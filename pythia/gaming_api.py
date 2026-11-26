@@ -29,7 +29,10 @@ NOT_KEPT = {
 NO_PLATFORM = "Unknown platform"
 
 ART_ROLES = ("cover", "banner", "logo", "background", "icon", "screenshot")
-_NO_SCREENSHOTS = "Pythia keeps no screenshots of a game."
+# A screenshot is asked for as "screenshot" (the newest) or "screenshot:<n>" (n from 0, newest first; art_list says
+# how many there are).
+_NO_SCREENSHOTS = "There are no screenshots of this game in Steam's screenshot folder on this computer."
+_SCREENSHOT_TYPES = (".jpg", ".jpeg", ".png")
 _EXTENSIONS = (".jpg", ".png", ".webp")
 _MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
 
@@ -272,7 +275,49 @@ def _steam(appid: str, *names: str) -> Path | None:
     cache = covers._steam_cache()  # noqa: SLF001 -- the one place that knows where Steam keeps it
     if not cache or not appid.isdigit():
         return None
-    return _first_file(*(p for name in names for p in (cache / f"{appid}_{name}", cache / appid / name)))
+    found = _first_file(*(p for name in names for p in (cache / f"{appid}_{name}", cache / appid / name)))
+    if found is not None or not (cache / appid).is_dir():
+        return found
+    # Steam's newer layout keeps each file in a folder named by a hash inside the game's folder.
+    return _first_file(*(p / name for p in sorted((cache / appid).iterdir()) if p.is_dir() for name in names))
+
+
+def _steam_screenshots(appid: str) -> list[Path]:
+    """The screenshots Steam took of a Steam game, newest first, from each account's screenshot folder
+    (``userdata/<account>/760/remote/<appid>/screenshots``); the thumbnails folder is not one of them."""
+    from pythia.util.steam import config  # noqa: PLC0415
+
+    steam = config.get_steam_dir()
+    if not steam or not appid.isdigit():
+        return []
+    shots: list[Path] = []
+    for account in sorted((Path(steam) / "userdata").glob("*")):
+        folder = account / "760" / "remote" / appid / "screenshots"
+        if folder.is_dir():
+            shots += [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in _SCREENSHOT_TYPES]
+    return sorted(shots, key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
+
+
+def _steam_ids(entries: list[dict]) -> list[str]:
+    return [
+        str(p["id"])
+        for e in entries
+        for p in e.get("platform_ids") or []
+        if p.get("platform") == "steam" and p.get("id")
+    ]
+
+
+def screenshots(entries: list[dict]) -> list[Path]:
+    """Every screenshot of the game this computer has, newest first (Steam's, for a game with a Steam id)."""
+    return [p for appid in _steam_ids(entries) for p in _steam_screenshots(appid)]
+
+
+def _screenshot_index(role: str) -> int | None:
+    """n for ``screenshot:<n>``, 0 for ``screenshot``, None for another role or a malformed one."""
+    if role == "screenshot":
+        return 0
+    head, _, tail = role.partition(":")
+    return int(tail) if head == "screenshot" and tail.isdigit() else None
 
 
 def art_path(entries: list[dict], role: str) -> tuple[Path | None, str | None]:
@@ -280,16 +325,15 @@ def art_path(entries: list[dict], role: str) -> tuple[Path | None, str | None]:
     reason when there is none. Nothing is downloaded or made."""
     from pythia import covers, settings  # noqa: PLC0415
 
-    if role not in ART_ROLES:
-        return None, f"There is no art role {role!r}; the roles are {', '.join(ART_ROLES)}."
-    if role == "screenshot":
-        return None, _NO_SCREENSHOTS
-    steam_ids = [
-        str(p["id"])
-        for e in entries
-        for p in e.get("platform_ids") or []
-        if p.get("platform") == "steam" and p.get("id")
-    ]
+    index = _screenshot_index(role)
+    if index is None and role not in ART_ROLES:
+        return None, f"There is no art role {role!r}; the roles are {', '.join(ART_ROLES)}, and screenshot:<n>."
+    if index is not None:
+        shots = screenshots(entries)
+        if index < len(shots):
+            return shots[index], None
+        return None, _NO_SCREENSHOTS if not shots else f"There are only {len(shots)} screenshots of this game."
+    steam_ids = _steam_ids(entries)
     slugs = [s for s in dict.fromkeys(slugify(e.get("canonical_name") or "") for e in entries) if s]
     found: Path | None = None
     if role == "cover":
@@ -299,11 +343,12 @@ def art_path(entries: list[dict], role: str) -> tuple[Path | None, str | None]:
                 break
     elif role == "banner":
         found = next((p for p in (_in_folder(settings.BANNER_PATH, s) for s in slugs) if p), None)
-        found = found or next((p for p in (_steam(i, "header.jpg") for i in steam_ids) if p), None)
+        steam_header = (_steam(i, "header.jpg", "library_header.jpg") for i in steam_ids)
+        found = found or next((p for p in steam_header if p), None)
     elif role == "icon":
         found = next((p for p in (_first_file(Path(settings.ICON_PATH) / f"pythia_{s}.png") for s in slugs) if p), None)
     elif role == "logo":
-        found = next((p for p in (_steam(i, "logo.png") for i in steam_ids) if p), None)
+        found = next((p for p in (_steam(i, "logo.png", "library_logo.png") for i in steam_ids) if p), None)
     elif role == "background":
         found = next((p for p in (_steam(i, "library_hero.jpg") for i in steam_ids) if p), None)
     if found:
@@ -312,6 +357,33 @@ def art_path(entries: list[dict], role: str) -> tuple[Path | None, str | None]:
     if role == "icon":
         where = "Pythia's icon folder"
     return None, f"There is no {role} for this game in {where} on this computer."
+
+
+def art_list(entries: list[dict]) -> dict:
+    """Every art role the game has on this computer in one answer: ``roles`` maps each of cover, banner, logo,
+    background and icon to its file (``path``, ``uri``, ``mime``, ``size``) or to None, and ``missing`` says why
+    for each that is None; ``screenshots`` lists the screenshots newest first (``index`` is the role suffix:
+    ``screenshot:<index>``). Nothing is downloaded or made."""
+    roles: dict[str, dict | None] = {}
+    missing: dict[str, str] = {}
+    for role in ART_ROLES:
+        if role == "screenshot":
+            continue
+        path, reason = art_path(entries, role)
+        roles[role] = _file_facts(path) if path is not None else None
+        if path is None:
+            missing[role] = reason or "No art."
+    shots = [{"index": i, **_file_facts(p)} for i, p in enumerate(screenshots(entries))]
+    return {"roles": roles, "missing": missing, "screenshots": shots}
+
+
+def _file_facts(path: Path) -> dict:
+    return {
+        "path": str(path),
+        "uri": path.as_uri(),
+        "mime": _MIME.get(path.suffix.lower(), "application/octet-stream"),
+        "size": os.path.getsize(path),
+    }
 
 
 def art(entries: list[dict], role: str) -> dict:

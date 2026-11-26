@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.20"
     id("org.jetbrains.compose") version "1.13.0-beta01"
     id("dev.brahmkshatriya.compose") version "1.13.0-beta01"
+    // The result types of the generated backend client (:core) are @Serializable; the version is the one :core applies.
+    kotlin("plugin.serialization") version "2.4.20" apply false
 }
 
 // The patched build's version (CN_VERSION, settings.gradle.kts) or upstream's.

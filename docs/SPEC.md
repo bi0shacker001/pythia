@@ -257,9 +257,14 @@ the droidtop coordinator for this lane. Later sections follow them.
     - **No drift:** the method and event list is read from the Backend's
       slots and signals and checked in as `schema/backend-ipc.json`
       (`python -m pythia.ipc.schema` writes it); a test fails when the two
-      differ. The Kotlin client is generated from that file. The schema types
-      arguments, not the fields of results, which the slots build as free-form
-      dicts.
+      differ. The Kotlin client (`ui-native/core`) is generated from that file
+      at build time, and nothing generated is checked in: a `@Serializable`
+      class for each entry of `types` (an optional or nullable key is
+      nullable, keys the schema does not name are ignored), a `TypedAnswer`
+      of that class for a method with a `result`, a Flow of the payload class
+      for an event with a `payload`, and the contract's `Answer` as it came
+      for everything the schema does not type. An ok answer that does not
+      read as its type is an error with the code `malformed`.
     - A call runs on the Qt thread, as over QWebChannel, so a slot behaves
       the same whoever calls it.
     - **The library as cards (mytop-project/tracker#920).** For a front end that

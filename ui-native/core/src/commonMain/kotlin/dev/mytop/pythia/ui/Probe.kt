@@ -12,7 +12,9 @@ import kotlin.system.exitProcess
 
 /**
  * `--probe`: connects to the running Pythia the way the window does, calls `hello` and `get_system_info`, prints the
- * answers and returns the exit status: 0 when both are ok, 1 when they are not, 2 when Pythia could not be reached.
+ * answers, then calls the typed `get_games` and `get_running_games` and prints what they came to. The exit status is 0 when
+ * `hello` and `get_system_info` are ok and the typed answers are in the shape the schema says, 1 when they are not, 2 when
+ * Pythia could not be reached.
  */
 fun probe(out: (String) -> Unit = ::println): Int = runBlocking {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -24,10 +26,16 @@ fun probe(out: (String) -> Unit = ::println): Int = runBlocking {
             }
             is Opened.Up -> {
                 out("hello: ${opened.hello.encode()}")
-                val info = PythiaBackend(opened.channel).getSystemInfo()
+                val backend = PythiaBackend(opened.channel)
+                val info = backend.getSystemInfo()
                 out("get_system_info: ${info.encode()}")
+                // The typed methods: read as the schema's types, so an answer that is not in the shape the schema says fails the probe.
+                val games = backend.getGames()
+                out("get_games: ${games.summary { "games=${it.games.size} version=${it.version}" }}")
+                val running = backend.getRunningGames()
+                out("get_running_games: ${running.summary { "games=${it.games.size}" }}")
                 opened.channel.close()
-                if (info is Answer.Ok) 0 else 1
+                if (info is Answer.Ok && !games.isMalformed() && !running.isMalformed()) 0 else 1
             }
         }
     }

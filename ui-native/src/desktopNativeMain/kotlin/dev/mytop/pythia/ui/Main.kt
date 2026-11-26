@@ -32,6 +32,7 @@ import androidx.compose.ui.window.rememberWindowState
 import dev.droidtop.lib.ui.contract.Answer
 import dev.droidtop.lib.ui.format.ValueFormat
 import dev.droidtop.lib.ui.tokens.ThemePalette
+import dev.mytop.pythia.ui.backend.GetGamesResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -147,6 +148,7 @@ private fun PythiaScreen(connection: PythiaConnection) {
                 AnswerCard("hello", s.hello)
                 val info = s.systemInfo
                 if (info == null) Text("Asking for the system info...") else AnswerCard("get_system_info", info)
+                s.games?.let { GamesCard(it) }
             }
         }
         Text(
@@ -161,6 +163,19 @@ private fun PythiaScreen(connection: PythiaConnection) {
                     Text(e.args, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
             }
+        }
+    }
+}
+
+/** The typed `get_games`: how many games Pythia has, read as the schema's `GetGamesResult`, or why it could not be read. */
+@Composable
+private fun GamesCard(games: TypedAnswer<GetGamesResult>) {
+    val line = games.summary { "${ValueFormat.count(it.games.size.toLong())} games, version ${it.version}" }
+    LaunchedEffect(line) { uiLog("ui: rendered get_games typed $line") }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("get_games", style = MaterialTheme.typography.titleMedium)
+            Text(line, color = if (games is TypedAnswer.Ok<*>) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error)
         }
     }
 }

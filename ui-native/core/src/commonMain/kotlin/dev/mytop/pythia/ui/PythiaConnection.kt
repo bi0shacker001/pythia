@@ -1,6 +1,7 @@
 package dev.mytop.pythia.ui
 
 import dev.droidtop.lib.ui.contract.Answer
+import dev.mytop.pythia.ui.backend.GetGamesResult
 import dev.mytop.pythia.ui.backend.PythiaBackend
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -17,8 +18,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 sealed interface PythiaState {
     data object Connecting : PythiaState
 
-    /** Connected: Pythia's `hello`, and `get_system_info` once it has answered. */
-    data class Ready(val hello: Answer, val systemInfo: Answer?) : PythiaState
+    /** Connected: Pythia's `hello`, `get_system_info` once it has answered, and `get_games`, a typed answer, after it. */
+    data class Ready(val hello: Answer, val systemInfo: Answer?, val games: TypedAnswer<GetGamesResult>? = null) : PythiaState
 
     /** Not connected; [reason] says why in words a screen can show. */
     data class Unavailable(val reason: String) : PythiaState
@@ -70,6 +71,7 @@ class PythiaConnection(
                     _state.value = PythiaState.Ready(opened.hello, null)
                     val info = backend.getSystemInfo()
                     _state.value = PythiaState.Ready(opened.hello, info)
+                    _state.value = PythiaState.Ready(opened.hello, info, backend.getGames())
                     _state.value = PythiaState.Unavailable(ended.await())
                     collecting.cancel()
                     opened.channel.close()

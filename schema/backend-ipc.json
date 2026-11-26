@@ -1,6 +1,772 @@
 {
   "protocol": 1,
   "contract": "mytop-project/mytop-ui@8a88ee97ca7b12cb2319f0d303eb547c943cc4a3 contract/python/ui_contract.py",
+  "envelope": {
+    "fields": {
+      "status": {
+        "type": {
+          "enum": [
+            "ok",
+            "unavailable",
+            "error",
+            "pending"
+          ]
+        }
+      },
+      "slot": {
+        "type": "string",
+        "optional": true
+      },
+      "message": {
+        "type": "string",
+        "optional": true
+      },
+      "title": {
+        "type": "string",
+        "optional": true
+      },
+      "code": {
+        "type": "string",
+        "optional": true
+      },
+      "request": {
+        "type": "string",
+        "optional": true
+      }
+    }
+  },
+  "types": {
+    "ArtFile": {
+      "fields": {
+        "mime": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "CancelJobResult": {
+      "fields": {
+        "job": {
+          "type": "string"
+        },
+        "stopping": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Card": {
+      "fields": {
+        "added": {
+          "type": {
+            "oneOf": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "art": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "favourite": {
+          "type": "boolean"
+        },
+        "has_update": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "installed": {
+          "type": "boolean"
+        },
+        "last_played": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "platforms": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "playcount": {
+          "type": "integer"
+        },
+        "playtime_hours": {
+          "type": "number"
+        },
+        "runner": {
+          "type": {
+            "oneOf": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "runners": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "sort_name": {
+          "type": "string"
+        },
+        "sources": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "stores": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "systems": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "title": {
+          "type": "string"
+        },
+        "year": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "Collection": {
+      "fields": {
+        "count": {
+          "type": "integer"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "game_ids": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      }
+    },
+    "CollectionMembersResult": {
+      "fields": {
+        "changed": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "collection": {
+          "type": {
+            "object": "Collection"
+          }
+        },
+        "unknown": {
+          "type": {
+            "array": "string"
+          },
+          "optional": true
+        }
+      }
+    },
+    "CollectionResult": {
+      "fields": {
+        "collection": {
+          "type": {
+            "object": "Collection"
+          }
+        }
+      }
+    },
+    "CollectionsChanged": {
+      "fields": {
+        "id": {
+          "type": "string",
+          "optional": true
+        },
+        "kind": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "DeleteCollectionResult": {
+      "fields": {
+        "collection": {
+          "type": "null"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Facets": {
+      "fields": {
+        "favourite": {
+          "type": {
+            "array": {
+              "object": "FlagFacet"
+            }
+          }
+        },
+        "installed": {
+          "type": {
+            "array": {
+              "object": "FlagFacet"
+            }
+          }
+        },
+        "runner": {
+          "type": {
+            "array": {
+              "object": "TextFacet"
+            }
+          }
+        },
+        "store": {
+          "type": {
+            "array": {
+              "object": "TextFacet"
+            }
+          }
+        },
+        "system": {
+          "type": {
+            "array": {
+              "object": "SystemFacet"
+            }
+          }
+        },
+        "year": {
+          "type": {
+            "array": {
+              "map": "any"
+            }
+          }
+        }
+      }
+    },
+    "FlagFacet": {
+      "fields": {
+        "count": {
+          "type": "integer"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    "GameFields": {
+      "fields": {
+        "added": {
+          "type": {
+            "oneOf": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "available_updates": {
+          "type": {
+            "array": {
+              "map": "any"
+            }
+          }
+        },
+        "current_version": {
+          "type": "any"
+        },
+        "description": {
+          "type": "any",
+          "optional": true
+        },
+        "developer": {
+          "type": "any",
+          "optional": true
+        },
+        "favourite": {
+          "type": "boolean"
+        },
+        "genre": {
+          "type": "any",
+          "optional": true
+        },
+        "id": {
+          "type": "string"
+        },
+        "installed": {
+          "type": "boolean"
+        },
+        "last_played": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "notes": {
+          "type": "string"
+        },
+        "ownership": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "platforms": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "playcount": {
+          "type": "integer"
+        },
+        "playtime_hours": {
+          "type": "number"
+        },
+        "publisher": {
+          "type": "any",
+          "optional": true
+        },
+        "rating": {
+          "type": "any",
+          "optional": true
+        },
+        "runners": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "sort_name": {
+          "type": "string"
+        },
+        "sources": {
+          "type": {
+            "array": "string"
+          }
+        },
+        "stores": {
+          "type": {
+            "array": {
+              "object": "StoreId"
+            }
+          }
+        },
+        "title": {
+          "type": "string"
+        },
+        "versions": {
+          "type": {
+            "array": {
+              "object": "VersionRow"
+            }
+          }
+        },
+        "year": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "GameStopped": {
+      "fields": {
+        "exit_code": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "game_id": {
+          "type": "string"
+        },
+        "pid": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "quittable": {
+          "type": "boolean"
+        },
+        "started_at": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "via": {
+          "type": "string"
+        }
+      }
+    },
+    "GetCollectionsResult": {
+      "fields": {
+        "collections": {
+          "type": {
+            "array": {
+              "object": "Collection"
+            }
+          }
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "GetGameArtDataResult": {
+      "fields": {
+        "data": {
+          "type": "string"
+        },
+        "eof": {
+          "type": "boolean"
+        },
+        "length": {
+          "type": "integer"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "role": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        }
+      }
+    },
+    "GetGameArtListResult": {
+      "fields": {
+        "missing": {
+          "type": {
+            "map": "string"
+          }
+        },
+        "roles": {
+          "type": {
+            "map": {
+              "oneOf": [
+                {
+                  "object": "ArtFile"
+                },
+                "null"
+              ]
+            }
+          }
+        },
+        "screenshots": {
+          "type": {
+            "array": {
+              "object": "Screenshot"
+            }
+          }
+        }
+      }
+    },
+    "GetGameArtResult": {
+      "fields": {
+        "mime": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "GetGameDetailResult": {
+      "fields": {
+        "fields": {
+          "type": {
+            "object": "GameFields"
+          }
+        },
+        "missing": {
+          "type": {
+            "map": {
+              "object": "MissingField"
+            }
+          }
+        }
+      }
+    },
+    "GetGameSystemsResult": {
+      "fields": {
+        "systems": {
+          "type": {
+            "array": {
+              "object": "SystemRow"
+            }
+          }
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "GetGamesResult": {
+      "fields": {
+        "games": {
+          "type": {
+            "array": {
+              "object": "Card"
+            }
+          }
+        },
+        "unchanged": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "GetRunningGamesResult": {
+      "fields": {
+        "games": {
+          "type": {
+            "array": {
+              "object": "RunningGame"
+            }
+          }
+        },
+        "scope": {
+          "type": "string"
+        }
+      }
+    },
+    "MissingField": {
+      "fields": {
+        "message": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "QueryGamesResult": {
+      "fields": {
+        "facets": {
+          "type": {
+            "object": "Facets"
+          },
+          "optional": true
+        },
+        "games": {
+          "type": {
+            "array": {
+              "object": "Card"
+            }
+          }
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "QuitGameResult": {
+      "fields": {
+        "asked": {
+          "type": "boolean"
+        },
+        "game_id": {
+          "type": "string"
+        }
+      }
+    },
+    "RunningGame": {
+      "fields": {
+        "game_id": {
+          "type": "string"
+        },
+        "pid": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "quittable": {
+          "type": "boolean"
+        },
+        "started_at": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "via": {
+          "type": "string"
+        }
+      }
+    },
+    "Screenshot": {
+      "fields": {
+        "index": {
+          "type": "integer"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "StoreId": {
+      "fields": {
+        "id": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        }
+      }
+    },
+    "SystemFacet": {
+      "fields": {
+        "count": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "SystemRow": {
+      "fields": {
+        "count": {
+          "type": "integer"
+        },
+        "favourites": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "installed": {
+          "type": "integer"
+        },
+        "known": {
+          "type": "boolean"
+        },
+        "last_played": {
+          "type": {
+            "oneOf": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "system_id": {
+          "type": "string"
+        },
+        "system_name": {
+          "type": "string"
+        }
+      }
+    },
+    "TextFacet": {
+      "fields": {
+        "count": {
+          "type": "integer"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "VersionRow": {
+      "fields": {
+        "variants": {
+          "type": "integer"
+        },
+        "version": {
+          "type": {
+            "oneOf": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  },
   "methods": [
     {
       "name": "accept_offered_game",
@@ -56,7 +822,8 @@
           "type": "any"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "CollectionMembersResult"
     },
     {
       "name": "apply_update",
@@ -85,7 +852,8 @@
           "type": "string"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "CancelJobResult"
     },
     {
       "name": "cancel_pairing",
@@ -140,7 +908,8 @@
           "type": "string"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "CollectionResult"
     },
     {
       "name": "delete_collection",
@@ -150,7 +919,8 @@
           "type": "string"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "DeleteCollectionResult"
     },
     {
       "name": "describe_store_links",
@@ -316,7 +1086,8 @@
     {
       "name": "get_collections",
       "params": [],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "GetCollectionsResult"
     },
     {
       "name": "get_downloader_plugins",
@@ -341,7 +1112,8 @@
         }
       ],
       "returns": "answer",
-      "async": true
+      "async": true,
+      "result": "GetGameArtResult"
     },
     {
       "name": "get_game_art_data",
@@ -366,7 +1138,20 @@
         }
       ],
       "returns": "answer",
-      "async": true
+      "async": true,
+      "result": "GetGameArtDataResult"
+    },
+    {
+      "name": "get_game_art_list",
+      "params": [
+        {
+          "name": "game_id",
+          "type": "string"
+        }
+      ],
+      "returns": "answer",
+      "async": true,
+      "result": "GetGameArtListResult"
     },
     {
       "name": "get_game_detail",
@@ -376,7 +1161,8 @@
           "type": "string"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "GetGameDetailResult"
     },
     {
       "name": "get_game_saves",
@@ -396,7 +1182,8 @@
     {
       "name": "get_game_systems",
       "params": [],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "GetGameSystemsResult"
     },
     {
       "name": "get_games",
@@ -407,7 +1194,8 @@
           "optional": true
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "GetGamesResult"
     },
     {
       "name": "get_handheld_games",
@@ -492,7 +1280,8 @@
     {
       "name": "get_running_games",
       "params": [],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "GetRunningGamesResult"
     },
     {
       "name": "get_save_backups",
@@ -763,7 +1552,8 @@
           "type": "any"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "QueryGamesResult"
     },
     {
       "name": "quit_app",
@@ -778,7 +1568,8 @@
           "type": "string"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "QuitGameResult"
     },
     {
       "name": "read_clipboard",
@@ -833,7 +1624,8 @@
           "type": "any"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "CollectionMembersResult"
     },
     {
       "name": "remove_library_folder",
@@ -875,7 +1667,8 @@
           "type": "string"
         }
       ],
-      "returns": "answer"
+      "returns": "answer",
+      "result": "CollectionResult"
     },
     {
       "name": "rename_game",
@@ -1367,7 +2160,8 @@
         {
           "type": "any"
         }
-      ]
+      ],
+      "payload": "CollectionsChanged"
     },
     {
       "name": "decisionNeeded",
@@ -1391,7 +2185,8 @@
         {
           "type": "any"
         }
-      ]
+      ],
+      "payload": "RunningGame"
     },
     {
       "name": "gameStopped",
@@ -1399,7 +2194,8 @@
         {
           "type": "any"
         }
-      ]
+      ],
+      "payload": "GameStopped"
     },
     {
       "name": "gamesChanged",

@@ -857,9 +857,7 @@ class Backend(QObject):
         """Folds every record of a Reconciliation cluster into one, one after
         another in one job (UX review A16: "Combine as versions")."""
         retired = [str(r) for r in retired_ids or [] if str(r) != surviving_id]
-        job = self._job_start(
-            "merge", f"Combine {len(retired) + 1} records", f"into {surviving_id}", cancellable=True
-        )
+        job = self._job_start("merge", f"Combine {len(retired) + 1} records", f"into {surviving_id}", cancellable=True)
         threading.Thread(target=self._merge_cluster_worker, args=(surviving_id, retired, job), daemon=True).start()
 
     def _merge_cluster_worker(self, surviving_id, retired, job):
@@ -2853,9 +2851,7 @@ class Backend(QObject):
 
         game = self._game_of(game_id)
         if game is None:
-            return ui_contract.error(
-                f"No game {game_id} in the library", slot="get_game_art_list", code="no-such-game"
-            )
+            return ui_contract.error(f"No game {game_id} in the library", slot="get_game_art_list", code="no-such-game")
         return _jsonable(ui_contract.ok("get_game_art_list", **gaming_api.art_list(game.get("entries") or [])))
 
     @Slot("QVariant", result="QVariant")

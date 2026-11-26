@@ -6,10 +6,10 @@
 #   4. the real window on the runner's desktop against a Backend that emits gamesChanged; a screenshot; exit 0 asserted
 param(
     [Parameter(Mandatory = $true)][string]$Exe,
-    [Parameter(Mandatory = $true)][string]$Out
+    [Parameter(Mandatory = $true)][string]$OutDir
 )
 $ErrorActionPreference = "Stop"
-New-Item -ItemType Directory -Force $Out | Out-Null
+New-Item -ItemType Directory -Force $OutDir | Out-Null
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $env:PYTHONPATH = $root
 $script:server = $null
@@ -52,16 +52,16 @@ try {
     $env:PYTHIA_DATA_DIR = Join-Path $env:RUNNER_TEMP "pythia-none"
     $none = & $Exe --probe
     $code = $LASTEXITCODE
-    $none | Tee-Object -FilePath (Join-Path $Out "probe-none.txt")
+    $none | Tee-Object -FilePath (Join-Path $OutDir "probe-none.txt")
     if ($code -ne 2) { throw "probe with no Pythia exited $code, not 2" }
     if (-not (($none -join "`n") -like "*unavailable: Pythia has not run on this computer yet*")) { throw "no reason given" }
 
     Write-Host "== 2. the real Backend"
-    Start-Backend (Join-Path $env:RUNNER_TEMP "pythia-data") (Join-Path $Out "server-probe.log")
+    Start-Backend (Join-Path $env:RUNNER_TEMP "pythia-data") (Join-Path $OutDir "server-probe.log")
     $env:PYTHIA_DATA_DIR = Join-Path $env:RUNNER_TEMP "pythia-data"
     $out = & $Exe --probe
     $code = $LASTEXITCODE
-    $out | Tee-Object -FilePath (Join-Path $Out "probe.txt")
+    $out | Tee-Object -FilePath (Join-Path $OutDir "probe.txt")
     if ($code -ne 0) { throw "probe exited $code" }
     $hello = ($out | Where-Object { $_ -like 'hello: *' }) -join ''
     $info = ($out | Where-Object { $_ -like 'get_system_info: *' }) -join ''
@@ -71,16 +71,16 @@ try {
 
     Write-Host "== 3. reconnect: the Backend is killed and started again while the client runs"
     $dir = Join-Path $env:RUNNER_TEMP "pythia-reconnect"
-    Start-Backend $dir (Join-Path $Out "server-reconnect-1.log")
+    Start-Backend $dir (Join-Path $OutDir "server-reconnect-1.log")
     $env:PYTHIA_DATA_DIR = $dir
-    $watchLog = Join-Path $Out "watch.log"
+    $watchLog = Join-Path $OutDir "watch.log"
     $watch = Start-Process $Exe -ArgumentList "--watch" -PassThru -NoNewWindow -RedirectStandardOutput $watchLog `
         -RedirectStandardError "$watchLog.err"
     if (-not (Wait-For $watchLog '^state: ready' 60)) { throw "the client never saw ready" }
     Stop-Backend
     if (-not (Wait-For $watchLog '^state: unavailable' 30)) { throw "the client never saw the Backend go" }
     $restarted = Get-Date
-    Start-Backend $dir (Join-Path $Out "server-reconnect-2.log")
+    Start-Backend $dir (Join-Path $OutDir "server-reconnect-2.log")
     if (-not $watch.WaitForExit(60000)) { Stop-Process -Id $watch.Id -Force; Get-Content $watchLog; throw "the client did not come back" }
     $seconds = ((Get-Date) - $restarted).TotalSeconds
     Get-Content $watchLog
@@ -90,17 +90,17 @@ try {
 
     Write-Host "== 4. the window, on the desktop, against the live Backend"
     $dir = Join-Path $env:RUNNER_TEMP "pythia-window"
-    Start-Backend $dir (Join-Path $Out "server-window.log") "gamesChanged"
+    Start-Backend $dir (Join-Path $OutDir "server-window.log") "gamesChanged"
     $env:PYTHIA_DATA_DIR = $dir
-    $uiLog = Join-Path $Out "ui.log"
+    $uiLog = Join-Path $OutDir "ui.log"
     $ui = Start-Process $Exe -ArgumentList "--smoke" -PassThru -RedirectStandardOutput $uiLog -RedirectStandardError "$uiLog.err"
     if (-not (Wait-For $uiLog '^smoke: ' 150)) { Stop-Process -Id $ui.Id -Force; Get-Content $uiLog, "$uiLog.err" -ErrorAction SilentlyContinue; throw "the window never got to smoke" }
     Start-Sleep -Seconds 1
-    Save-Screenshot (Join-Path $Out "screen.png")
+    Save-Screenshot (Join-Path $OutDir "screen.png")
     if (-not $ui.WaitForExit(60000)) { Stop-Process -Id $ui.Id -Force; throw "the window did not exit" }
     $exit = $ui.ExitCode
     Get-Content $uiLog
-    Set-Content (Join-Path $Out "ui.exit") "exit=$exit"
+    Set-Content (Join-Path $OutDir "ui.exit") "exit=$exit"
     $log = Get-Content $uiLog -Raw
     foreach ($want in @('ui: rendered hello status=ok', 'ui: rendered get_system_info status=ok', 'smoke: ok')) {
         if ($log -notlike "*$want*") { throw "the window's log has no '$want'" }

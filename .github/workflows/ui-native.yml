@@ -392,7 +392,7 @@ jobs:
         run: |
           $exe = Join-Path $env:PYTHIA_DIST "pythia-ui.exe"
           if (-not (Test-Path $exe)) { $exe = (Get-ChildItem $env:PYTHIA_DIST -Filter *.exe | Select-Object -First 1).FullName }
-          ui-native/ci/integration.ps1 -Exe $exe -Out "$PWD\integration-out"
+          ui-native/ci/integration.ps1 -Exe $exe -OutDir "$PWD\integration-out"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

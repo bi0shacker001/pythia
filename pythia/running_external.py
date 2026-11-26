@@ -74,6 +74,8 @@ def running_apps_from_registry(registry: dict) -> set[str]:
 
 
 def _windows_running_apps() -> set[str]:
+    if sys.platform != "win32":
+        return set()
     import winreg  # noqa: PLC0415
 
     found: set[str] = set()

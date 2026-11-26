@@ -71,10 +71,11 @@ def type_json(tp: Any, found: dict[str, type]) -> Any:
 def describe_object(tp: type, found: dict[str, type]) -> dict[str, Any]:
     """The fields of a TypedDict: each its ``type`` and, when it may be absent, ``optional``."""
     hints = get_type_hints(tp)
+    required = getattr(tp, "__required_keys__", frozenset())
     fields: dict[str, Any] = {}
     for name in sorted(hints):
         entry: dict[str, Any] = {"type": type_json(hints[name], found)}
-        if name not in tp.__required_keys__:
+        if name not in required:
             entry["optional"] = True
         fields[name] = entry
     return {"fields": fields}
@@ -161,7 +162,7 @@ def problems(value: Any, tp: type, path: str = "$") -> list[str]:
         return [f"{path}: expected an object, got {value!r}"]
     hints = get_type_hints(tp)
     out: list[str] = []
-    for name in sorted(tp.__required_keys__):
+    for name in sorted(getattr(tp, "__required_keys__", frozenset())):
         if name not in value:
             out.append(f"{path}.{name}: missing")
     for name, item in value.items():

@@ -30,6 +30,7 @@ internal fun DevicesPage(connection: PythiaConnection) {
     var forgetting by remember { mutableStateOf<JsonObject?>(null) }
     var networkRequest by remember { mutableStateOf<PairingRequest?>(null) }
     var networkResult by remember { mutableStateOf<Answer?>(null) }
+    var checkingNetwork by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val events by connection.events.collectAsState()
     suspend fun startPairing(request: PairingRequest) {
@@ -39,15 +40,17 @@ internal fun DevicesPage(connection: PythiaConnection) {
         } else mode = request.mode
     }
     fun requestPairing(request: PairingRequest) {
+        if (busy) return
+        busy = true
+        checkingNetwork = true
         scope.launch {
-            busy = true
             try {
                 when (val decision = pairingNetworkDecision(connection.call { pairingNetworkExplained() })) {
                     PairingNetworkDecision.Ready -> startPairing(request)
                     PairingNetworkDecision.Explain -> { networkResult = null; networkRequest = request }
                     is PairingNetworkDecision.Blocked -> result = decision.answer
                 }
-            } finally { busy = false }
+            } finally { checkingNetwork = false; busy = false }
         }
     }
     LaunchedEffect(events.firstOrNull { it.name == "handheldsChanged" }?.number) {
@@ -80,6 +83,7 @@ internal fun DevicesPage(connection: PythiaConnection) {
         item {
             Button(enabled = !busy && mode.isEmpty(), onClick = { requestPairing(PairingRequest("compare")) }) { Text("Pair on this network") }
             TextButton(enabled = !busy && mode.isEmpty(), onClick = { requestPairing(PairingRequest("code")) }) { Text("Show a code for a handheld") }
+            if (checkingNetwork) LoadingStatus("Checking pairing…")
             if (mode.isNotEmpty()) TextButton(onClick = { mode = ""; status = null; found = null }) { Text("Stop pairing") }
         }
         if (mode.isNotEmpty()) {
@@ -164,15 +168,19 @@ internal fun DevicesPage(connection: PythiaConnection) {
                 networkResult?.let { AnswerMessage(it) }
             } },
             dismissButton = { TextButton(enabled = !busy, onClick = { networkRequest = null }) { Text("Cancel") } },
-            confirmButton = { TextButton(enabled = !busy, onClick = { scope.launch {
-                busy = true
-                networkResult = null
-                try {
-                    val answer = connection.call { markPairingNetworkExplained() }
-                    if (answer is Answer.Ok) { networkRequest = null; startPairing(request) }
-                    else networkResult = answer
-                } finally { busy = false }
-            } }) { Text(if (busy) "Working…" else "Continue") } },
+            confirmButton = { TextButton(enabled = !busy, onClick = {
+                if (!busy) {
+                    busy = true
+                    scope.launch {
+                        networkResult = null
+                        try {
+                            val answer = connection.call { markPairingNetworkExplained() }
+                            if (answer is Answer.Ok) { networkRequest = null; startPairing(request) }
+                            else networkResult = answer
+                        } finally { busy = false }
+                    }
+                }
+            }) { Text(if (busy) "Working…" else "Continue") } },
         )
     }
     forgetting?.let { device ->

@@ -294,6 +294,8 @@ private fun FoldersPage(connection: PythiaConnection) {
     var path by remember { mutableStateOf("") }
     var roms by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var success by remember { mutableStateOf("") }
+    var working by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     LaunchedEffect(connection) { answer = connection.call { getLibraryFolders() } }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -304,14 +306,18 @@ private fun FoldersPage(connection: PythiaConnection) {
             Button(enabled = path.isNotBlank() && !busy, onClick = {
                 scope.launch {
                     busy = true
+                    result = null
+                    working = "Adding folder…"
+                    success = "Folder added. Games are being scanned."
                     try {
                         result = connection.call { addLibraryFolder(path.trim(), if (roms) "roms" else "games") }
                         if (result is Answer.Ok) { path = ""; answer = connection.call { getLibraryFolders() }; connection.refreshGames() }
                     } finally { busy = false }
                 }
-            }) { Text(if (busy) "Adding…" else "Add folder") }
+            }) { Text("Add folder") }
         }
-        item { result?.let { AnswerMessage(it, "Folder added. Games are being scanned.") }; AnswerMessage(answer) }
+        if (busy) item { LoadingStatus(working) }
+        item { result?.let { AnswerMessage(it, success) }; AnswerMessage(answer) }
         val folders = (answer as? Answer.Ok)?.fields?.get("folders") as? JsonArray ?: JsonArray(emptyList())
         if (answer is Answer.Ok && folders.isEmpty()) item { Text("No folders added yet.") }
         items(folders) { folder ->
@@ -323,6 +329,9 @@ private fun FoldersPage(connection: PythiaConnection) {
                 TextButton(enabled = !busy, onClick = {
                     scope.launch {
                         busy = true
+                        result = null
+                        working = "Stopping tracking…"
+                        success = "Folder is no longer tracked. Its files remain in place."
                         try { result = connection.call { removeLibraryFolder(folderPath) }; answer = connection.call { getLibraryFolders() } }
                         finally { busy = false }
                     }

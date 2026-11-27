@@ -26,6 +26,12 @@ sealed interface TypedAnswer<out T> {
     data class Other(val answer: Answer) : TypedAnswer<Nothing>
 }
 
+/** The original contract answer of a typed call, for action feedback which needs no typed fields. */
+fun TypedAnswer<*>.asAnswer(): Answer = when (this) {
+    is TypedAnswer.Ok -> answer
+    is TypedAnswer.Other -> answer
+}
+
 /** Reads this answer's fields as [serializer]'s type. */
 fun <T> Answer.typed(serializer: KSerializer<T>): TypedAnswer<T> {
     if (this !is Answer.Ok) return TypedAnswer.Other(this)

@@ -123,7 +123,7 @@ private fun GamePage(connection: PythiaConnection, id: String, onBack: () -> Uni
     suspend fun reload() {
         detail = connection.gameDetail(id)
         play = connection.call { getPlayState(id) }
-        val active = connection.call { getRunningGames().let { (it as? TypedAnswer.Ok)?.answer ?: (it as TypedAnswer.Other).answer } }
+        val active = connection.call { getRunningGames().asAnswer() }
         running = ((active as? Answer.Ok)?.fields?.get("games") as? JsonArray)?.any {
             it.jsonObject["game_id"]?.text() == id && it.jsonObject["quittable"]?.text() == "true"
         } == true
@@ -163,7 +163,7 @@ private fun GamePage(connection: PythiaConnection, id: String, onBack: () -> Uni
                         Button(enabled = !busy && running, onClick = {
                             scope.launch {
                                 busy = true
-                                try { result = connection.call { quitGame(id) } }
+                                try { result = connection.call { quitGame(id).asAnswer() }; reload() }
                                 finally { busy = false }
                             }
                         }) { Text("Quit game") }
@@ -274,7 +274,7 @@ private fun ActivityPage(connection: PythiaConnection) {
                 Text(row["title"]?.text() ?: row["label"]?.text() ?: "Job")
                 Text(row["state"]?.text().orEmpty())
                 if (row["state"]?.text() == "running") TextButton(onClick = {
-                    scope.launch { result = connection.call { cancelJob(row["id"]?.text().orEmpty()) }; answer = connection.call { getJobs() } }
+                    scope.launch { result = connection.call { cancelJob(row["id"]?.text().orEmpty()).asAnswer() }; answer = connection.call { getJobs() } }
                 }) { Text("Cancel") }
             }
         }

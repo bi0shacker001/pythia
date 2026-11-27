@@ -2,7 +2,8 @@
 # The native front end against Pythia's real Backend, served headless by serve_backend.py (the Python environment with
 # pythia and PySide6 is active). Usage: integration.sh BINARY [--window]
 #   1. no Pythia ever ran here: --probe says why and exits 2
-#   2. the real Backend: --probe gets hello and get_system_info ok; with the Backend gone it says so and exits 2
+#   2. the real Backend: --probe gets hello and get_system_info ok, and the typed get_games and get_running_games read as the
+#      schema's types; with the Backend gone it says so and exits 2
 #   3. reconnect: --watch sees ready, then the Backend killed (unavailable), then restarted (ready again, in time)
 #   4. with --window: the real window under Xvfb, a screenshot, and the window's own log asserted
 set -euo pipefail
@@ -63,6 +64,9 @@ grep '^hello: ' "$OUT/probe.txt" | grep -q '"status":"ok"'
 grep '^hello: ' "$OUT/probe.txt" | grep -q '"server":"pythia"'
 grep '^get_system_info: ' "$OUT/probe.txt" | grep -q '"status":"ok"'
 grep '^get_system_info: ' "$OUT/probe.txt" | grep -q '"system_uuid"'
+# The typed calls: ok and read as GetGamesResult and GetRunningGamesResult (a malformed answer would have failed the probe).
+grep -q '^get_games: ok games=[0-9][0-9]* version=' "$OUT/probe.txt"
+grep -q '^get_running_games: ok games=[0-9][0-9]*$' "$OUT/probe.txt"
 stop_server
 set +e
 PYTHIA_DATA_DIR="$DATA" "$BIN" --probe | tee "$OUT/probe-gone.txt"
@@ -122,6 +126,8 @@ if [ "$WINDOW" = "--window" ]; then
   grep -q '^ui: rendered hello status=ok' "$OUT/ui.log"
   grep -q '^ui: rendered get_system_info status=ok' "$OUT/ui.log"
   grep -q '^ui: rendered events=[1-9]' "$OUT/ui.log"
+  # The typed get_games, read as the schema's GetGamesResult, was shown by the window.
+  grep -q '^ui: rendered get_games typed ok [0-9,][0-9,]* games, version ' "$OUT/ui.log"
   grep -q '^smoke: ok' "$OUT/ui.log"
   # The patched compose-native ends the window cleanly (the stock one raised BadWindow on teardown, exit 1).
   grep -q '^exit=0' "$OUT/ui.exit"

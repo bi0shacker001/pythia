@@ -357,6 +357,8 @@ the droidtop coordinator for this lane. Later sections follow them.
       Library, Activity and Devices are primary navigation tabs; setup and
       diagnostics destinations are collected in More, with the active secondary
       destination named below the tabs. Navigation is not a row of filter chips.
+      The game page edits notes through `save_notes` for this computer's record;
+      failed saves preserve the draft, and Cancel makes no backend call.
       Library changes and game start/stop signals refresh the snapshot;
       reconnecting replaces the channel without retaining a dead client.
       CI's window smoke check exercises the library, not the diagnostics.

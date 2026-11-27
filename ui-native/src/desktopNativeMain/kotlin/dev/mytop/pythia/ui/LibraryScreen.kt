@@ -142,6 +142,9 @@ private fun GamePage(connection: PythiaConnection, id: String, onBack: () -> Uni
     var play by remember(id) { mutableStateOf<Answer?>(null) }
     var choices by remember(id) { mutableStateOf<Answer?>(null) }
     var showChoices by remember(id) { mutableStateOf(false) }
+    var notesDraft by remember(id) { mutableStateOf<String?>(null) }
+    var notesResult by remember(id) { mutableStateOf<Answer?>(null) }
+    var savingNotes by remember(id) { mutableStateOf(false) }
     var running by remember(id) { mutableStateOf(false) }
     var result by remember(id) { mutableStateOf<Answer?>(null) }
     var busy by remember(id) { mutableStateOf(false) }
@@ -228,11 +231,47 @@ private fun GamePage(connection: PythiaConnection, id: String, onBack: () -> Uni
                 }
                 item { Text("Played ${game.playcount} times · ${game.playtimeHours} hours") }
                 if (game.notes.isNotBlank()) item { Text(game.notes) }
+                item {
+                    TextButton(enabled = !busy, onClick = { notesResult = null; notesDraft = game.notes }) {
+                        Text("Edit notes on this computer")
+                    }
+                }
                 item { Text("Versions", style = MaterialTheme.typography.titleMedium) }
                 items(game.versions) { Text(it.version ?: "Version not recorded") }
                 if (game.stores.isNotEmpty()) item { Text(game.stores.joinToString(" · ") { it.platform }) }
             }
         }
+    }
+    notesDraft?.let { draft ->
+        AlertDialog(
+            onDismissRequest = { if (!savingNotes) notesDraft = null },
+            title = { Text("Game notes") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Saved in this computer's record of the game.")
+                    OutlinedTextField(draft, { notesDraft = it }, enabled = !savingNotes,
+                        label = { Text("Notes") }, minLines = 4, maxLines = 10, modifier = Modifier.fillMaxWidth())
+                    notesResult?.let { AnswerMessage(it) }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !savingNotes, onClick = {
+                    scope.launch {
+                        savingNotes = true
+                        try {
+                            val answer = connection.call { saveNotes(id, draft) }
+                            notesResult = answer
+                            if (answer is Answer.Ok) {
+                                notesDraft = null
+                                reload()
+                                connection.refreshGames()
+                            }
+                        } finally { savingNotes = false }
+                    }
+                }) { Text(if (savingNotes) "Saving…" else "Save") }
+            },
+            dismissButton = { TextButton(enabled = !savingNotes, onClick = { notesDraft = null }) { Text("Cancel") } },
+        )
     }
 }
 

@@ -14,7 +14,7 @@ default or deleting the current front ends.
 |---|---|---|
 | Library | `LibraryScreen.kt` | Artwork, system browsing, sorting, collections, large-library performance review |
 | Search and filters | `LibraryScreen.kt` | Platform/store/runner facets, keyboard/pad focus review |
-| Game details and running | `LibraryScreen.kt`, `GameActions.kt` | Version choice, notes editing, saves, history, store links, update actions |
+| Game details and running | `LibraryScreen.kt`, `GameActions.kt` | Version choice, saves, history, store links, update actions |
 | How it runs | `LibraryScreen.kt`, `GameActions.kt` | Current choice marking, runner setup and full launch-path parity |
 | Library folders | `LibraryScreen.kt` | Folder picker, scan cadence, watching and Look/Add workflows |
 | Review queue | Not yet wired | Resolve scan decisions, Look proposals, duplicate clusters and merging |
@@ -33,6 +33,10 @@ The native window now gives Library, Activity and Devices primary tabs. Folders,
 Accounts, Plugins, Save backups and Diagnostics live in More, with the current
 secondary page named below the tabs. This separates frequent tasks from setup
 instead of presenting eight equally prominent filter chips as navigation.
+
+Game notes have a separate editor for this computer's record. Cancel discards the
+draft; a failed save retains it with the backend's reason. The dialog closes and
+the game details refresh only after a successful answer.
 
 For each surface, source review must follow a press to the backend, distinguish
 loading/empty/unavailable/error states, retain failure feedback, prevent duplicate

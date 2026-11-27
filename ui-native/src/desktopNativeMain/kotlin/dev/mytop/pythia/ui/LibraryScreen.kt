@@ -39,7 +39,7 @@ fun LibraryScreen(connection: PythiaConnection) {
         Text("Pythia", style = MaterialTheme.typography.headlineMedium)
         // FlowRow keeps every destination reachable at a phone-sized width.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (name in listOf("Library", "Folders", "Accounts", "Plugins", "Activity", "Diagnostics")) {
+            for (name in listOf("Library", "Folders", "Accounts", "Plugins", "Devices", "Save backups", "Activity", "Diagnostics")) {
                 FilterChip(selected = page == name, onClick = { page = name; selected = null }, label = { Text(name) })
             }
         }
@@ -91,6 +91,8 @@ fun LibraryScreen(connection: PythiaConnection) {
                 "Activity" -> ActivityPage(connection)
                 "Accounts" -> AccountsPage(connection)
                 "Plugins" -> PluginsPage(connection)
+                "Devices" -> DevicesPage(connection)
+                "Save backups" -> SaveBackupsPage(connection)
                 else -> {
                     AnswerMessage(s.systemInfo)
                     val events by connection.events.collectAsState()

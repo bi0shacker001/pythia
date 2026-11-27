@@ -367,6 +367,15 @@ the droidtop coordinator for this lane. Later sections follow them.
       reads of an empty/in-progress Look, not malformed backend answers. The
       old front ends still receive the slot unchanged, and other slots retain
       the strict contract-status validation.
+      Devices uses the existing code and same-code pairing protocols, with an
+      explicit human answer to a comparison; leaving the page withdraws the
+      correct offer. The invitation code stays visible while status is polled.
+      Generated calls accept an optional transport timeout (60 seconds by
+      default); confirmation allows 150 seconds because the backend waits up
+      to two minutes for the other device. Sharing and launch switches read
+      their saved state back, and forgetting asks first. Save backups reads
+      real copies, requests a backup and confirms before restoring a selected
+      copy (the backend keeps the replaced saves first).
     - **Not yet:** a macOS window, the remaining screens, packaging and
       making this window the packaged default. The existing front ends
       stay available until their tasks have working native replacements.

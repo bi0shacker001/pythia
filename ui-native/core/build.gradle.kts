@@ -188,17 +188,18 @@ abstract class GenerateBackendClient : DefaultTask() {
 
             @Suppress("UNCHECKED_CAST")
             val params = method["params"] as List<Map<String, Any?>>
-            val signature = params.joinToString(", ") { p ->
+            val backendSignature = params.joinToString(", ") { p ->
                 val optional = p["optional"] == true
                 val type = kotlinType(p["type"] as String) + if (optional) "?" else ""
                 "${camel(p["name"] as String)}: $type" + if (optional) " = null" else ""
             }
+            val signature = listOf(backendSignature, "timeoutMs: Long = 60_000").filter { it.isNotEmpty() }.joinToString(", ")
             val returns = if (result != null) "TypedAnswer<$result>" else "Answer"
             val finish = if (result != null) ".typed($result.serializer())" else ""
             out.appendLine()
             out.appendLine("    suspend fun ${camel(name)}($signature): $returns =")
             if (params.isEmpty()) {
-                out.appendLine("        channel.call(\"$name\", buildJsonObject { })$finish")
+                out.appendLine("        channel.call(\"$name\", buildJsonObject { }, timeoutMs = timeoutMs)$finish")
             } else {
                 out.appendLine("        channel.call(")
                 out.appendLine("            \"$name\",")
@@ -213,6 +214,7 @@ abstract class GenerateBackendClient : DefaultTask() {
                     }
                 }
                 out.appendLine("            },")
+                out.appendLine("            timeoutMs = timeoutMs,")
                 out.appendLine("        )$finish")
             }
         }

@@ -356,6 +356,12 @@ the droidtop coordinator for this lane. Later sections follow them.
       Library changes and game start/stop signals refresh the snapshot;
       reconnecting replaces the channel without retaining a dead client.
       CI's window smoke check exercises the library, not the diagnostics.
+      Accounts keeps the backend's plugin-declared credential fields and browser
+      sign-in flow; values are masked when secret and cleared after a successful
+      save. Plugins searches the real inventory and changes enabled state only
+      after the backend answers. `docs/native-ui-surfaces.md` records the remaining
+      tasks; `utils/audit_native_ui.py` inventories source calls without claiming
+      runtime usability. Live testing is paused at the owner's request.
     - **Not yet:** a macOS window, the remaining screens, packaging and
       making this window the packaged default. The existing front ends
       stay available until their tasks have working native replacements.

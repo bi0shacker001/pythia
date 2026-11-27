@@ -39,7 +39,7 @@ fun LibraryScreen(connection: PythiaConnection) {
         Text("Pythia", style = MaterialTheme.typography.headlineMedium)
         // FlowRow keeps every destination reachable at a phone-sized width.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (name in listOf("Library", "Folders", "Activity", "Diagnostics")) {
+            for (name in listOf("Library", "Folders", "Accounts", "Plugins", "Activity", "Diagnostics")) {
                 FilterChip(selected = page == name, onClick = { page = name; selected = null }, label = { Text(name) })
             }
         }
@@ -89,6 +89,8 @@ fun LibraryScreen(connection: PythiaConnection) {
                 }
                 "Folders" -> FoldersPage(connection)
                 "Activity" -> ActivityPage(connection)
+                "Accounts" -> AccountsPage(connection)
+                "Plugins" -> PluginsPage(connection)
                 else -> {
                     AnswerMessage(s.systemInfo)
                     val events by connection.events.collectAsState()
@@ -120,6 +122,7 @@ private fun GamePage(connection: PythiaConnection, id: String, onBack: () -> Uni
     var result by remember(id) { mutableStateOf<Answer?>(null) }
     var busy by remember(id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val events by connection.events.collectAsState()
     suspend fun reload() {
         detail = connection.gameDetail(id)
         play = connection.call { getPlayState(id) }
@@ -128,7 +131,7 @@ private fun GamePage(connection: PythiaConnection, id: String, onBack: () -> Uni
             it.jsonObject["game_id"]?.text() == id && it.jsonObject["quittable"]?.text() == "true"
         } == true
     }
-    LaunchedEffect(id) { reload() }
+    LaunchedEffect(id, events.firstOrNull { it.name == "gameStarted" || it.name == "gameStopped" }?.number) { reload() }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { TextButton(onClick = onBack) { Text("Back to library") } }
         when (val d = detail) {
@@ -259,12 +262,17 @@ private fun FoldersPage(connection: PythiaConnection) {
 private fun ActivityPage(connection: PythiaConnection) {
     var answer by remember { mutableStateOf<Answer?>(null) }
     var result by remember { mutableStateOf<Answer?>(null) }
+    var busy by remember { mutableStateOf(false) }
     val events by connection.events.collectAsState()
     val scope = rememberCoroutineScope()
     LaunchedEffect(events.firstOrNull { it.name == "jobsChanged" }?.number) { answer = connection.call { getJobs() } }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Activity", style = MaterialTheme.typography.titleLarge) }
-        item { TextButton(onClick = { scope.launch { result = connection.call { clearFinishedJobs() }; answer = connection.call { getJobs() } } }) { Text("Clear finished jobs") } }
+        item { TextButton(enabled = !busy, onClick = { scope.launch {
+            busy = true
+            try { result = connection.call { clearFinishedJobs() }; answer = connection.call { getJobs() } }
+            finally { busy = false }
+        } }) { Text("Clear finished jobs") } }
         item { AnswerMessage(answer); result?.let { AnswerMessage(it) } }
         val jobs = (answer as? Answer.Ok)?.fields?.get("jobs") as? JsonArray ?: JsonArray(emptyList())
         if (answer is Answer.Ok && jobs.isEmpty()) item { Text("No jobs yet.") }
@@ -273,8 +281,14 @@ private fun ActivityPage(connection: PythiaConnection) {
             Column {
                 Text(row["title"]?.text() ?: row["label"]?.text() ?: "Job")
                 Text(row["state"]?.text().orEmpty())
-                if (row["state"]?.text() == "running") TextButton(onClick = {
-                    scope.launch { result = connection.call { cancelJob(row["id"]?.text().orEmpty()).asAnswer() }; answer = connection.call { getJobs() } }
+                row["detail"]?.text()?.takeIf { it.isNotBlank() }?.let { Text(it) }
+                row["summary"]?.text()?.takeIf { it.isNotBlank() }?.let { Text(it) }
+                if (row["state"]?.text() == "running" && row["cancellable"]?.text() == "true") TextButton(enabled = !busy, onClick = {
+                    scope.launch {
+                        busy = true
+                        try { result = connection.call { cancelJob(row["id"]?.text().orEmpty()).asAnswer() }; answer = connection.call { getJobs() } }
+                        finally { busy = false }
+                    }
                 }) { Text("Cancel") }
             }
         }
@@ -282,7 +296,7 @@ private fun ActivityPage(connection: PythiaConnection) {
 }
 
 @Composable
-private fun AnswerMessage(answer: Answer?, success: String? = null) {
+internal fun AnswerMessage(answer: Answer?, success: String? = null) {
     when (answer) {
         null -> ShellLoading()
         is Answer.Ok -> if (success != null) Text(success)
@@ -292,4 +306,4 @@ private fun AnswerMessage(answer: Answer?, success: String? = null) {
     }
 }
 
-private fun JsonElement.text(): String = (this as? JsonPrimitive)?.content.orEmpty()
+internal fun JsonElement.text(): String = (this as? JsonPrimitive)?.contentOrNull.orEmpty()

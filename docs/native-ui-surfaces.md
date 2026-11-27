@@ -29,6 +29,11 @@ default or deleting the current front ends.
 | Updater and packaging | Existing Python packages | Bundle native executable, preserve update lanes and auto-start; macOS window support |
 | Input and accessibility | Shared components + Compose controls | Initial/restored focus, pad actions, touch target/contrast/text size review |
 
+The native window now gives Library, Activity and Devices primary tabs. Folders,
+Accounts, Plugins, Save backups and Diagnostics live in More, with the current
+secondary page named below the tabs. This separates frequent tasks from setup
+instead of presenting eight equally prominent filter chips as navigation.
+
 For each surface, source review must follow a press to the backend, distinguish
 loading/empty/unavailable/error states, retain failure feedback, prevent duplicate
 mutations, and verify cancellation/reconnection does not retain stale state. The

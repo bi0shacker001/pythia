@@ -326,7 +326,8 @@ the droidtop coordinator for this lane. Later sections follow them.
     no JVM at runtime), for linuxX64, linuxArm64 and mingwX64.
     - **The shared UI library** (tokens, format, the backend contract) is
       consumed from source: `ui-native/vendor/mytop-ui` is a git submodule
-      pinned at tag v0.5.0 and included as composite builds (the core modules
+      pinned at commit `967ae5617a2fcd25aa207fe002bbc38694015d7b` (the 0.5.1
+      key-identity correction) and included as composite builds (the core modules
       and `components`). Nothing of it is
       copied.
     - **The client is generated at build time** from
@@ -353,6 +354,9 @@ the droidtop coordinator for this lane. Later sections follow them.
       and can stop tracking without removing files. Activity reads real
       jobs and asks the backend to cancel them. Shared components supply
       selection, switches and loading; diagnostics are a separate place.
+      Library, Activity and Devices are primary navigation tabs; setup and
+      diagnostics destinations are collected in More, with the active secondary
+      destination named below the tabs. Navigation is not a row of filter chips.
       Library changes and game start/stop signals refresh the snapshot;
       reconnecting replaces the channel without retaining a dead client.
       CI's window smoke check exercises the library, not the diagnostics.

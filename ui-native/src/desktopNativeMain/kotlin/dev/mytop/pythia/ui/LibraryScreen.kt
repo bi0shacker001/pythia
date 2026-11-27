@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.*
@@ -39,12 +40,7 @@ fun LibraryScreen(connection: PythiaConnection) {
         } else false
     }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Pythia", style = MaterialTheme.typography.headlineMedium)
-        // FlowRow keeps every destination reachable at a phone-sized width.
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (name in listOf("Library", "Folders", "Accounts", "Plugins", "Devices", "Save backups", "Activity", "Diagnostics")) {
-                FilterChip(selected = page == name, onClick = { page = name; selected = null }, label = { Text(name) })
-            }
-        }
+        LibraryNavigation(page) { page = it; selected = null }
         when (val s = state) {
             PythiaState.Connecting -> { ShellLoading(); Text("Connecting to Pythia…") }
             is PythiaState.Unavailable -> {
@@ -102,6 +98,30 @@ fun LibraryScreen(connection: PythiaConnection) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LibraryNavigation(page: String, navigate: (String) -> Unit) {
+    val primary = listOf("Library", "Activity", "Devices")
+    val secondary = listOf("Folders", "Accounts", "Plugins", "Save backups", "Diagnostics")
+    var expanded by remember { mutableStateOf(false) }
+    val selected = primary.indexOf(page).takeIf { it >= 0 } ?: primary.size
+    Column {
+        TabRow(selectedTabIndex = selected) {
+            primary.forEach { name ->
+                Tab(selected = page == name, onClick = { expanded = false; navigate(name) }, text = { Text(name) })
+            }
+            Tab(selected = selected == primary.size, onClick = { expanded = !expanded }, text = { Text("More") })
+        }
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                secondary.forEach { name ->
+                    DropdownMenuItem(text = { Text(name) }, onClick = { expanded = false; navigate(name) })
+                }
+            }
+        }
+        if (selected == primary.size) Text(page, style = MaterialTheme.typography.titleMedium)
     }
 }
 

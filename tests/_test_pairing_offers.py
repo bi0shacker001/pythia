@@ -5,6 +5,45 @@ from pythia.pairing_offers import PairingOffers
 
 
 class PairingOffersTest(TestCase):
+    def test_delayed_stop_cannot_withdraw_a_new_offer_on_the_same_connection(self):
+        offers = PairingOffers()
+        owner = object()
+        stopped = []
+        offers.begin(owner, "compare", lambda: {}, lambda: stopped.append("old"))
+        old_stop = offers.request_stop(owner, "compare")
+        new_start = offers.reserve(owner, "compare")
+        offers.begin(owner, "compare", lambda: {}, lambda: stopped.append("new"), generation=new_start)
+        self.assertFalse(offers.stop(owner, "compare", old_stop))
+        self.assertEqual(stopped, ["old"])
+        offers.release(owner)
+        self.assertEqual(stopped, ["old", "new"])
+
+    def test_stop_before_worker_start_prevents_a_late_listener(self):
+        offers = PairingOffers()
+        owner = object()
+        generation = offers.reserve(owner, "compare")
+        offers.request_stop(owner, "compare")
+        started = []
+
+        def start():
+            started.append(True)
+            return {"status": "ok"}
+
+        result = offers.begin(owner, "compare", start, lambda: None, generation=generation)
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(started, [])
+
+    def test_reordered_old_start_does_not_replace_a_newer_clients_listener(self):
+        offers = PairingOffers()
+        old, new = object(), object()
+        first = offers.reserve(old, "compare")
+        second = offers.reserve(new, "compare")
+        stopped = []
+        offers.begin(new, "compare", lambda: {}, lambda: stopped.append("new"), generation=second)
+        result = offers.begin(old, "compare", lambda: {}, lambda: stopped.append("old"), generation=first)
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(stopped, [])
+
     def test_disconnect_withdraws_only_its_current_offer(self):
         offers = PairingOffers()
         old, new = object(), object()
@@ -23,9 +62,9 @@ class PairingOffersTest(TestCase):
         offers.begin(client, "compare", lambda: {}, lambda: stopped.append("client"))
         offers.begin(None, "code", lambda: {}, lambda: stopped.append("qt"))
         offers.release(client)
-        self.assertFalse(offers.stop(client, "code"))
+        self.assertFalse(offers.stop(client, "code", offers.request_stop(client, "code")))
         self.assertEqual(stopped, ["client"])
-        self.assertTrue(offers.stop(None, "code"))
+        self.assertTrue(offers.stop(None, "code", offers.request_stop(None, "code")))
         self.assertEqual(stopped, ["client", "qt"])
 
     def test_disconnect_during_start_withdraws_the_late_offer(self):

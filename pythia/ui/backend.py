@@ -134,6 +134,12 @@ def _off_the_main_thread(fn):
 _LEVELS = {"error": logging.ERROR, "warn": logging.WARNING, "info": logging.INFO, "debug": logging.DEBUG}
 
 
+def _pairing_operation(fn):
+    """Pairing dispatch reserves its generation on the calling thread, then answers asynchronously."""
+    fn.answers_later = True
+    return fn
+
+
 class _UiLogHandler(logging.Handler):
     """Turns every record of Pythia's logger into one UI log entry. The backend's
     own messages carry `ui_source` ("pythia" for progress, "web" for the page's
@@ -2094,12 +2100,12 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
-    @_off_the_main_thread
+    @_pairing_operation
     def show_pairing_code(self):
         """This computer shows a code for 10 minutes: the code, the addresses
         with their labels and the invitation text; pairing_status says how
         it is going."""
-        return self._pairing_call("show_pairing_code")
+        return self._pairing_dispatch("show_pairing_code")
 
     @Slot(result="QVariant")
     @_guarded
@@ -2117,18 +2123,18 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
-    @_off_the_main_thread
+    @_pairing_operation
     def cancel_pairing(self):
-        return self._pairing_call("cancel_pairing")
+        return self._pairing_dispatch("cancel_pairing")
 
     # ---- one code on both screens (docs/SPEC.md 7.1, 7.2) ------------------------
     @Slot(result="QVariant")
     @_guarded
-    @_off_the_main_thread
+    @_pairing_operation
     def start_pair_offer(self):
         """This computer can be picked by a handheld or another computer while
         the pairing sheet is open; pair_compare_status follows it."""
-        return self._pairing_call("start_pair_offer")
+        return self._pairing_dispatch("start_pair_offer")
 
     @Slot(result="QVariant")
     @_guarded
@@ -2195,11 +2201,20 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
-    @_off_the_main_thread
+    @_pairing_operation
     def stop_pair_offer(self):
-        return self._pairing_call("stop_pair_offer")
+        return self._pairing_dispatch("stop_pair_offer")
 
-    def _pairing_call(self, name: str, owner: object | None = None, alive: Callable[[], bool] = lambda: True):
+    def _pairing_dispatch(self, name: str, owner: object | None = None, alive: Callable[[], bool] = lambda: True):
+        kind = "compare" if name in ("start_pair_offer", "stop_pair_offer") else "code"
+        generation = (
+            self._pairing_offers.reserve(owner, kind)
+            if name in ("start_pair_offer", "show_pairing_code")
+            else self._pairing_offers.request_stop(owner, kind)
+        )
+        return self._answer_later(name, lambda: self._pairing_call(name, owner, alive, generation))
+
+    def _pairing_call(self, name: str, owner: object | None, alive: Callable[[], bool], generation: int | None):
         from pythia import droidtop
 
         if not droidtop.available():
@@ -2208,19 +2223,19 @@ class Backend(QObject):
 
         if name == "start_pair_offer":
             return self._pairing_offers.begin(
-                owner, "compare", lambda: _jsonable({"status": "ok", **pair.offer()}), pair.stop, alive
+                owner, "compare", lambda: _jsonable({"status": "ok", **pair.offer()}), pair.stop, alive, generation
             )
         if name == "show_pairing_code":
             return self._pairing_offers.begin(
-                owner, "code", lambda: _jsonable({"status": "ok", **pair.show()}), pair.cancel, alive
+                owner, "code", lambda: _jsonable({"status": "ok", **pair.show()}), pair.cancel, alive, generation
             )
         if name not in ("stop_pair_offer", "cancel_pairing"):
             raise ValueError("Unknown pairing operation")
-        self._pairing_offers.stop(owner, "compare" if name == "stop_pair_offer" else "code")
+        self._pairing_offers.stop(owner, "compare" if name == "stop_pair_offer" else "code", generation)
         return {"status": "ok"}
 
     def _pairing_from_ipc(self, name: str, owner: object, alive: Callable[[], bool]):
-        return self._answer_later(name, lambda: self._pairing_call(name, owner, alive))
+        return self._pairing_dispatch(name, owner, alive)
 
     def _release_ipc_pairing(self, owner: object) -> None:
         # Native startup/withdrawal stays off both Qt's UI thread and the IPC writer/read loops.

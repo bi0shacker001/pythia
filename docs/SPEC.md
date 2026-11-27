@@ -382,6 +382,8 @@ the droidtop coordinator for this lane. Later sections follow them.
       Starts from Qt and other clients replace ownership under the same lock, so
       stale cleanup cannot stop their newer offers. Native cleanup never redirects
       Stop onto a replacement connection. Listener mutations run off Qt's thread.
+      Listener generations are reserved before worker scheduling; Stop cancels
+      pending startup and cannot withdraw a newer generation on the same channel.
       The invitation code stays visible while status is polled.
       Offer startup, polling and withdrawal are serialized across mode/page changes.
       Cleanup is bound to the connection which started the offer, so reconnecting

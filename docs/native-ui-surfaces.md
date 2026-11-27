@@ -62,3 +62,8 @@ and stops from both Qt and IPC. A disconnected startup checks the connection aga
 before returning and withdraws its late listener. Ownership replacement prevents
 old cleanup from stopping a newer Qt or other-client offer. Python tests cover
 real-transport disconnect and ownership races; this is not a device-test result.
+Reservations are captured before scheduling workers, so a timed-out old Stop
+cannot cancel a newer same-connection listener and a stopped queued start cannot
+open a late listener. Comparison pick/confirm ownership and in-flight native
+confirmation cancellation still require review of the shared native binding;
+the listener lease does not establish that those separate operations are scoped.

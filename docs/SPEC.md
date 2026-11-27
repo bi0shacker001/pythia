@@ -377,9 +377,11 @@ the droidtop coordinator for this lane. Later sections follow them.
       the strict contract-status validation.
       Devices uses the existing code and same-code pairing protocols, with an
       explicit human answer to a comparison; leaving the page withdraws the
-      correct offer while the original IPC connection remains usable. Losing that
-      connection still needs backend-owned offer lease/expiry cleanup; native
-      cleanup never redirects Stop onto a replacement or another client's offer.
+      correct offer. The backend additionally owns IPC pairing leases: disconnect
+      withdraws only that connection's current offer, including a late startup.
+      Starts from Qt and other clients replace ownership under the same lock, so
+      stale cleanup cannot stop their newer offers. Native cleanup never redirects
+      Stop onto a replacement connection. Listener mutations run off Qt's thread.
       The invitation code stays visible while status is polled.
       Offer startup, polling and withdrawal are serialized across mode/page changes.
       Cleanup is bound to the connection which started the offer, so reconnecting

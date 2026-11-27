@@ -858,7 +858,8 @@
     {
       "name": "cancel_pairing",
       "params": [],
-      "returns": "answer"
+      "returns": "answer",
+      "async": true
     },
     {
       "name": "check_path",
@@ -2017,7 +2018,8 @@
     {
       "name": "show_pairing_code",
       "params": [],
-      "returns": "answer"
+      "returns": "answer",
+      "async": true
     },
     {
       "name": "start_look",
@@ -2105,7 +2107,8 @@
     {
       "name": "stop_pair_offer",
       "params": [],
-      "returns": "answer"
+      "returns": "answer",
+      "async": true
     },
     {
       "name": "stop_watch",

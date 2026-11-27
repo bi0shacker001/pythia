@@ -31,6 +31,7 @@ import json
 import logging
 import os
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -204,6 +205,9 @@ class Backend(QObject):
         self._games_version = ""
         self._collections_version = ""
         self._lock = threading.Lock()
+        from pythia.pairing_offers import PairingOffers
+
+        self._pairing_offers = PairingOffers()
         self._ui_log: list[dict] = []
         self._jobs: list[dict] = []
         self._cancels: dict[str, threading.Event] = {}  # a job's cancel flag, set by cancel_job
@@ -2090,17 +2094,12 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def show_pairing_code(self):
         """This computer shows a code for 10 minutes: the code, the addresses
         with their labels and the invitation text; pairing_status says how
         it is going."""
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("show_pairing_code")
-        from pythia.droidtop import pair
-
-        return _jsonable({"status": "ok", **pair.show()})
+        return self._pairing_call("show_pairing_code")
 
     @Slot(result="QVariant")
     @_guarded
@@ -2118,15 +2117,9 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def cancel_pairing(self):
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("cancel_pairing")
-        from pythia.droidtop import pair
-
-        pair.cancel()
-        return {"status": "ok"}
+        return self._pairing_call("cancel_pairing")
 
     # ---- one code on both screens (docs/SPEC.md 7.1, 7.2) ------------------------
     @Slot(result="QVariant")
@@ -2135,13 +2128,7 @@ class Backend(QObject):
     def start_pair_offer(self):
         """This computer can be picked by a handheld or another computer while
         the pairing sheet is open; pair_compare_status follows it."""
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("start_pair_offer")
-        from pythia.droidtop import pair
-
-        return _jsonable({"status": "ok", **pair.offer()})
+        return self._pairing_call("start_pair_offer")
 
     @Slot(result="QVariant")
     @_guarded
@@ -2208,15 +2195,42 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @_off_the_main_thread
     def stop_pair_offer(self):
+        return self._pairing_call("stop_pair_offer")
+
+    def _pairing_call(self, name: str, owner: object | None = None, alive: Callable[[], bool] = lambda: True):
         from pythia import droidtop
 
         if not droidtop.available():
-            return self._agent_unavailable("stop_pair_offer")
+            return self._agent_unavailable(name)
         from pythia.droidtop import pair
 
-        pair.stop()
+        if name == "start_pair_offer":
+            return self._pairing_offers.begin(
+                owner, "compare", lambda: _jsonable({"status": "ok", **pair.offer()}), pair.stop, alive
+            )
+        if name == "show_pairing_code":
+            return self._pairing_offers.begin(
+                owner, "code", lambda: _jsonable({"status": "ok", **pair.show()}), pair.cancel, alive
+            )
+        if name not in ("stop_pair_offer", "cancel_pairing"):
+            raise ValueError("Unknown pairing operation")
+        self._pairing_offers.stop(owner, "compare" if name == "stop_pair_offer" else "code")
         return {"status": "ok"}
+
+    def _pairing_from_ipc(self, name: str, owner: object, alive: Callable[[], bool]):
+        return self._answer_later(name, lambda: self._pairing_call(name, owner, alive))
+
+    def _release_ipc_pairing(self, owner: object) -> None:
+        # Native startup/withdrawal stays off both Qt's UI thread and the IPC writer/read loops.
+        def release():
+            try:
+                self._pairing_offers.release(owner)
+            except Exception:  # noqa: BLE001 -- cleanup failure must be recorded without stopping the server
+                logger.exception("The disconnected UI's pairing offer could not be withdrawn")
+
+        threading.Thread(target=release, name="pairing-disconnect", daemon=True).start()
 
     @Slot(result="QVariant")
     @_guarded

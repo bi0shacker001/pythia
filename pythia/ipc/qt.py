@@ -56,7 +56,15 @@ def attach(app: Any, backend: QObject, where: str | None = None) -> Server | Non
         schema = schema_module.describe(type(backend))
         handlers = {m["name"]: getattr(backend, m["name"]) for m in schema["methods"]}
         caller = MainThreadCaller()
-        server = Server(schema, handlers, instance.channel_key(), call_on_main=caller.call, where=where)
+        server = Server(
+            schema,
+            handlers,
+            instance.channel_key(),
+            call_on_main=caller.call,
+            where=where,
+            pairing_call=getattr(backend, "_pairing_from_ipc", None),
+            pairing_release=getattr(backend, "_release_ipc_pairing", None),
+        )
         if not server.start():
             logger.warning("The backend channel is already served; this Pythia does not serve it.")
             return None

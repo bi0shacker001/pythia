@@ -33,6 +33,7 @@ from pythia.util.log import logger
 BUILTINS = ("hello", "ping", "schema", "subscribe")
 HELLO_TIMEOUT_S = 10.0
 OUTBOX_LIMIT = 2000
+PAIRING_METHODS = frozenset(("start_pair_offer", "show_pairing_code", "stop_pair_offer", "cancel_pairing"))
 _EARLY_LIMIT = 256
 _TYPE_CHECKS: dict[str, Callable[[Any], bool]] = {
     "string": lambda v: isinstance(v, str),
@@ -70,6 +71,7 @@ class _Connection:
         self.events: set[str] | None = None  # None: every event
         self._outbox: queue.Queue = queue.Queue(OUTBOX_LIMIT)
         self._closed = threading.Event()
+        self.pairing_requested = False
 
     def start(self) -> None:
         threading.Thread(target=self._write_loop, name="pythia-ipc-write", daemon=True).start()
@@ -152,6 +154,8 @@ class Server:
         key: bytes,
         call_on_main: Callable[[Callable[[], Any]], Any] | None = None,
         where: str | None = None,
+        pairing_call: Callable[[str, object, Callable[[], bool]], Any] | None = None,
+        pairing_release: Callable[[object], None] | None = None,
     ):
         self._schema = schema
         self._methods = {m["name"]: m for m in schema["methods"]}
@@ -163,6 +167,8 @@ class Server:
         if missing:
             raise ValueError(f"No handler for {sorted(missing)}")
         self._handlers = handlers
+        self._pairing_call = pairing_call
+        self._pairing_release = pairing_release
         self._key = key
         self._call_on_main = call_on_main or (lambda fn: fn())
         self._where = where
@@ -213,6 +219,11 @@ class Server:
             self._connections.discard(connection)
             for request in [r for r, (c, _) in self._pending.items() if c is connection]:
                 del self._pending[request]
+        if connection.pairing_requested and self._pairing_release is not None:
+            try:
+                self._pairing_release(connection)
+            except Exception:  # noqa: BLE001 -- one cleanup failure must not leave the other connections open
+                logger.exception("The disconnected UI's pairing cleanup could not be scheduled")
 
     # ---- one message -------------------------------------------------------------
     def _handle(self, connection: _Connection, message: dict[str, Any]) -> None:
@@ -247,7 +258,9 @@ class Server:
         if isinstance(args, str):
             connection.send(self._reply(call_id, method, "bad_args", args))
             return
-        answer = self._call_on_main(lambda: self._invoke(method, args))
+        if method in PAIRING_METHODS and self._pairing_call is not None:
+            connection.pairing_requested = True
+        answer = self._call_on_main(lambda: self._invoke(method, args, connection))
         connection.send({"id": call_id, "result": answer})
         if answer.get("status") == "pending":
             self._expect(connection, call_id, answer["request"])
@@ -321,13 +334,18 @@ class Server:
                 return f"{spec['name']}: {param['name']} is a {param['type']}."
         return args
 
-    def _invoke(self, name: str, args: list[Any]) -> dict[str, Any]:
+    def _invoke(self, name: str, args: list[Any], connection: _Connection | None = None) -> dict[str, Any]:
         """Runs the slot; always an answer. Arguments are not logged (set_account_credential carries a secret)."""
 
         def failed(slot: str, exc: Exception) -> None:
             logger.error("%s failed over the backend channel: %s", slot, exc, exc_info=exc)
 
-        return ui_contract.guarded(name, lambda: to_answer(name, self._handlers[name](*args)), log=failed)
+        def invoke():
+            if name in PAIRING_METHODS and self._pairing_call is not None and connection is not None:
+                return self._pairing_call(name, connection, lambda: not connection.closed)
+            return self._handlers[name](*args)
+
+        return ui_contract.guarded(name, lambda: to_answer(name, invoke()), log=failed)
 
     # ---- pending answers and events ----------------------------------------------
     def _expect(self, connection: _Connection, call_id: Any, request: str) -> None:

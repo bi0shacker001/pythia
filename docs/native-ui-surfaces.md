@@ -56,8 +56,9 @@ First-use pairing explains network access with the existing desktop copy before
 any of its three entry actions can start. Cancel makes no mutation; failed or
 malformed explanation-state reads and failed consent writes block startup.
 
-Remaining ownership limit: if the IPC connection disappears while the backend
-survives, the native client cannot withdraw that connection's offer. It refuses
-to redirect cleanup to a new connection, which could stop another client's offer.
-Backend-owned per-client lease/expiry cleanup with an offer generation guard is
-still required before claiming an offer can never outlive a lost/closed UI.
+The backend now retains the actual pairing-offer owner. IPC disconnect schedules
+withdrawal for that owner, while a shared lock serializes native listener starts
+and stops from both Qt and IPC. A disconnected startup checks the connection again
+before returning and withdraws its late listener. Ownership replacement prevents
+old cleanup from stopping a newer Qt or other-client offer. Python tests cover
+real-transport disconnect and ownership races; this is not a device-test result.

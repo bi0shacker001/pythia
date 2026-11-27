@@ -6,7 +6,7 @@ plugins {
     kotlin("plugin.serialization")
 }
 
-val uiLibVersion = "0.3.0" // mytop-ui's tag, which vendor/mytop-ui is pinned at; the composite build ignores it
+val uiLibVersion = "0.5.0" // source pinned in vendor/mytop-ui
 
 /**
  * Writes the Kotlin client of Pythia's backend from schema/backend-ipc.json (pythia.ipc.schema writes that file from

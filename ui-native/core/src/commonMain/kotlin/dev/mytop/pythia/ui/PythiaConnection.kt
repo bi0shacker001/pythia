@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** What the front end knows of Pythia right now. */
 sealed interface PythiaState {
@@ -47,6 +50,28 @@ class PythiaConnection(
 
     private val retry = Channel<Unit>(Channel.CONFLATED)
     private var counter = 0L
+    private var backend: PythiaBackend? = null
+    private val refresh = Channel<Unit>(Channel.CONFLATED)
+    private val snapshotLock = Mutex()
+
+    /** Calls always use the current connection; a disconnected action has an honest answer. */
+    suspend fun call(action: suspend PythiaBackend.() -> Answer): Answer {
+        val current = backend ?: return Answer.Unavailable("Pythia is not connected. Try again when it reconnects.")
+        return current.action()
+    }
+
+    suspend fun gameDetail(id: String) = backend?.getGameDetail(id)
+        ?: TypedAnswer.Other(Answer.Unavailable("Pythia is not connected."))
+
+    fun refreshGames() { refresh.trySend(Unit) }
+
+    private suspend fun updateGames(current: PythiaBackend) = snapshotLock.withLock {
+        val answer = current.getGames()
+        // An old connection must never replace a new connection's library.
+        if (backend === current) _state.update { s ->
+            if (s is PythiaState.Ready) s.copy(games = answer) else s
+        }
+    }
 
     fun start(): Job = scope.launch { run() }
 
@@ -62,19 +87,28 @@ class PythiaConnection(
             when (val opened = BackendChannel.open(scope, where) { ended.complete(it) }) {
                 is Opened.Down -> _state.value = PythiaState.Unavailable(opened.reason)
                 is Opened.Up -> {
-                    val backend = PythiaBackend(opened.channel)
+                    val current = PythiaBackend(opened.channel)
+                    backend = current
                     val collecting = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                        backend.events.collect { e ->
+                        current.events.collect { e ->
                             _events.update { listOf(LoggedEvent(++counter, e.name, e.args.toString())) + it.take(MAX_EVENTS - 1) }
+                            if (e.name in setOf("gamesChanged", "gameStarted", "gameStopped")) refresh.trySend(Unit)
                         }
                     }
-                    _state.value = PythiaState.Ready(opened.hello, null)
-                    val info = backend.getSystemInfo()
-                    _state.value = PythiaState.Ready(opened.hello, info)
-                    _state.value = PythiaState.Ready(opened.hello, info, backend.getGames())
-                    _state.value = PythiaState.Unavailable(ended.await())
-                    collecting.cancel()
-                    opened.channel.close()
+                    var refreshing: Job? = null
+                    try {
+                        _state.value = PythiaState.Ready(opened.hello, null)
+                        val info = current.getSystemInfo()
+                        _state.value = PythiaState.Ready(opened.hello, info)
+                        updateGames(current)
+                        refreshing = scope.launch { for (ignored in refresh) updateGames(current) }
+                        _state.value = PythiaState.Unavailable(ended.await())
+                    } finally {
+                        backend = null
+                        refreshing?.cancelAndJoin()
+                        collecting.cancelAndJoin()
+                        opened.channel.close()
+                    }
                 }
             }
             withTimeoutOrNull(retryEveryMs) { retry.receive() }

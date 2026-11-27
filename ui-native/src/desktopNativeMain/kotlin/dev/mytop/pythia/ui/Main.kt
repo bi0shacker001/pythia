@@ -60,7 +60,7 @@ fun main(args: Array<String>) {
             LaunchedEffect(connection) {
                 val seen = withTimeoutOrNull(120_000) {
                     combine(connection.state, connection.events) { state, events ->
-                        state is PythiaState.Ready && state.systemInfo is Answer.Ok && events.isNotEmpty()
+                        state is PythiaState.Ready && state.games is TypedAnswer.Ok && events.isNotEmpty()
                     }.first { it }
                 }
                 if (seen == null) {
@@ -79,7 +79,7 @@ fun main(args: Array<String>) {
             state = rememberWindowState(size = DpSize(760.dp, 820.dp)),
         ) {
             PythiaTheme(ThemePalette.DEFAULT) {
-                PythiaScreen(connection)
+                if ("--diagnostics" in args) PythiaScreen(connection) else LibraryScreen(connection)
             }
         }
     }

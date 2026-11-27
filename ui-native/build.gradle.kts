@@ -10,7 +10,7 @@ plugins {
 // The patched build's version (CN_VERSION, settings.gradle.kts) or upstream's.
 val composeNativeVersion = System.getenv("CN_VERSION") ?: "1.13.0-beta01"
 val composeVersion = "1.13.0-beta01"
-val uiLibVersion = "0.3.0" // mytop-ui's tag, which vendor/mytop-ui is pinned at; the composite build ignores it
+val uiLibVersion = "0.5.0" // source pinned in vendor/mytop-ui
 
 kotlin {
     desktopNative {
@@ -28,6 +28,7 @@ kotlin {
                 implementation(project(":core"))
                 implementation("dev.droidtop.lib.ui:tokens:$uiLibVersion")
                 implementation("dev.droidtop.lib.ui:format:$uiLibVersion")
+                implementation("dev.droidtop.lib.ui:components:$uiLibVersion")
             }
         }
         named("desktopNativeMain") {

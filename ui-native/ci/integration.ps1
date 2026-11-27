@@ -102,10 +102,9 @@ try {
     Get-Content $uiLog
     Set-Content (Join-Path $OutDir "ui.exit") "exit=$exit"
     $log = Get-Content $uiLog -Raw
-    foreach ($want in @('ui: rendered hello status=ok', 'ui: rendered get_system_info status=ok', 'smoke: ok')) {
+    foreach ($want in @('ui: rendered library games=', 'smoke: ok')) {
         if ($log -notlike "*$want*") { throw "the window's log has no '$want'" }
     }
-    if ($log -notmatch 'ui: rendered events=[1-9]') { throw "no event reached the window" }
     if ($exit -ne 0) { throw "the window exited $exit, not 0" }
     Write-Host "integration: ok"
 }

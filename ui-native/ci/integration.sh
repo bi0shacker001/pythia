@@ -123,11 +123,7 @@ if [ "$WINDOW" = "--window" ]; then
   '
   cat "$OUT/ui.log"
   cat "$OUT/ui.exit"
-  grep -q '^ui: rendered hello status=ok' "$OUT/ui.log"
-  grep -q '^ui: rendered get_system_info status=ok' "$OUT/ui.log"
-  grep -q '^ui: rendered events=[1-9]' "$OUT/ui.log"
-  # The typed get_games, read as the schema's GetGamesResult, was shown by the window.
-  grep -q '^ui: rendered get_games typed ok [0-9,][0-9,]* games, version ' "$OUT/ui.log"
+  grep -q '^ui: rendered library games=[0-9]' "$OUT/ui.log"
   grep -q '^smoke: ok' "$OUT/ui.log"
   # The patched compose-native ends the window cleanly (the stock one raised BadWindow on teardown, exit 1).
   grep -q '^exit=0' "$OUT/ui.exit"

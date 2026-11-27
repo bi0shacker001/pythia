@@ -54,3 +54,9 @@ includeBuild("vendor/mytop-ui") {
         }
     }
 }
+
+includeBuild("vendor/mytop-ui/components") {
+    dependencySubstitution {
+        substitute(module("dev.droidtop.lib.ui:components")).using(project(":"))
+    }
+}

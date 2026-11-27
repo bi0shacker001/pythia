@@ -326,7 +326,8 @@ the droidtop coordinator for this lane. Later sections follow them.
     no JVM at runtime), for linuxX64, linuxArm64 and mingwX64.
     - **The shared UI library** (tokens, format, the backend contract) is
       consumed from source: `ui-native/vendor/mytop-ui` is a git submodule
-      pinned at tag v0.3.0 and included as a composite build. Nothing of it is
+      pinned at tag v0.5.0 and included as composite builds (the core modules
+      and `components`). Nothing of it is
       copied.
     - **The client is generated at build time** from
       `schema/backend-ipc.json` (a Gradle task; nothing generated is checked
@@ -344,7 +345,20 @@ the droidtop coordinator for this lane. Later sections follow them.
       does the same headless, prints the answers and exits (0 ok, 1 an answer
       that is not ok, 2 Pythia unreachable); CI runs it against the real
       Backend.
-    - **Not yet:** a macOS build, the real screens, packaging.
+    - **Library surfaces (owner, 2026-11-27: "get Pythia moved over to the
+      shared UI").** The native window opens on the real library, with
+      search, Installed and Favourites filters, a game page, the backend's
+      Play/Install action and disabled reason, favourite and quit controls,
+      and the per-computer launch choices. Folders adds games/ROM folders
+      and can stop tracking without removing files. Activity reads real
+      jobs and asks the backend to cancel them. Shared components supply
+      selection, switches and loading; diagnostics are a separate place.
+      Library changes and game start/stop signals refresh the snapshot;
+      reconnecting replaces the channel without retaining a dead client.
+      CI's window smoke check exercises the library, not the diagnostics.
+    - **Not yet:** a macOS window, the remaining screens, packaging and
+      making this window the packaged default. The existing front ends
+      stay available until their tasks have working native replacements.
 
 ## 2. The pad model (handheld shell)
 

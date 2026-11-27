@@ -24,13 +24,13 @@ def audit(root: Path) -> dict:
         kotlin = parts[0] + "".join(part[:1].upper() + part[1:] for part in parts[1:])
         pattern = re.compile(r"\b" + re.escape(kotlin) + r"\s*\(")
         screens, infrastructure = [], []
-        for path, text in sources:
+        for source_path, text in sources:
             for number, line in enumerate(text.splitlines(), 1):
                 # Comments explain an operation but are not a call path.
                 if line.lstrip().startswith(("//", "*")) or not pattern.search(line):
                     continue
-                target = screens if path.startswith("ui-native/src/") else infrastructure
-                target.append(f"{path}:{number}")
+                target = screens if source_path.startswith("ui-native/src/") else infrastructure
+                target.append(f"{source_path}:{number}")
         operations.append({"operation": name, "screens": screens, "infrastructure": infrastructure})
     return {
         "evidence": "Static call references only; reachability, state handling and runtime behaviour need review.",

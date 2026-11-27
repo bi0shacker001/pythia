@@ -139,17 +139,16 @@ private fun GamePage(connection: PythiaConnection, id: String, onBack: () -> Uni
                 item { Text(game.title, style = MaterialTheme.typography.headlineMedium) }
                 item { Text((game.platforms + game.runners).joinToString(" · ")) }
                 item {
-                    val primary = (play as? Answer.Ok)?.fields?.get("primary") as? JsonObject
-                    val action = primary?.get("action")?.text() ?: "Play"
-                    Button(enabled = !busy && primary?.get("enabled")?.text() == "true", onClick = {
+                    val primary = primaryAction(play)
+                    Button(enabled = !busy && primary.enabled, onClick = {
                         scope.launch {
                             busy = true
                             try { result = connection.call { playGame(id) }; connection.refreshGames(); reload() }
                             finally { busy = false }
                         }
-                    }) { Text(if (busy) "Working…" else action.replaceFirstChar { it.uppercase() }) }
+                    }) { Text(if (busy) "Working…" else primary.label) }
                     if (play !is Answer.Ok) AnswerMessage(play)
-                    primary?.get("reason")?.text()?.takeIf { it.isNotBlank() && it != "null" }?.let { Text(it) }
+                    if (play is Answer.Ok) primary.reason?.let { Text(it) }
                     result?.let { AnswerMessage(it, "Done") }
                 }
                 item {
@@ -179,19 +178,17 @@ private fun GamePage(connection: PythiaConnection, id: String, onBack: () -> Uni
                 if (showChoices) {
                     item { AnswerMessage(choices) }
                     val fields = (choices as? Answer.Ok)?.fields
-                    val candidates = fields?.get("candidates") as? JsonArray ?: JsonArray(emptyList())
-                    val vias = fields?.get("vias") as? JsonArray ?: JsonArray(emptyList())
-                    items(candidates) { candidate ->
-                        val exe = candidate.jsonObject["exe"]?.text().orEmpty()
+                    val options = launchOptions(choices)
+                    items(options) { option ->
                         Column {
-                            Text(exe)
-                            for (via in vias) TextButton(enabled = !busy, onClick = {
+                            Text(option.exe)
+                            TextButton(enabled = !busy, onClick = {
                                 scope.launch {
                                     busy = true
-                                    try { result = connection.call { setLaunch(id, exe, via.text()) }; reload() }
+                                    try { result = connection.call { setLaunch(id, option.exe, option.via) }; reload() }
                                     finally { busy = false }
                                 }
-                            }) { Text("Run ${if (via.text() == "wine") "with Wine" else "natively"}") }
+                            }) { Text("Run ${if (option.via == "wine") "with Wine" else "natively"}") }
                         }
                     }
                     if (fields != null) item {

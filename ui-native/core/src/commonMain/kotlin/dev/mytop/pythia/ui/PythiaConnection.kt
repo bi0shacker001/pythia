@@ -105,9 +105,11 @@ class PythiaConnection(
                         _state.value = PythiaState.Unavailable(ended.await())
                     } finally {
                         backend = null
+                        opened.channel.close()
+                        collecting.cancel()
+                        refreshing?.cancel()
                         refreshing?.cancelAndJoin()
                         collecting.cancelAndJoin()
-                        opened.channel.close()
                     }
                 }
             }

@@ -15,6 +15,8 @@ import kotlinx.serialization.json.*
 internal fun Answer?.rows(name: String): List<JsonObject> =
     ((this as? Answer.Ok)?.fields?.get(name) as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
 
+private data class PairingRequest(val mode: String, val code: String = "")
+
 @Composable
 internal fun DevicesPage(connection: PythiaConnection) {
     var devices by remember { mutableStateOf<Answer?>(null) }
@@ -26,12 +28,32 @@ internal fun DevicesPage(connection: PythiaConnection) {
     var code by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var forgetting by remember { mutableStateOf<JsonObject?>(null) }
+    var networkRequest by remember { mutableStateOf<PairingRequest?>(null) }
+    var networkResult by remember { mutableStateOf<Answer?>(null) }
     val scope = rememberCoroutineScope()
     val events by connection.events.collectAsState()
+    suspend fun startPairing(request: PairingRequest) {
+        if (request.mode == "typed") {
+            result = connection.call { pairWithCode(request.code) }
+            if (result is Answer.Ok) code = ""
+        } else mode = request.mode
+    }
+    fun requestPairing(request: PairingRequest) {
+        scope.launch {
+            busy = true
+            try {
+                when (val decision = pairingNetworkDecision(connection.call { pairingNetworkExplained() })) {
+                    PairingNetworkDecision.Ready -> startPairing(request)
+                    PairingNetworkDecision.Explain -> { networkResult = null; networkRequest = request }
+                    is PairingNetworkDecision.Blocked -> result = decision.answer
+                }
+            } finally { busy = false }
+        }
+    }
     LaunchedEffect(events.firstOrNull { it.name == "handheldsChanged" }?.number) {
         devices = connection.call { getHandhelds() }
     }
-    // Leaving the page or cancelling always withdraws the offer; a hidden screen must not keep offering to pair.
+    // Serialize withdrawal while this connection survives. A lost IPC client still needs a backend-owned offer lease.
     LaunchedEffect(mode) {
         val activeMode = mode
         if (activeMode.isNotEmpty()) {
@@ -56,8 +78,8 @@ internal fun DevicesPage(connection: PythiaConnection) {
         item { Text("Devices", style = MaterialTheme.typography.titleLarge) }
         item { Text("Pairing connects your library and saves to another device. Compare the code on both screens before agreeing.") }
         item {
-            Button(enabled = !busy && mode.isEmpty(), onClick = { mode = "compare" }) { Text("Pair on this network") }
-            TextButton(enabled = !busy && mode.isEmpty(), onClick = { mode = "code" }) { Text("Show a code for a handheld") }
+            Button(enabled = !busy && mode.isEmpty(), onClick = { requestPairing(PairingRequest("compare")) }) { Text("Pair on this network") }
+            TextButton(enabled = !busy && mode.isEmpty(), onClick = { requestPairing(PairingRequest("code")) }) { Text("Show a code for a handheld") }
             if (mode.isNotEmpty()) TextButton(onClick = { mode = ""; status = null; found = null }) { Text("Stop pairing") }
         }
         if (mode.isNotEmpty()) {
@@ -103,11 +125,8 @@ internal fun DevicesPage(connection: PythiaConnection) {
         }
         item {
             OutlinedTextField(code, { code = it }, label = { Text("Code shown on a handheld") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            TextButton(enabled = !busy && mode.isEmpty() && code.isNotBlank(), onClick = { scope.launch {
-                busy = true
-                try { result = connection.call { pairWithCode(code.trim()) }; if (result is Answer.Ok) code = "" }
-                finally { busy = false }
-            } }) { Text("Pair using this code") }
+            TextButton(enabled = !busy && mode.isEmpty() && code.isNotBlank(),
+                onClick = { requestPairing(PairingRequest("typed", code.trim())) }) { Text("Pair using this code") }
             result?.let { AnswerMessage(it) }
             (result as? Answer.Ok)?.fields?.let { feedback ->
                 if (feedback["job"] != null) Text("Pairing started. See Activity for progress.")
@@ -135,6 +154,26 @@ internal fun DevicesPage(connection: PythiaConnection) {
                 TextButton(enabled = !busy && id.isNotBlank(), onClick = { forgetting = device }) { Text("Forget device") }
             }
         }
+    }
+    networkRequest?.let { request ->
+        AlertDialog(
+            onDismissRequest = { if (!busy) networkRequest = null },
+            title = { Text("Pairing uses your network") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(PAIRING_NETWORK_EXPLANATION)
+                networkResult?.let { AnswerMessage(it) }
+            } },
+            dismissButton = { TextButton(enabled = !busy, onClick = { networkRequest = null }) { Text("Cancel") } },
+            confirmButton = { TextButton(enabled = !busy, onClick = { scope.launch {
+                busy = true
+                networkResult = null
+                try {
+                    val answer = connection.call { markPairingNetworkExplained() }
+                    if (answer is Answer.Ok) { networkRequest = null; startPairing(request) }
+                    else networkResult = answer
+                } finally { busy = false }
+            } }) { Text(if (busy) "Working…" else "Continue") } },
+        )
     }
     forgetting?.let { device ->
         AlertDialog(onDismissRequest = { forgetting = null }, title = { Text("Forget this device?") },

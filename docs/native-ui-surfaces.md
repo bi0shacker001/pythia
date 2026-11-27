@@ -52,3 +52,12 @@ to settle before cleanup. Core coroutine tests cover rapid mode replacement,
 reconnection during cleanup, cancelled queued starts and caller cancellation.
 These are source/CI contracts; expiry presentation and device pairing still need
 runtime review. Transport cancellation is not rendered as an ordinary failure.
+First-use pairing explains network access with the existing desktop copy before
+any of its three entry actions can start. Cancel makes no mutation; failed or
+malformed explanation-state reads and failed consent writes block startup.
+
+Remaining ownership limit: if the IPC connection disappears while the backend
+survives, the native client cannot withdraw that connection's offer. It refuses
+to redirect cleanup to a new connection, which could stop another client's offer.
+Backend-owned per-client lease/expiry cleanup with an offer generation guard is
+still required before claiming an offer can never outlive a lost/closed UI.

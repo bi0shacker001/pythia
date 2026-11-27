@@ -377,7 +377,10 @@ the droidtop coordinator for this lane. Later sections follow them.
       the strict contract-status validation.
       Devices uses the existing code and same-code pairing protocols, with an
       explicit human answer to a comparison; leaving the page withdraws the
-      correct offer. The invitation code stays visible while status is polled.
+      correct offer while the original IPC connection remains usable. Losing that
+      connection still needs backend-owned offer lease/expiry cleanup; native
+      cleanup never redirects Stop onto a replacement or another client's offer.
+      The invitation code stays visible while status is polled.
       Offer startup, polling and withdrawal are serialized across mode/page changes.
       Cleanup is bound to the connection which started the offer, so reconnecting
       cannot direct an old Stop at a new backend. Leaving during asynchronous
@@ -711,6 +714,12 @@ the handheld over the home network and that the system may ask whether to
 allow it, and to allow it on private networks. The system's prompt is
 expected on Windows; this is inferred from how Windows treats a new
 listening program and has not been verified on a test machine.
+
+The native Devices page uses the same first-use explanation and copy as the
+desktop flow before network pairing, showing a code or pairing with a typed
+code. It reads `pairing_network_explained`; an unknown/failed read blocks
+startup. Continue records `mark_pairing_network_explained` successfully before
+starting the requested action. Cancel neither records consent nor starts it.
 
 ### 7.6 No camera
 

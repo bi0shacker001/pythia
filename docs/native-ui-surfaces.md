@@ -27,7 +27,7 @@ default or deleting the current front ends.
 | Error console | Diagnostics place | Semantic event/log presentation, bounded text, copy/export diagnostics |
 | Tray and single instance | Existing Python owner | Native window show/hide/close lifecycle, flags still reaching the running process |
 | Updater and packaging | Existing Python packages | Bundle native executable, preserve update lanes and auto-start; macOS window support |
-| Input and accessibility | Shared components + Compose controls | Initial/restored focus, pad actions, touch target/contrast/text size review |
+| Input and accessibility | Shared components + Compose controls | Initial focus, fallback when an opened game disappears, pad actions, touch target/contrast/text size review |
 
 The native window now gives Library, Activity and Devices primary tabs. Folders,
 Accounts, Plugins, Save backups and Diagnostics live in More, with the current
@@ -37,6 +37,8 @@ instead of presenting eight equally prominent filter chips as navigation.
 Game notes have a separate editor for this computer's record. Cancel discards the
 draft; a failed save retains it with the backend's reason. The dialog closes and
 the game details refresh only after a successful answer.
+The library retains its scroll position and requests focus on the opened game
+when returning from its page. Runtime keyboard/pad verification remains open.
 
 For each surface, source review must follow a press to the backend, distinguish
 loading/empty/unavailable/error states, retain failure feedback, prevent duplicate

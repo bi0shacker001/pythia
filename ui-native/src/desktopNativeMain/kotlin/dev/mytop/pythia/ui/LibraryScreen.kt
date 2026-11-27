@@ -4,11 +4,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -33,6 +36,8 @@ fun LibraryScreen(connection: PythiaConnection) {
     var query by remember { mutableStateOf("") }
     var installed by remember { mutableStateOf(false) }
     var favourites by remember { mutableStateOf(false) }
+    val libraryScroll = rememberLazyListState()
+    var returnFocus by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().padding(16.dp).onPreviewKeyEvent {
         if (it.type == KeyEventType.KeyDown && it.key == Key.Escape && selected != null) {
             selected = null
@@ -40,7 +45,7 @@ fun LibraryScreen(connection: PythiaConnection) {
         } else false
     }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Pythia", style = MaterialTheme.typography.headlineMedium)
-        LibraryNavigation(page) { page = it; selected = null }
+        LibraryNavigation(page) { page = it; selected = null; returnFocus = null }
         when (val s = state) {
             PythiaState.Connecting -> { ShellLoading(); Text("Connecting to Pythia…") }
             is PythiaState.Unavailable -> {
@@ -77,9 +82,12 @@ fun LibraryScreen(connection: PythiaConnection) {
                                 Text("No games match. Clear the search or filters to see more games.")
                                 TextButton(onClick = { query = ""; installed = false; favourites = false }) { Text("Clear search and filters") }
                             }
-                            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            LazyColumn(state = libraryScroll, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 items(games, key = { it.id }) { game ->
-                                    GameRow(game) { selected = game.id }
+                                    GameRow(game, restoreFocus = returnFocus == game.id, restored = { returnFocus = null }) {
+                                        returnFocus = game.id
+                                        selected = game.id
+                                    }
                                 }
                             }
                         }
@@ -126,9 +134,13 @@ private fun LibraryNavigation(page: String, navigate: (String) -> Unit) {
 }
 
 @Composable
-private fun GameRow(game: Card, open: () -> Unit) {
+private fun GameRow(game: Card, restoreFocus: Boolean, restored: () -> Unit, open: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }.rowFocus(focused)
+    val requester = remember(game.id) { FocusRequester() }
+    LaunchedEffect(restoreFocus) {
+        if (restoreFocus) { requester.requestFocus(); restored() }
+    }
+    Column(Modifier.fillMaxWidth().focusRequester(requester).onFocusChanged { focused = it.isFocused }.rowFocus(focused)
         .clickable(onClick = open).padding(12.dp)) {
         Text(game.title, style = MaterialTheme.typography.titleMedium)
         Text(listOfNotNull(if (game.installed) "Installed" else "Not installed", game.runner,

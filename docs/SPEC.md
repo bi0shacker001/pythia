@@ -359,6 +359,8 @@ the droidtop coordinator for this lane. Later sections follow them.
       destination named below the tabs. Navigation is not a row of filter chips.
       The game page edits notes through `save_notes` for this computer's record;
       failed saves preserve the draft, and Cancel makes no backend call.
+      Returning from a game page retains the library scroll position and requests
+      focus on that game's row while it remains in the filtered results.
       Library changes and game start/stop signals refresh the snapshot;
       reconnecting replaces the channel without retaining a dead client.
       CI's window smoke check exercises the library, not the diagnostics.

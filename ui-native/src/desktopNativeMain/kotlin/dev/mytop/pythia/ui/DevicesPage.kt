@@ -8,7 +8,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.droidtop.lib.ui.contract.Answer
-import dev.droidtop.shell.gamepad.ShellSwitch
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -126,13 +125,13 @@ internal fun DevicesPage(connection: PythiaConnection) {
                 val offers = device["offered"] as? JsonObject
                 for ((key, label) in listOf("library" to "Share library", "saves" to "Share saves", "launch" to "Allow starting games here")) {
                     val on = (if (key == "launch") device[key] else offers?.get(key))?.text() == "true"
-                    TextButton(enabled = !busy && id.isNotBlank(), onClick = { scope.launch {
+                    ToggleRow(label, on, enabled = !busy && id.isNotBlank(), change = { scope.launch {
                         busy = true
                         try {
                             result = connection.call { if (key == "launch") setHandheldLaunch(id, !on) else setDeviceOffer(id, key, !on) }
                             devices = connection.call { getHandhelds() }
                         } finally { busy = false }
-                    } }) { ShellSwitch(on); Spacer(Modifier.width(8.dp)); Text(label) }
+                    } })
                 }
                 TextButton(enabled = !busy && id.isNotBlank(), onClick = { forgetting = device }) { Text("Forget device") }
             }

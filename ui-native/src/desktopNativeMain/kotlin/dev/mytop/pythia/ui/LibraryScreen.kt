@@ -9,11 +9,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.droidtop.lib.ui.contract.Answer
 import dev.droidtop.lib.ui.format.ValueFormat
 import dev.droidtop.shell.gamepad.ShellLoading
-import dev.droidtop.shell.gamepad.ShellSwitch
 import dev.droidtop.shell.gamepad.rowFocus
 import dev.mytop.pythia.ui.backend.Card
 import dev.mytop.pythia.ui.backend.GetGameDetailResult
@@ -226,8 +228,8 @@ private fun FoldersPage(connection: PythiaConnection) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Library folders", style = MaterialTheme.typography.titleLarge) }
         item { OutlinedTextField(path, { path = it }, label = { Text("Folder path on this computer") }, modifier = Modifier.fillMaxWidth()) }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { roms = !roms }) { ShellSwitch(roms); Spacer(Modifier.width(8.dp)); Text("Console ROMs") }
+        item { ToggleRow("Console ROM folder", roms, enabled = !busy, change = { roms = !roms }) }
+        item {
             Button(enabled = path.isNotBlank() && !busy, onClick = {
                 scope.launch {
                     busy = true
@@ -237,7 +239,7 @@ private fun FoldersPage(connection: PythiaConnection) {
                     } finally { busy = false }
                 }
             }) { Text(if (busy) "Adding…" else "Add folder") }
-        } }
+        }
         item { result?.let { AnswerMessage(it, "Folder added. Games are being scanned.") }; AnswerMessage(answer) }
         val folders = (answer as? Answer.Ok)?.fields?.get("folders") as? JsonArray ?: JsonArray(emptyList())
         if (answer is Answer.Ok && folders.isEmpty()) item { Text("No folders added yet.") }
@@ -300,11 +302,11 @@ private fun ActivityPage(connection: PythiaConnection) {
 @Composable
 internal fun AnswerMessage(answer: Answer?, success: String? = null) {
     when (answer) {
-        null -> ShellLoading()
-        is Answer.Ok -> if (success != null) Text(success)
-        is Answer.Error -> Text(answer.message, color = MaterialTheme.colorScheme.error)
-        is Answer.Unavailable -> Text(answer.message)
-        is Answer.Pending -> { ShellLoading(); Text("Working…") }
+        null -> LoadingStatus("Loading…")
+        is Answer.Ok -> if (success != null) Text(success, Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        is Answer.Error -> Text(answer.message, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, color = MaterialTheme.colorScheme.error)
+        is Answer.Unavailable -> Text(answer.message, Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        is Answer.Pending -> LoadingStatus()
     }
 }
 

@@ -10,7 +10,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.droidtop.lib.ui.contract.Answer
-import dev.droidtop.shell.gamepad.ShellSwitch
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 
@@ -43,7 +42,7 @@ internal fun PluginsPage(connection: PythiaConnection) {
                 Text(row["display_name"]?.text().orEmpty(), style = MaterialTheme.typography.titleMedium)
                 val kinds = (row["categories"] as? JsonArray).orEmpty().map { categories[it.text()] ?: "Other" }
                 Text((kinds + listOfNotNull(row["version"]?.text(), row["origin"]?.text())).filter { it.isNotBlank() }.joinToString(" · "))
-                TextButton(enabled = busy == null, onClick = {
+                ToggleRow(label = "Use ${row["display_name"]?.text().orEmpty()}", on = enabled, enabled = busy == null, change = {
                     scope.launch {
                         busy = id
                         try {
@@ -51,11 +50,7 @@ internal fun PluginsPage(connection: PythiaConnection) {
                             answer = connection.call { getAllPlugins() }
                         } finally { busy = null }
                     }
-                }) {
-                    ShellSwitch(enabled)
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (busy == id) "Changing…" else if (enabled) "Enabled" else "Disabled")
-                }
+                })
             }
         }
     }

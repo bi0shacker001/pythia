@@ -376,6 +376,12 @@ the droidtop coordinator for this lane. Later sections follow them.
       their saved state back, and forgetting asks first. Save backups reads
       real copies, requests a backup and confirms before restoring a selected
       copy (the backend keeps the replaced saves first).
+      Interactive switch rows wrap the shared drawing with Foundation's
+      toggleable semantics (name, Switch role, current state, enabled state
+      and one action), with a 48dp minimum target. Changing answer text uses
+      polite live regions; loading exposes indeterminate progress. These are
+      source-level accessibility contracts, not a claim that the native
+      Compose fork's accessibility bridge has passed device validation.
     - **Not yet:** a macOS window, the remaining screens, packaging and
       making this window the packaged default. The existing front ends
       stay available until their tasks have working native replacements.

@@ -378,6 +378,14 @@ the droidtop coordinator for this lane. Later sections follow them.
       Devices uses the existing code and same-code pairing protocols, with an
       explicit human answer to a comparison; leaving the page withdraws the
       correct offer. The invitation code stays visible while status is polled.
+      Offer startup, polling and withdrawal are serialized across mode/page changes.
+      Cleanup is bound to the connection which started the offer, so reconnecting
+      cannot direct an old Stop at a new backend. Leaving during asynchronous
+      startup waits for that start to settle before withdrawing it. Transport
+      cancellation propagates to the screen; only the channel's own deadline
+      becomes a timeout answer. Pending calls are removed on every exit.
+      Core tests cover rapid replacement, reconnect during cleanup, leaving
+      during startup, cancelled queued owners and caller versus channel timeouts.
       Generated calls accept an optional transport timeout (60 seconds by
       default); confirmation allows 150 seconds because the backend waits up
       to two minutes for the other device. Sharing and launch switches read

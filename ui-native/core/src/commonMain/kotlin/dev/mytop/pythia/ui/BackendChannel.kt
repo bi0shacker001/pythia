@@ -2,9 +2,10 @@ package dev.mytop.pythia.ui
 
 import dev.droidtop.lib.ui.contract.Answer
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -15,7 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -37,9 +38,9 @@ sealed interface Opened {
  * One connection to Pythia's backend (pythia/ipc/server.py): length-prefixed JSON, `{id, method, args}` answered with
  * `{id, result}`, a pending answer settled later by `{id, settled, result}`, and `{event, args}` pushed. The
  * first message is `hello` with the install's key. Every call resolves to a contract [Answer]; a failure of the
- * channel is an [Answer.Error], never an exception (contract rule 1).
+ * channel is an [Answer.Error] (contract rule 1). Coroutine cancellation still propagates to the caller.
  */
-class BackendChannel private constructor(private val stream: Stream, private val scope: CoroutineScope) {
+class BackendChannel internal constructor(private val stream: Stream, private val scope: CoroutineScope) {
     private val lock = Mutex()
     private val writeLock = Mutex()
     private val waiting = HashMap<Long, CompletableDeferred<Answer>>()
@@ -66,11 +67,16 @@ class BackendChannel private constructor(private val stream: Stream, private val
                     if (n < 0) break
                     for (message in decoder.feed(buffer, n)) dispatch(message)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 reason = e.message ?: "The connection to Pythia broke."
+            } finally {
+                withContext(NonCancellable) {
+                    fail(reason)
+                    onClosed(reason)
+                }
             }
-            fail(reason)
-            onClosed(reason)
         }
     }
 
@@ -112,13 +118,14 @@ class BackendChannel private constructor(private val stream: Stream, private val
         try {
             val bytes = Framing.encode(frame)
             writeLock.withLock { withContext(blockingDispatcher) { stream.write(bytes) } }
-            return withTimeout(timeoutMs) { deferred.await() }
-        } catch (e: TimeoutCancellationException) {
-            lock.withLock { waiting.remove(id) }
-            return Answer.Error("Pythia did not answer $method in ${timeoutMs / 1000} seconds.", code = "timeout", slot = method)
+            return withTimeoutOrNull(timeoutMs) { deferred.await() }
+                ?: Answer.Error("Pythia did not answer $method in ${timeoutMs / 1000} seconds.", code = "timeout", slot = method)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            lock.withLock { waiting.remove(id) }
             return Answer.Error(e.message ?: "The call to Pythia failed.", code = "closed", slot = method)
+        } finally {
+            withContext(NonCancellable) { lock.withLock { waiting.remove(id) } }
         }
     }
 
@@ -130,7 +137,7 @@ class BackendChannel private constructor(private val stream: Stream, private val
     companion object {
         /**
          * Opens the channel and says hello with the key from Pythia's data folder. [onClosed] is told once, with the
-         * reason, when the connection ends. Never throws: what went wrong is [Opened.Down.reason].
+         * reason, when the connection ends. Connection failures are [Opened.Down.reason]; cancellation propagates.
          */
         suspend fun open(
             scope: CoroutineScope,
@@ -149,7 +156,12 @@ class BackendChannel private constructor(private val stream: Stream, private val
             }
             val channel = BackendChannel(stream, scope)
             channel.startReading(onClosed)
-            val hello = channel.call("hello", buildJsonObject { put("token", key) }, timeoutMs = 15_000)
+            val hello = try {
+                channel.call("hello", buildJsonObject { put("token", key) }, timeoutMs = 15_000)
+            } catch (e: CancellationException) {
+                channel.close()
+                throw e
+            }
             return if (hello is Answer.Ok) {
                 Opened.Up(channel, hello)
             } else {

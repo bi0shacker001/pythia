@@ -8,10 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.droidtop.lib.ui.contract.Answer
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
 internal fun Answer?.rows(name: String): List<JsonObject> =
@@ -36,21 +34,22 @@ internal fun DevicesPage(connection: PythiaConnection) {
     // Leaving the page or cancelling always withdraws the offer; a hidden screen must not keep offering to pair.
     LaunchedEffect(mode) {
         val activeMode = mode
-        if (activeMode.isNotEmpty()) try {
+        if (activeMode.isNotEmpty()) {
             invitation = null
-            status = connection.call { if (activeMode == "compare") startPairOffer() else showPairingCode() }
-            invitation = status
-            if (status is Answer.Ok) while (true) {
-                delay(1_000)
-                status = connection.call { if (activeMode == "compare") pairCompareStatus() else pairingStatus() }
-                val state = (status as? Answer.Ok)?.fields?.get("state")?.text()
-                if (state == "paired" || state == "failed" || status !is Answer.Ok) {
-                    devices = connection.call { getHandhelds() }
-                    break
+            val owned = connection.withPairingSession(activeMode == "compare") { initial ->
+                status = initial
+                invitation = status
+                if (status is Answer.Ok) while (true) {
+                    delay(1_000)
+                    status = call { if (activeMode == "compare") pairCompareStatus() else pairingStatus() }
+                    val state = (status as? Answer.Ok)?.fields?.get("state")?.text()
+                    if (state == "paired" || state == "failed" || status !is Answer.Ok) {
+                        devices = call { getHandhelds() }
+                        break
+                    }
                 }
             }
-        } finally {
-            withContext(NonCancellable) { connection.call { if (activeMode == "compare") stopPairOffer() else cancelPairing() } }
+            if (!owned) status = Answer.Unavailable("Pythia is not connected. Try pairing again after it reconnects.")
         }
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {

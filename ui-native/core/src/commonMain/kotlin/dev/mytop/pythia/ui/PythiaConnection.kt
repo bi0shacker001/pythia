@@ -31,6 +31,12 @@ sealed interface PythiaState {
 /** One line of the live event stream. */
 data class LoggedEvent(val number: Long, val name: String, val args: String)
 
+/** An action bound to the connection which owns it; reconnecting never redirects cleanup to another backend. */
+class PythiaSession internal constructor(private val backend: PythiaBackend, private val isCurrent: () -> Boolean) {
+    suspend fun call(action: suspend PythiaBackend.() -> Answer): Answer =
+        if (isCurrent()) backend.action() else Answer.Unavailable("The connection which owned this pairing offer has ended.")
+}
+
 /**
  * Keeps a connection to the running Pythia: connects, asks `hello` and `get_system_info`, logs every event, and when
  * Pythia is not there (or goes away) says why and tries again every few seconds. Nothing is invented while it is down.
@@ -51,6 +57,7 @@ class PythiaConnection(
     private val retry = Channel<Unit>(Channel.CONFLATED)
     private var counter = 0L
     private var backend: PythiaBackend? = null
+    private val pairing = PairingLifecycle { backend?.let { current -> PythiaSession(current) { backend === current } } }
     private val refresh = Channel<Unit>(Channel.CONFLATED)
     private val snapshotLock = Mutex()
 
@@ -59,6 +66,13 @@ class PythiaConnection(
         val current = backend ?: return Answer.Unavailable("Pythia is not connected. Try again when it reconnects.")
         return current.action()
     }
+
+    /** Own an offer through startup, polling and withdrawal, serializing rapid page/mode changes. */
+    suspend fun withPairingSession(compare: Boolean, body: suspend PythiaSession.(Answer) -> Unit): Boolean = pairing.run(
+        start = { session -> session.call { if (compare) startPairOffer() else showPairingCode() } },
+        stop = { session -> session.call { if (compare) stopPairOffer() else cancelPairing() }; Unit },
+        body = { session, initial -> session.body(initial) },
+    )
 
     suspend fun gameDetail(id: String) = backend?.getGameDetail(id)
         ?: TypedAnswer.Other(Answer.Unavailable("Pythia is not connected."))

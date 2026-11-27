@@ -45,3 +45,10 @@ loading/empty/unavailable/error states, retain failure feedback, prevent duplica
 mutations, and verify cancellation/reconnection does not retain stale state. The
 native screens use the shared library's palette, focus selection, switches and
 loading components; Pythia does not fork their implementation.
+
+Pairing offer ownership is serialized through withdrawal and bound to its
+original backend connection. Leaving during startup waits for the backend start
+to settle before cleanup. Core coroutine tests cover rapid mode replacement,
+reconnection during cleanup, cancelled queued starts and caller cancellation.
+These are source/CI contracts; expiry presentation and device pairing still need
+runtime review. Transport cancellation is not rendered as an ordinary failure.

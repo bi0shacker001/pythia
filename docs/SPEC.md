@@ -362,6 +362,11 @@ the droidtop coordinator for this lane. Later sections follow them.
       after the backend answers. `docs/native-ui-surfaces.md` records the remaining
       tasks; `utils/audit_native_ui.py` inventories source calls without claiming
       runtime usability. Live testing is paused at the owner's request.
+      The channel translates the legacy Look slot's `status: none/looking`
+      phases into `status: ok` with `state: none/looking`; those are successful
+      reads of an empty/in-progress Look, not malformed backend answers. The
+      old front ends still receive the slot unchanged, and other slots retain
+      the strict contract-status validation.
     - **Not yet:** a macOS window, the remaining screens, packaging and
       making this window the packaged default. The existing front ends
       stay available until their tasks have working native replacements.

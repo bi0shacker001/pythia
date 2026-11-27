@@ -50,6 +50,11 @@ def to_answer(slot: str, value: Any) -> dict[str, Any]:
         return ui_contract.ok()
     if isinstance(value, (str, int, float, bool, list)):
         return ui_contract.ok(value=value)
+    # The old Look page uses status for its UI phase, not the answer envelope.
+    # Preserve those phases as data without weakening validation for other slots.
+    if slot == "get_look" and isinstance(value, dict) and value.get("status") in ("none", "looking"):
+        fields = {key: item for key, item in value.items() if key != "status"}
+        return ui_contract.ok(slot=slot, state=value["status"], **fields)
     decoded = ui_contract.decode(value)
     if decoded.get("code") == "malformed":
         logger.warning("The slot %s answered with something that is not a contract answer.", slot)

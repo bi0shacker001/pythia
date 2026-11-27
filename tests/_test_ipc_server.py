@@ -8,11 +8,25 @@ from unittest import TestCase
 
 from pythia.ipc import framing, transport
 from pythia.ipc.client import Client
-from pythia.ipc.server import Server
+from pythia.ipc.server import Server, to_answer
 from tests.ipc_support import KEY, SCHEMA, FakeBackend, Place
 
 
 class ServerTest(TestCase):
+    def test_look_phases_are_data_and_not_invalid_answer_statuses(self):
+        self.assertEqual(
+            to_answer("get_look", {"status": "none"}), {"status": "ok", "slot": "get_look", "state": "none"}
+        )
+        self.assertEqual(
+            to_answer("get_look", {"status": "looking", "counts": {"folders": 2}, "job": "scan-1"}),
+            {"status": "ok", "slot": "get_look", "state": "looking", "counts": {"folders": 2}, "job": "scan-1"},
+        )
+        self.assertEqual(to_answer("other", {"status": "looking"})["code"], "malformed")
+        self.assertEqual(
+            to_answer("get_look", {"status": "error", "message": "No folder"}),
+            {"status": "error", "message": "No folder"},
+        )
+
     def setUp(self):
         self.place = Place()
         self.addCleanup(self.place.cleanup)

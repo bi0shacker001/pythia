@@ -9,18 +9,26 @@ on:
     paths:
       - "ui-native/**"
       - "schema/backend-ipc.json"
+      - "pythia/ipc/**"
+      - "pythia/ui/backend.py"
       - ".github/workflows/ui-native.yml"
       - ".gitmodules"
   pull_request:
     paths:
       - "ui-native/**"
       - "schema/backend-ipc.json"
+      - "pythia/ipc/**"
+      - "pythia/ui/backend.py"
       - ".github/workflows/ui-native.yml"
       - ".gitmodules"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   DEBIAN_FRONTEND: noninteractive

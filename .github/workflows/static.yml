@@ -1,6 +1,10 @@
 on: [push, pull_request]
 
 name: Static Analysis
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   native:
     name: Native module (native/)

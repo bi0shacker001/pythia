@@ -17,6 +17,7 @@ turns on the web UI's error console for this run (the config key
 
 import logging
 import sys
+from pathlib import Path
 
 from pythia import settings
 from pythia.database.games import rebuild_cache
@@ -33,13 +34,20 @@ def run(argv: list[str] | None = None) -> int:
         if i + 1 < len(argv):
             ui_hint = argv[i + 1]
     error_console = "--error-console" in argv
+    executable = None
+    if ui_hint == "native":
+        name = "pythia-ui.exe" if sys.platform == "win32" else "pythia-ui"
+        executable = Path(sys.executable).parent / "native-ui" / name
+        if not executable.is_file():
+            logger.error("The shared Pythia UI is missing from this installation.")
+            return 1
 
     # Settings > Advanced > Log level (Backend.set_log_level writes the same key).
     saved_level = {"debug": logging.DEBUG, "info": logging.INFO}.get(settings.read_setting("log_level").lower())
     if saved_level is not None:
         logger.setLevel(saved_level)
 
-    logger.info("Starting Pythia %s (Qt UI)", settings.VERSION)
+    logger.info("Starting Pythia %s", settings.VERSION)
     init_pythia()
     migrate()
     rebuild_cache()
@@ -53,6 +61,11 @@ def run(argv: list[str] | None = None) -> int:
     from pythia.droidtop import kdeconnect  # noqa: PLC0415
 
     kdeconnect.start_in_background()
+
+    if executable is not None:
+        from pythia.ui import native_host
+
+        return native_host.run(executable, error_console=error_console)
 
     from pythia.ui import mode
 

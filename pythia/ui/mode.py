@@ -4,11 +4,11 @@ in `pythia.cli`'s subcommands (scan/onboard/list/renpy-patch) ever imports this 
 or PySide6, so they keep working on a bare stdlib install. Only `python -m pythia`
 with no subcommand reaches here.
 
-Precedence: an explicit --ui hint > a saved choice of Big Picture (local.db, via
-identity.get_setting -- not synced) > the web UI.
+An explicit --ui hint takes precedence. A Windows preview with the bundled
+native front end uses that next. Other builds honor a saved Big Picture choice
+(local.db, via identity.get_setting) and otherwise open the web UI.
 
-The web UI (pythia/ui/webview/app.py) is what Pythia starts in (UI review
-2026-10-23, U1 and U3, mytop-project/tracker#538): it holds both the desktop and the
+The web UI (pythia/ui/webview/app.py) holds both the desktop and the
 handheld shell and picks between them itself, by the device and the person's
 "Start in" setting (pythia.start_shell). The QtWidgets "desktop" front end is
 still a placeholder and Big Picture is the older handheld UI; each starts only

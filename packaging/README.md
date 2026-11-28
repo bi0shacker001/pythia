@@ -17,6 +17,18 @@ has one job per system (macOS twice, one per chip), each building, installing an
 on every push to main and by hand on a `ci/` branch. No wheels are built; one can still be built from the
 repository by hand (`python -m build`).
 
+The `ci/native-preview` Windows installer bundles the shared Compose front end
+in the `native-ui` directory. Launch Pythia from Start as usual. The Python
+process starts the local backend and tray, then opens the bundled front end.
+Closing that window returns to the tray when one is available. Use **Open
+Pythia** in the tray to reopen it. To compare with the HTML UI, quit Pythia
+from the tray first, then launch `Pythia.exe --ui web`.
+
+Download `pythia-windows-installer` from the preview branch's **Build** workflow
+artifacts. Its Windows installer job packages the native front end built from
+the same commit. The preview uses the regular Pythia installation location and
+user data, so it replaces the installed Windows build when installed there.
+
 **Release lanes** (docs/SPEC.md, decision 13), as droidtop has them:
 
 - **Unstable**: every green build of main publishes itself as a pre-release tagged `v<version>-dev.<build>`

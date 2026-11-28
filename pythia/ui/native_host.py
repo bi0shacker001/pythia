@@ -1,6 +1,8 @@
 """Run the Python backend and the shared Compose frontend without Qt."""
 
+import os
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -9,6 +11,19 @@ from pythia.droidtop import commands
 from pythia.ipc import host
 from pythia.ui.backend import Backend
 from pythia.util.log import logger
+
+
+def _frontend_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    if getattr(sys, "frozen", False) and sys.platform.startswith("linux"):
+        # PyInstaller prepends its Python libraries for in-process extension
+        # loading. The separate Compose executable resolves its own libraries.
+        original = environment.pop("LD_LIBRARY_PATH_ORIG", None)
+        if original is None:
+            environment.pop("LD_LIBRARY_PATH", None)
+        else:
+            environment["LD_LIBRARY_PATH"] = original
+    return environment
 
 
 def run(executable: Path, *, error_console: bool = False) -> int:
@@ -25,7 +40,7 @@ def run(executable: Path, *, error_console: bool = False) -> int:
             if frontend is not None and frontend.poll() is None:
                 return 0
             try:
-                frontend = subprocess.Popen([str(executable)], cwd=executable.parent)
+                frontend = subprocess.Popen([str(executable)], cwd=executable.parent, env=_frontend_environment())
             except OSError:
                 logger.exception("Could not start the shared UI")
                 say("Could not start the shared UI.")

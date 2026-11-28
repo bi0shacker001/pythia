@@ -2,12 +2,7 @@
 
 import re
 from pathlib import Path
-from unittest import SkipTest, TestCase
-
-try:
-    import PySide6.QtCore  # noqa: F401 -- Backend still uses Qt platform services
-except ImportError as ex:  # the schema is read from Qt's meta-objects
-    raise SkipTest("PySide6 is not installed") from ex
+from unittest import TestCase
 
 from pythia.ipc import schema
 from pythia.ipc.declarations import Event, method
@@ -93,9 +88,9 @@ class BackendSchemaTest(TestCase):
             "pythia/ui/backend.py changed; run: python -m pythia.ipc.schema",
         )
 
-    def test_every_slot_of_the_backend_is_in_it(self):
+    def test_every_declared_backend_method_is_included(self):
         source = Path(backend_module.__file__).read_text("utf-8")
-        declared = len(re.findall(r"^    @Slot\(", source, flags=re.MULTILINE))
+        declared = len(re.findall(r"^    @method\(", source, flags=re.MULTILINE))
         self.assertEqual(len(self.generated["methods"]), declared)
 
     def test_every_method_can_be_called_on_a_backend(self):

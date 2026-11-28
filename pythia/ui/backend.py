@@ -29,13 +29,10 @@ import datetime
 import functools
 import json
 import logging
-import os
 import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-
-from PySide6.QtCore import QUrl
 
 from pythia import (
     datadir,
@@ -53,21 +50,13 @@ from pythia.database import games as games_db
 from pythia.identity import get_system_uuid
 from pythia.ipc import results as ipc_results
 from pythia.ipc.declarations import Event, method
+from pythia.util import desktop_open
 from pythia.util.log import logger
 
 _UI_LOG_LIMIT = 500
 _JOB_LIMIT = 100
 # Slot arguments that are secrets: never written to the log, shown as "***".
 _SECRET_ARG_SLOTS = {"set_account_credential": {2}}
-
-
-def _normalize_path(path_str: str) -> str:
-    """QML folder dialogs hand back file:// URLs, not plain paths -- accept either.
-    A leading ~ is the home folder, as in the dialogs' example paths
-    (pythia.path_check checks the same path)."""
-    if path_str.startswith("file:"):
-        return QUrl(path_str).toLocalFile()
-    return os.path.expanduser(path_str) if path_str.startswith("~") else path_str
 
 
 def _jsonable(obj):
@@ -508,7 +497,7 @@ class Backend:
     # ---- onboard a single path (interactive) -----------------------------------
     @method("string")
     def start_onboard(self, path_str: str):
-        path_str = _normalize_path(path_str)
+        path_str = desktop_open.local_path(path_str)
         job = self._job_start("onboard", f"Add {Path(path_str).name or path_str}", path_str)
         threading.Thread(target=self._onboard_worker, args=(path_str, job), daemon=True).start()
 
@@ -552,7 +541,7 @@ class Backend:
         """Scans a folder and records what it finds: the big-picture UI's
         scan (bigpicture/qml/HomeScreen.qml). The web UI looks first
         (start_look) and adds what the person keeps."""
-        path_str = _normalize_path(path_str)
+        path_str = desktop_open.local_path(path_str)
         job = self._job_start("scan", f"Scan {path_str}", "Finds every game folder inside", cancellable=True)
         threading.Thread(target=self._scan_worker, args=(path_str, job), daemon=True).start()
 
@@ -563,7 +552,7 @@ class Backend:
         """Looks through a folder for games without writing anything; its
         proposals arrive as lookChanged, with live counts while it walks. A
         Look started while another runs replaces it (pythia.look.LookSlot)."""
-        path_str = _normalize_path(path_str)
+        path_str = desktop_open.local_path(path_str)
         job = self._job_start(
             "scan", f"Look in {Path(path_str).name or path_str}", "Nothing is added until you Add", cancellable=True
         )
@@ -789,7 +778,7 @@ class Backend:
         if not manager["on"] and "downloads" in manager["pages"]:
             self._record("warn", "pythia", "Not watching: manager mode is off", "start_watch")
             return
-        watch_dir_str = _normalize_path(watch_dir_str)
+        watch_dir_str = desktop_open.local_path(watch_dir_str)
         self.stop_watch()
         self._watch_stop_event = threading.Event()
         job = self._job_start("watch", f"Watching {watch_dir_str}", f"Running {command_str}" if command_str else "")
@@ -1272,14 +1261,12 @@ class Backend:
     def open_account_login(self, plugin_id: str):
         """Opens a store's own sign-in page in the person's browser (GOG, Epic;
         mytop-project/tracker#630): they sign in there, then paste back what it shows."""
-        from PySide6.QtGui import QDesktopServices
-
         from pythia.plugins import library as library_plugins
 
         plugin = next((p for p in library_plugins.all_plugins() if p.id == plugin_id and p.browser_connect), None)
         if plugin is None:
             return {"status": "error", "message": f"{plugin_id} does not sign in through a browser."}
-        if not QDesktopServices.openUrl(QUrl(plugin.browser_login_url())):
+        if not desktop_open.open_web(plugin.browser_login_url()):
             return {"status": "error", "message": "The browser did not open.", "url": plugin.browser_login_url()}
         return {"status": "ok", "url": plugin.browser_login_url()}
 
@@ -1561,13 +1548,11 @@ class Backend:
     def play_game(self, game_id: str):
         """Starts the game: through Steam (its steam:// link), Pythia's runner, or
         a folder game's own program (natively, or through Wine)."""
-        from PySide6.QtGui import QDesktopServices
-
         from pythia import play
 
         result = play.play(game_id, self._entries_of(game_id))
         if result.get("status") == "ok" and result.get("url"):
-            if not QDesktopServices.openUrl(QUrl(result["url"])):
+            if not desktop_open.open_web(result["url"]):
                 store = {"steam": "Steam", "gog": "GOG Galaxy", "egs": "The Epic Games Launcher"}.get(
                     result.get("via") or "", "Its launcher"
                 )
@@ -1761,19 +1746,17 @@ class Backend:
         ``reason`` is empty when it will."""
         from pythia import path_check
 
-        return {"status": "ok", "reason": path_check.check(_normalize_path(path_str), want)}
+        return {"status": "ok", "reason": path_check.check(desktop_open.local_path(path_str), want)}
 
     @method("string", returns="answer")
     @_guarded
     def open_path(self, path: str):
         """Open a folder (or file) in the system's own file manager."""
-        from PySide6.QtGui import QDesktopServices
-
         if not path:
             return {"status": "error", "message": "No folder to open."}
         if not Path(path).exists():
             return {"status": "error", "message": f"{path} does not exist on this computer."}
-        if not QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
+        if not desktop_open.open_path(path):
             return {"status": "error", "message": f"The system could not open {path}."}
         return {"status": "ok"}
 
@@ -1781,11 +1764,9 @@ class Backend:
     @_guarded
     def open_url(self, url: str):
         """Help links: the browser opens http(s) only."""
-        from PySide6.QtGui import QDesktopServices
-
         if not url.startswith(("http://", "https://")):
             return {"status": "error", "message": "Only web links can be opened."}
-        if not QDesktopServices.openUrl(QUrl(url)):
+        if not desktop_open.open_web(url):
             return {"status": "error", "message": f"The system could not open {url}."}
         return {"status": "ok"}
 
@@ -1935,7 +1916,7 @@ class Backend:
     @_guarded
     def export_library_report(self, dest_dir: str):
         """Bulk > Export report: this computer's records as one JSON file."""
-        dest = Path(_normalize_path(dest_dir))
+        dest = Path(desktop_open.local_path(dest_dir))
         if not dest.is_dir():
             return {"status": "error", "message": f"{dest} is not a folder."}
         path = dest / f"pythia-library-{datetime.date.today().isoformat()}.json"
@@ -1950,7 +1931,7 @@ class Backend:
         and plugin facts. No credentials are included."""
         from pythia.util.log import LOG_FILENAME
 
-        dest = Path(_normalize_path(dest_dir))
+        dest = Path(desktop_open.local_path(dest_dir))
         if not dest.is_dir():
             return {"status": "error", "message": f"{dest} is not a folder."}
         stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -2586,7 +2567,7 @@ class Backend:
         from pythia.droidtop import store
 
         kind = "roms" if kind == "roms" else "games"
-        path_str = _normalize_path(path_str)
+        path_str = desktop_open.local_path(path_str)
         if not Path(path_str).is_dir():
             return {"status": "error", "message": f"{path_str} is not a folder on this computer"}
         folders = store.library_folders()

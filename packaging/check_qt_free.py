@@ -11,10 +11,50 @@ from multiprocessing.connection import Client
 from pathlib import Path
 
 
+def check_window(executable: Path) -> None:
+    from pythia.ipc import host
+    from pythia.ui.backend import Backend
+    from pythia.ui.native_host import _frontend_environment
+
+    backend = Backend()
+    server = host.start(backend)
+    assert server is not None, "frozen backend could not start"
+    stop = threading.Event()
+
+    def emit() -> None:
+        while not stop.wait(0.2):
+            backend.gamesChanged.emit()
+
+    worker = threading.Thread(target=emit, daemon=True)
+    worker.start()
+    try:
+        completed = subprocess.run(
+            [str(executable), "--smoke"],
+            cwd=executable.parent,
+            env=_frontend_environment(),
+            capture_output=True,
+            text=True,
+            timeout=150,
+            check=False,
+        )
+        print(completed.stdout, flush=True)
+        print(completed.stderr, file=sys.stderr, flush=True)
+        assert completed.returncode == 0, completed.returncode
+        assert "ui: rendered library games=" in completed.stdout
+        assert "smoke: ok" in completed.stdout
+    finally:
+        stop.set()
+        worker.join(timeout=5)
+        server.stop()
+
+
 def main() -> None:
     root = Path(sys.executable).parent
     executable = root / "native-ui" / ("pythia-ui.exe" if sys.platform == "win32" else "pythia-ui")
     assert executable.is_file(), executable
+    if sys.argv[1:] == ["--window-only"]:
+        check_window(executable)
+        return
     assert importlib.util.find_spec("PySide6") is None, "Qt is importable in the frozen host"
     forbidden = [
         path
@@ -25,42 +65,18 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="pythia-native-bundle-") as data:
         os.environ["PYTHIA_DATA_DIR"] = data
         os.environ["PYTHIA_DATADIR_OVERRIDE"] = str(Path(data) / "datadir")
-        from pythia.ipc import host
-        from pythia.ui.backend import Backend
-        from pythia.ui.native_host import _frontend_environment
-
-        backend = Backend()
-        server = host.start(backend)
-        assert server is not None, "frozen backend could not start"
-        stop = threading.Event()
-
-        def emit() -> None:
-            while not stop.wait(0.2):
-                backend.gamesChanged.emit()
-
-        worker = threading.Thread(target=emit, daemon=True)
-        worker.start()
-        try:
-            completed = subprocess.run(
-                [str(executable), "--smoke"],
-                cwd=executable.parent,
-                env=_frontend_environment(),
-                capture_output=True,
-                text=True,
-                timeout=150,
-                check=False,
-            )
-            print(completed.stdout, flush=True)
-            print(completed.stderr, file=sys.stderr, flush=True)
-            assert completed.returncode == 0, completed.returncode
-            assert "ui: rendered library games=" in completed.stdout
-            assert "smoke: ok" in completed.stdout
-        finally:
-            stop.set()
-            worker.join(timeout=5)
-            server.stop()
+        # Run the standalone backend in a separate process. Windows can retain
+        # a pipe while its accept thread is blocked, even after Server.stop().
+        subprocess.run(
+            [sys.executable, "--pythia-script", __file__, "--window-only"],
+            check=True,
+            timeout=180,
+        )
+        os.environ["PYTHIA_DATA_DIR"] = str(Path(data) / "launcher")
+        os.environ["PYTHIA_DATADIR_OVERRIDE"] = str(Path(data) / "launcher" / "datadir")
         # Exercise the installed entry point too, not only a host assembled by this check.
         from pythia import instance
+        from pythia.ui.native_host import _frontend_environment
 
         with tempfile.TemporaryFile(mode="w+") as log:
             application = subprocess.Popen([sys.executable, "--ui", "native"], stdout=log, stderr=log)
@@ -68,6 +84,9 @@ def main() -> None:
                 deadline = time.monotonic() + 120
                 while time.monotonic() < deadline:
                     assert application.poll() is None, "installed native launcher exited during startup"
+                    if instance.request("ping") != 0:
+                        time.sleep(0.5)
+                        continue
                     probe = subprocess.run(
                         [str(executable), "--probe"],
                         cwd=executable.parent,

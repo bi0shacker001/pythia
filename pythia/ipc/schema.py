@@ -1,6 +1,6 @@
 """The method and event list of the backend channel, read from the Backend itself so it cannot drift.
 
-`describe(Backend)` walks the Qt meta-object (every `@Slot` and `Signal` the HTML UI can reach) and the Python
+`describe(Backend)` reads explicit IPC method and event declarations and the Python
 signatures (for the argument names and which have defaults). schema/backend-ipc.json is its checked-in output; the
 Kotlin client is generated from that file, and tests/_test_ipc_schema.py fails when the Backend changes without it.
 
@@ -10,7 +10,7 @@ Kotlin client is generated from that file, and tests/_test_ipc_schema.py fails w
 What the file says about results: every call is answered with a backend-contract answer (`status` ok,
 unavailable, error or pending; pythia/ipc/ui_contract.py). A slot that returns a bare string is wrapped as
 `{"status": "ok", "value": "..."}` and one that returns nothing as `{"status": "ok"}`. The fields beside `status`
-are the slot's own. The Slot declarations do not carry them (`returns` says only `answer`, `string` or `none`),
+are the slot's own. The method declarations do not carry them (`returns` says only `answer`, `string` or `none`),
 so a slot that builds them declares their type with `@results.returns(Type)` (pythia/ipc/results.py): the method
 then has `result`, the name of a type, and the file's `types` describe every such type field by field, read off
 the TypedDicts with `typing`'s own introspection. `envelope` is what every answer has, whatever its status. An event
@@ -25,23 +25,11 @@ from pathlib import Path
 from typing import Any
 
 from pythia.ipc import CONTRACT_PIN, PROTOCOL, results, ui_contract
+from pythia.ipc.declarations import Event
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "backend-ipc.json"
 
-# What a Qt type is on the wire (JSON): QVariant is any JSON value.
-_TYPES = {"QString": "string", "bool": "boolean", "int": "integer", "double": "number", "QVariant": "any"}
-_RETURNS = {"QVariant": "answer", "QString": "string", "void": "none"}
 _ANNOTATIONS = {str: "string", bool: "boolean", int: "integer", float: "number"}
-
-
-def _text(value: Any) -> str:
-    return bytes(value).decode() if not isinstance(value, str) else value
-
-
-def _wire_type(qt_type: str) -> str:
-    if qt_type not in _TYPES:
-        raise ValueError(f"The Qt type {qt_type!r} has no wire type; add it to pythia.ipc.schema._TYPES.")
-    return _TYPES[qt_type]
 
 
 def _answers_later(function: Any) -> bool:
@@ -53,20 +41,20 @@ def _answers_later(function: Any) -> bool:
     return False
 
 
-def _params(cls: type, name: str, qt_types: list[str]) -> list[dict[str, Any]]:
+def _params(cls: type, name: str, wire_types: tuple[str, ...]) -> list[dict[str, Any]]:
     function = getattr(cls, name)
     python = [p for p in inspect.signature(function).parameters.values() if p.name != "self"]
     params: list[dict[str, Any]] = []
-    for index, qt_type in enumerate(qt_types):
+    for index, wire_type in enumerate(wire_types):
         entry: dict[str, Any] = {"name": python[index].name if index < len(python) else f"arg{index}"}
-        entry["type"] = _wire_type(qt_type)
+        entry["type"] = wire_type
         if index < len(python) and python[index].default is not inspect.Parameter.empty:
             entry["optional"] = True
         params.append(entry)
-    # A Python default the @Slot declaration does not list (start_watch's plugin_id): callable, so optional.
-    for extra in python[len(qt_types) :]:
+    # A Python default the IPC declaration does not list (start_watch's plugin_id): callable, so optional.
+    for extra in python[len(wire_types) :]:
         if extra.default is inspect.Parameter.empty:
-            raise ValueError(f"{name}: the parameter {extra.name} is not in its @Slot declaration.")
+            raise ValueError(f"{name}: the parameter {extra.name} is not in its IPC declaration.")
         params.append({"name": extra.name, "type": _ANNOTATIONS.get(extra.annotation, "any"), "optional": True})
     return params
 
@@ -81,31 +69,26 @@ def _envelope() -> dict[str, Any]:
 
 
 def describe(cls: type) -> dict[str, Any]:
-    """The schema of a QObject class: its slots as methods, its signals as events, each sorted by name."""
-    from PySide6.QtCore import QMetaMethod  # noqa: PLC0415
-
-    meta = cls.staticMetaObject  # type: ignore[attr-defined]
+    """Read a backend's wire declarations, sorting its methods and events by name."""
     methods: list[dict[str, Any]] = []
     events: list[dict[str, Any]] = []
     roots: list[type] = []
-    for index in range(meta.methodOffset(), meta.methodCount()):
-        method = meta.method(index)
-        name = _text(method.name())
-        qt_types = [_text(t) for t in method.parameterTypes()]
-        if method.methodType() == QMetaMethod.MethodType.Slot:
-            returns = _text(method.typeName())
-            if returns not in _RETURNS:
-                raise ValueError(f"{name}: the result type {returns!r} is not one of {sorted(_RETURNS)}.")
-            entry: dict[str, Any] = {"name": name, "params": _params(cls, name, qt_types), "returns": _RETURNS[returns]}
-            if _answers_later(getattr(cls, name)):
-                entry["async"] = True
-            result_type = results.result_type_of(getattr(cls, name))
-            if result_type is not None:
-                entry["result"] = result_type.__name__
-                roots.append(result_type)
-            methods.append(entry)
-        elif method.methodType() == QMetaMethod.MethodType.Signal:
-            event: dict[str, Any] = {"name": name, "params": [{"type": _wire_type(t)} for t in qt_types]}
+    for name, function in vars(cls).items():
+        declaration = getattr(function, "__ipc_method__", None)
+        if declaration is None:
+            continue
+        params, returns = declaration
+        entry: dict[str, Any] = {"name": name, "params": _params(cls, name, params), "returns": returns}
+        if _answers_later(function):
+            entry["async"] = True
+        result_type = results.result_type_of(function)
+        if result_type is not None:
+            entry["result"] = result_type.__name__
+            roots.append(result_type)
+        methods.append(entry)
+    for name, declaration in vars(cls).items():
+        if isinstance(declaration, Event):
+            event: dict[str, Any] = {"name": name, "params": [{"type": t} for t in declaration.params]}
             if name in results.EVENT_PAYLOADS:
                 event["payload"] = results.EVENT_PAYLOADS[name].__name__
                 roots.append(results.EVENT_PAYLOADS[name])

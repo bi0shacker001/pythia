@@ -5,11 +5,12 @@ from pathlib import Path
 from unittest import SkipTest, TestCase
 
 try:
-    from PySide6.QtCore import QObject, Signal, Slot
+    import PySide6.QtCore  # noqa: F401 -- Backend still uses Qt platform services
 except ImportError as ex:  # the schema is read from Qt's meta-objects
     raise SkipTest("PySide6 is not installed") from ex
 
 from pythia.ipc import schema
+from pythia.ipc.declarations import Event, method
 from pythia.ipc.server import BUILTINS
 from pythia.ui import backend as backend_module
 
@@ -21,28 +22,28 @@ def _later(fn):
 
 class DescribeTest(TestCase):
     def test_slots_and_signals_become_methods_and_events(self):
-        class Toy(QObject):
-            changed = Signal()
-            said = Signal(str, "QVariant")
+        class Toy:
+            changed = Event()
+            said = Event("string", "any")
 
-            @Slot(str, bool, result="QVariant")
+            @method("string", "boolean", returns="answer")
             def both(self, name: str, flag: bool):
                 return {}
 
-            @Slot(result=str)
+            @method(returns="string")
             def text(self) -> str:
                 return ""
 
-            @Slot(str)
+            @method("string")
             def plain(self, path: str):
                 pass
 
-            @Slot(int, float, "QVariant", result="QVariant")
+            @method("integer", "number", "any", returns="answer")
             @_later
             def numbers(self, a, b, c):
                 return {}
 
-            @Slot(str)
+            @method("string")
             def with_extra_default(self, a: str, extra: str = ""):
                 pass
 
@@ -98,8 +99,8 @@ class BackendSchemaTest(TestCase):
         self.assertEqual(len(self.generated["methods"]), declared)
 
     def test_every_method_can_be_called_on_a_backend(self):
-        for method in self.generated["methods"]:
-            self.assertTrue(callable(getattr(backend_module.Backend, method["name"])), method["name"])
+        for entry in self.generated["methods"]:
+            self.assertTrue(callable(getattr(backend_module.Backend, entry["name"])), entry["name"])
 
     def test_no_slot_is_named_like_a_built_in_method(self):
         self.assertFalse({m["name"] for m in self.generated["methods"]} & set(BUILTINS))

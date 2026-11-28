@@ -35,7 +35,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
+from PySide6.QtCore import QUrl
 
 from pythia import (
     datadir,
@@ -52,6 +52,7 @@ from pythia import (
 from pythia.database import games as games_db
 from pythia.identity import get_system_uuid
 from pythia.ipc import results as ipc_results
+from pythia.ipc.declarations import Event, method
 from pythia.util.log import logger
 
 _UI_LOG_LIMIT = 500
@@ -163,40 +164,40 @@ class _UiLogHandler(logging.Handler):
         self._backend._keep(entry)
 
 
-class Backend(QObject):
-    logLine = Signal(str)
+class Backend:
+    logLine = Event("string")
     # Dict and list payloads are declared as QVariant, not a bare Python object:
     # QWebChannel (the web UI) can only serialize QVariant values, and QML reads
     # both the same way.
-    decisionNeeded = Signal("QVariant")  # a preview-shaped dict: {"path", "name", "candidates", ...}
-    onboardComplete = Signal("QVariant")
-    scanComplete = Signal("QVariant")
-    gamesChanged = Signal()
-    downloadDetected = Signal(str)  # a new file's path, from a watched Downloads folder
-    mergeCandidatesReady = Signal("QVariant")
-    mergeComplete = Signal("QVariant")
-    accountSyncComplete = Signal(str, "QVariant")
-    updateCheckComplete = Signal("QVariant")
-    platformEnableComplete = Signal("QVariant")
-    jobsChanged = Signal("QVariant")  # the whole job list, newest first
-    intakeChanged = Signal("QVariant")  # {"detected": [...], "decisions": [...]}
-    uiLog = Signal("QVariant")  # one {"ts", "level", "source", "slot", "message"} entry
-    handheldsChanged = Signal()  # a handheld was paired, forgotten or changed
-    libraryFoldersChanged = Signal()  # a library folder was added or removed
-    modesChanged = Signal()  # manager mode turned on or off (pythia.modes)
-    pairingFinished = Signal("QVariant")  # {"status": "ok", "paired": name} or an error result
-    asyncResult = Signal("QVariant")  # a slow slot's answer: {"request": id, ...its result}
-    lookChanged = Signal("QVariant")  # a Look's live counts, its proposals, or that it was added (pythia.look)
-    padAction = Signal(str)  # a controller press, named (pythia.pad), only while Pythia has the focus
-    kdeconnectEvent = Signal("QVariant")  # one KDE Connect event (pythia.droidtop.kdeconnect), on the GUI thread
+    decisionNeeded = Event("any")  # a preview-shaped dict: {"path", "name", "candidates", ...}
+    onboardComplete = Event("any")
+    scanComplete = Event("any")
+    gamesChanged = Event()
+    downloadDetected = Event("string")  # a new file's path, from a watched Downloads folder
+    mergeCandidatesReady = Event("any")
+    mergeComplete = Event("any")
+    accountSyncComplete = Event("string", "any")
+    updateCheckComplete = Event("any")
+    platformEnableComplete = Event("any")
+    jobsChanged = Event("any")  # the whole job list, newest first
+    intakeChanged = Event("any")  # {"detected": [...], "decisions": [...]}
+    uiLog = Event("any")  # one {"ts", "level", "source", "slot", "message"} entry
+    handheldsChanged = Event()  # a handheld was paired, forgotten or changed
+    libraryFoldersChanged = Event()  # a library folder was added or removed
+    modesChanged = Event()  # manager mode turned on or off (pythia.modes)
+    pairingFinished = Event("any")  # {"status": "ok", "paired": name} or an error result
+    asyncResult = Event("any")  # a slow slot's answer: {"request": id, ...its result}
+    lookChanged = Event("any")  # a Look's live counts, its proposals, or that it was added (pythia.look)
+    padAction = Event("string")  # a controller press, named (pythia.pad), only while Pythia has the focus
+    kdeconnectEvent = Event("any")  # one KDE Connect event (pythia.droidtop.kdeconnect), on the GUI thread
     # For a front end that reads the library as cards (pythia.gaming_api); gamesChanged above is unchanged.
-    gamesVersionChanged = Signal(str)  # the library was read again; the version get_games answers with now
-    gameStarted = Signal("QVariant")  # a game Pythia started is running: {"game_id", "via", "started_at", "pid"}
-    gameStopped = Signal("QVariant")  # it ended: the same, and "exit_code" (None when not known)
+    gamesVersionChanged = Event("string")  # the library was read again; the version get_games answers with now
+    gameStarted = Event("any")  # a game Pythia started is running: {"game_id", "via", "started_at", "pid"}
+    gameStopped = Event("any")  # it ended: the same, and "exit_code" (None when not known)
     # The person's collections changed here or on another computer: {"kind": "created" | "renamed" |
     # "deleted" | "members" | "synced", "id" (the collection; absent for "synced"), "version"}
     # (pythia.game_collections).
-    collectionsChanged = Signal("QVariant")
+    collectionsChanged = Event("any")
 
     def __init__(self, error_console: bool = False):
         super().__init__()
@@ -500,12 +501,12 @@ class Backend(QObject):
 
         droidtop_library.export_soon()
 
-    @Property("QVariantList", notify=gamesChanged)
+    @property
     def games(self):
         return self._games
 
     # ---- onboard a single path (interactive) -----------------------------------
-    @Slot(str)
+    @method("string")
     def start_onboard(self, path_str: str):
         path_str = _normalize_path(path_str)
         job = self._job_start("onboard", f"Add {Path(path_str).name or path_str}", path_str)
@@ -546,7 +547,7 @@ class Backend(QObject):
         self.onboardComplete.emit(_jsonable(result))
 
     # ---- scan a library (automatic; ambiguous results reviewed afterward) -----
-    @Slot(str)
+    @method("string")
     def start_scan(self, path_str: str):
         """Scans a folder and records what it finds: the big-picture UI's
         scan (bigpicture/qml/HomeScreen.qml). The web UI looks first
@@ -556,7 +557,7 @@ class Backend(QObject):
         threading.Thread(target=self._scan_worker, args=(path_str, job), daemon=True).start()
 
     # ---- Look, Review, Add (pythia.look; UX review A16) ------------------------
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def start_look(self, path_str: str):
         """Looks through a folder for games without writing anything; its
@@ -597,13 +598,13 @@ class Backend(QObject):
         self._job_finish(job, result["summary"] + ". Review them, then Add.")
         self.lookChanged.emit(_jsonable(result))
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_look(self):
         """The current Look: looking (with counts), its proposals, or none."""
         return _jsonable(self._look.get() or {"status": "none"})
 
-    @Slot("QVariant", result="QVariant")
+    @method("any", returns="answer")
     @_guarded
     def add_from_look(self, rows):
         """Adds the games Review kept, as reviewed (pythia.look.add)."""
@@ -632,12 +633,12 @@ class Backend(QObject):
         )
         self.lookChanged.emit(_jsonable({**result, "status": "added", "summary": text}))
 
-    @Slot()
+    @method()
     def discard_look(self):
         self._look.clear()
         self.lookChanged.emit({"status": "none"})
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def start_store_scan(self):
         """Records the games the stores on this computer have installed (Steam,
@@ -734,7 +735,7 @@ class Backend(QObject):
         self._awaiting_live_decision = False
         return self._decision_result
 
-    @Slot(str, "QVariant")
+    @method("string", "any")
     def resolveDecision(self, path_str: str, decision):
         # Assumes at most one operation (a single onboard, or a scan's post-review
         # queue) is being driven through the UI at a time -- reasonable for a single
@@ -769,13 +770,13 @@ class Backend(QObject):
         self.onboardComplete.emit(_jsonable(result))
 
     # ---- download watching -----------------------------------------------------
-    @Slot(str, str, str)
+    @method("string", "string", "string")
     def start_watch_for(self, plugin_id: str, command_str: str, watch_dir_str: str):
         """start_watch for one downloader plugin: only that plugin's card and
         row say Watching (mytop-project/tracker#538 retest D4)."""
         self.start_watch(command_str, watch_dir_str, plugin_id)
 
-    @Slot(str, str)
+    @method("string", "string")
     def start_watch(self, command_str: str, watch_dir_str: str, plugin_id: str = ""):
         """Launch `command_str` (a single executable path -- no argument splitting
         yet) and watch `watch_dir_str` for new files, emitting downloadDetected for
@@ -825,19 +826,19 @@ class Backend(QObject):
         self._watcher = None
         self._emit_intake()
 
-    @Slot()
+    @method()
     def stop_watch(self):
         if self._watch_stop_event is not None:
             self._watch_stop_event.set()
 
-    @Slot(str)
+    @method("string")
     def forget_detected(self, path: str):
         with self._lock:
             self._detected = [d for d in self._detected if d["path"] != path]
         self._emit_intake()
 
     # ---- reconciliation ---------------------------------------------------------
-    @Slot()
+    @method()
     def refresh_merge_candidates(self):
         threading.Thread(target=self._merge_candidates_worker, daemon=True).start()
 
@@ -850,7 +851,7 @@ class Backend(QObject):
             return
         self.mergeCandidatesReady.emit(_jsonable(candidates))
 
-    @Slot(str, str)
+    @method("string", "string")
     def merge_games(self, surviving_id: str, retired_id: str):
         job = self._job_start("merge", "Fold two records into one", f"{retired_id} into {surviving_id}")
         threading.Thread(target=self._merge_worker, args=(surviving_id, retired_id, job), daemon=True).start()
@@ -862,7 +863,7 @@ class Backend(QObject):
         self._job_finish(job, "Folded" if ok else result.get("message", ""), ok)
         self.mergeComplete.emit(_jsonable(result))
 
-    @Slot(str, "QVariant")
+    @method("string", "any")
     def merge_cluster(self, surviving_id: str, retired_ids):
         """Folds every record of a Reconciliation cluster into one, one after
         another in one job (UX review A16: "Combine as versions")."""
@@ -892,7 +893,7 @@ class Backend(QObject):
         self.mergeComplete.emit({"status": "ok" if not failed else "error", "message": "; ".join(failed)})
 
     # ---- notes ------------------------------------------------------------------
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def save_notes(self, game_id: str, text: str):
@@ -911,7 +912,7 @@ class Backend(QObject):
             "message": "This computer has no record of that game, so notes cannot be saved here.",
         }
 
-    @Slot(str, bool, result="QVariant")
+    @method("string", "boolean", returns="answer")
     @_guarded
     def set_favourite(self, game_id: str, on: bool):
         """Marks a game the person's favourite, or not. It is the person's, so it
@@ -923,7 +924,7 @@ class Backend(QObject):
         self.refresh_games()
         return result
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     def set_current_version(self, game_id: str, version: str):
         """ "Set as current" (UX review A13): the version this computer treats as
@@ -947,7 +948,7 @@ class Backend(QObject):
         return {"status": "error", "message": "This computer has no record of that game."}
 
     # ---- a folder's kind and language (UX review A14) --------------------------
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_folder_vocabulary(self):
         """The kinds a folder can be and the languages Pythia names, for the
@@ -971,7 +972,7 @@ class Backend(QObject):
             return {"status": "error", "message": "That folder is not one of this game's folders here."}
         return {"status": "error", "message": "This computer has no record of that game."}
 
-    @Slot(str, str, str, str, result="QVariant")
+    @method("string", "string", "string", "string", returns="answer")
     @_guarded
     def set_variant_details(self, game_id: str, path: str, kind: str, language: str):
         """A folder's kind (game, mod, patch or translation) and language, as the
@@ -990,7 +991,7 @@ class Backend(QObject):
 
         return self._edit_variant(game_id, path, change)
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     def link_variant_to_version(self, game_id: str, path: str, base_version: str):
         """Links a translation, patch or mod folder to the version it applies to
@@ -1031,7 +1032,7 @@ class Backend(QObject):
             return result
         return {"status": "error", "message": "This computer has no record of that game."}
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     def set_store_link(self, game_id: str, path: str, text: str):
         """Records a pasted store link or id on the game (``path`` empty) or on
@@ -1051,7 +1052,7 @@ class Backend(QObject):
 
         return self._edit_links(game_id, path, change)
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     def remove_store_link(self, game_id: str, path: str, platform: str):
         from pythia import store_links
@@ -1064,7 +1065,7 @@ class Backend(QObject):
 
         return self._edit_links(game_id, path, change)
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def describe_store_links(self):
         """Store names and which stores have an update check, for the page."""
@@ -1072,7 +1073,7 @@ class Backend(QObject):
 
         return {"status": "ok", "stores": store_links.STORE_NAMES, "update_checks": sorted(store_links.UPDATE_CHECKS)}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def read_clipboard(self):
         """The clipboard's text, for "Paste link"."""
@@ -1091,7 +1092,7 @@ class Backend(QObject):
     # had none at all until this point; desktop already talks to these modules
     # directly since it's plain QtWidgets/Python, but QML's only bridge to Python is
     # this `backend` context object, so these slots exist specifically for it).
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_system_info(self):
@@ -1113,7 +1114,7 @@ class Backend(QObject):
             }
         )
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_downloader_plugins(self):
         from pythia.plugins import DownloaderPlugin
@@ -1135,7 +1136,7 @@ class Backend(QObject):
             ]
         )
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_all_plugins(self):
         """Every registered plugin, every category -- real inventory (2026-08-03),
@@ -1176,7 +1177,7 @@ class Backend(QObject):
             ]
         )
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_capabilities(self, category: str):
@@ -1226,7 +1227,7 @@ class Backend(QObject):
             out.append(item)
         return _jsonable({"status": "ok", "category": category, "plugins": out})
 
-    @Slot(str, bool, result="QVariant")
+    @method("string", "boolean", returns="answer")
     @_guarded
     def set_plugin_enabled(self, plugin_id: str, enabled: bool):
         from pythia.plugins.registry import all_plugins, get_enabled_plugin_ids, set_enabled_plugin_ids
@@ -1240,7 +1241,7 @@ class Backend(QObject):
         set_enabled_plugin_ids(list(current))
         return {"status": "ok"}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_account_plugins(self):
         """Every LibraryPlugin declaring credential_fields (PluginMeta's generic
@@ -1266,7 +1267,7 @@ class Backend(QObject):
             ]
         )
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def open_account_login(self, plugin_id: str):
         """Opens a store's own sign-in page in the person's browser (GOG, Epic;
@@ -1282,7 +1283,7 @@ class Backend(QObject):
             return {"status": "error", "message": "The browser did not open.", "url": plugin.browser_login_url()}
         return {"status": "ok", "url": plugin.browser_login_url()}
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def finish_account_connect(self, plugin_id: str, pasted: str):
@@ -1300,7 +1301,7 @@ class Backend(QObject):
             }
         return {"status": "ok"}
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     def set_account_credential(self, plugin_id: str, key: str, value: str):
         from pythia.plugins import library as library_plugins
@@ -1311,7 +1312,7 @@ class Backend(QObject):
                 return {"status": "ok"}
         return {"status": "error", "message": f"No game source named '{plugin_id}'."}
 
-    @Slot(str)
+    @method("string")
     def sync_account(self, plugin_id: str):
         job = self._job_start(f"sync:{plugin_id}", f"Sync {plugin_id}", "Owned games", cancellable=True)
         threading.Thread(target=self._sync_account_worker, args=(plugin_id, job), daemon=True).start()
@@ -1341,7 +1342,7 @@ class Backend(QObject):
         )
         self.accountSyncComplete.emit(plugin_id, _jsonable(result))
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def sync_all_accounts(self):
         """Library > Refresh all sources: every connected game source, one job each.
@@ -1355,7 +1356,7 @@ class Backend(QObject):
                 started.append(p.id)
         return {"status": "ok", "started": started}
 
-    @Slot(str)
+    @method("string")
     def import_f95(self, db_path: str):
         """One-shot F95Checker db.sqlite3 import (see plugins/library/f95.py) --
         previously CLI-only (`pythia f95-import`), never reachable from the
@@ -1386,7 +1387,7 @@ class Backend(QObject):
         )
         self.accountSyncComplete.emit(f95_plugin.id, _jsonable(result))
 
-    @Slot()
+    @method()
     def check_updates(self):
         """Library > Check all updates: the real F95zone pass (plugins/library/
         f95_updates.run_update_check) over every game with an F95zone id. Other
@@ -1417,24 +1418,24 @@ class Backend(QObject):
         self._job_finish(job, summary, ok=not errors, cancelled=bool(result.get("cancelled")))
         self.updateCheckComplete.emit(_jsonable({"status": "ok", **result}))
 
-    @Slot(result=str)
+    @method(returns="string")
     def get_system_uuid(self) -> str:
         return get_system_uuid()
 
-    @Slot(result=str)
+    @method(returns="string")
     def get_ui_mode(self) -> str:
         from pythia.identity import get_setting
 
         return get_setting("ui_mode") or ""
 
-    @Slot(str)
+    @method("string")
     def set_ui_mode(self, mode: str):
         from pythia.identity import set_setting
 
         set_setting("ui_mode", mode)
 
     # ---- Start in (pythia.start_shell; UX review A8) --------------------------
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_start(self):
         """``start_in`` (auto, desktop, handheld or last), ``shell`` (the one to
@@ -1450,7 +1451,7 @@ class Backend(QObject):
             "device": device,
         }
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def set_start_in(self, value: str):
         from pythia import start_shell
@@ -1458,7 +1459,7 @@ class Backend(QObject):
         start_shell.set_start_in(value)
         return {"status": "ok", "start_in": value}
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def remember_shell(self, shell: str):
         """A confirmed, deliberate switch of shell (A4), what "Remember last" starts in."""
@@ -1475,7 +1476,7 @@ class Backend(QObject):
             game = next((g for g in self._games if g.get("game_id") == game_id), None)
         return list(game["entries"]) if game else None
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_play_state(self, game_id: str):
@@ -1485,7 +1486,7 @@ class Backend(QObject):
 
         return play.state(game_id, self._entries_of(game_id))
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_wine_setup(self):
         """Windows games on Linux (mytop-project/tracker#629): whether Pythia sets up
@@ -1503,7 +1504,7 @@ class Backend(QObject):
             "using": folder_launch.wine(),
         }
 
-    @Slot()
+    @method()
     def set_up_windows_games(self):
         """Fetches and unpacks the latest Wine build into Pythia's runners
         folder, as a job on the Activity page."""
@@ -1533,7 +1534,7 @@ class Backend(QObject):
         self._job_finish(job, f"Windows games are set up: {done['name']}")
         self.refresh_games()
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_launch_choices(self, game_id: str):
@@ -1543,7 +1544,7 @@ class Backend(QObject):
 
         return play.launch_choices(game_id)
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     def set_launch(self, game_id: str, exe: str, via: str):
         """Keeps what Play starts for a folder game; an empty exe goes back to
@@ -1555,7 +1556,7 @@ class Backend(QObject):
             self.refresh_games()
         return result
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def play_game(self, game_id: str):
         """Starts the game: through Steam (its steam:// link), Pythia's runner, or
@@ -1578,7 +1579,7 @@ class Backend(QObject):
         return result
 
     # ---- launcher hand-off --------------------------------------------------
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def find_manager_for_game(self, game_id: str):
@@ -1609,7 +1610,7 @@ class Backend(QObject):
             }
         )
 
-    @Slot(str, str)
+    @method("string", "string")
     def open_in_manager(self, game_id: str, manager_id: str):
         """Real, side-effecting hand-off -- launches an external application (the
         manager plugin's own tool, e.g. Steam). Never the game's own executable;
@@ -1650,7 +1651,7 @@ class Backend(QObject):
                         return entry, group, variant
         return None, None, None
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_platform_status(self, game_id: str):
@@ -1683,7 +1684,7 @@ class Backend(QObject):
             }
         )
 
-    @Slot(str, str)
+    @method("string", "string")
     def enable_platform(self, game_id: str, platform: str):
         """Run the engine plugin's own remediation for one platform (Ren'Py's
         renpy_patch, for instance). Writes into the game folder; the page confirms first."""
@@ -1721,20 +1722,20 @@ class Backend(QObject):
     # ---- the web UI's own needs (2026-10-14, pythia/ui/desktop/web) -------------
     # Small, real operations the browser page cannot do itself: native pickers,
     # opening a folder, renaming or forgetting a record, rebuilding the index.
-    @Slot(str, result=str)
+    @method("string", returns="string")
     def pick_folder(self, title: str) -> str:
         from PySide6.QtWidgets import QFileDialog
 
         return QFileDialog.getExistingDirectory(None, title or "Choose a folder") or ""
 
-    @Slot(str, result=str)
+    @method("string", returns="string")
     def pick_file(self, title: str) -> str:
         from PySide6.QtWidgets import QFileDialog
 
         path, _filter = QFileDialog.getOpenFileName(None, title or "Choose a file")
         return path or ""
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def start_pad(self):
         """Starts reading game controllers (pythia.pad), once; each press then
@@ -1752,7 +1753,7 @@ class Backend(QObject):
             "pads": self._pad.pads(),
         }
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     def check_path(self, path_str: str, want: str):
         """Whether a dialog's path will do before anything starts
@@ -1762,7 +1763,7 @@ class Backend(QObject):
 
         return {"status": "ok", "reason": path_check.check(_normalize_path(path_str), want)}
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def open_path(self, path: str):
         """Open a folder (or file) in the system's own file manager."""
@@ -1776,7 +1777,7 @@ class Backend(QObject):
             return {"status": "error", "message": f"The system could not open {path}."}
         return {"status": "ok"}
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def open_url(self, url: str):
         """Help links: the browser opens http(s) only."""
@@ -1788,7 +1789,7 @@ class Backend(QObject):
             return {"status": "error", "message": f"The system could not open {url}."}
         return {"status": "ok"}
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def rename_game(self, game_id: str, name: str):
@@ -1810,7 +1811,7 @@ class Backend(QObject):
                 return {"status": "ok"}
         return {"status": "error", "message": "This computer has no record of that game, so it cannot be renamed here."}
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def forget_game(self, game_id: str):
@@ -1819,7 +1820,7 @@ class Backend(QObject):
         self.refresh_games()
         return {"status": "ok"}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_off_the_main_thread
     def rebuild_index(self):
@@ -1827,7 +1828,7 @@ class Backend(QObject):
         self.refresh_games()
         return {"status": "ok"}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_app_info(self):
         import platform
@@ -1850,7 +1851,7 @@ class Backend(QObject):
             "docs_url": "https://github.com/mytop-project/pythia#readme",
         }
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_ui_config(self):
         """What the page needs to know at start: whether the error console is on
@@ -1863,7 +1864,7 @@ class Backend(QObject):
             "log_level": logging.getLevelName(logger.level).lower(),
         }
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def set_log_level(self, level: str):
         from pythia import settings
@@ -1878,20 +1879,20 @@ class Backend(QObject):
         return {"status": "ok"}
 
     # ---- the UI log, jobs and intake: what the pages read on load ---------------
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_ui_log(self):
         with self._lock:
             return {"status": "ok", "entries": list(self._ui_log)}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def clear_ui_log(self):
         with self._lock:
             self._ui_log.clear()
         return {"status": "ok"}
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     def report_web_error(self, level: str, message: str, context: str):
         """The page's own errors (window.onerror, unhandled rejections, console.error)
@@ -1900,13 +1901,13 @@ class Backend(QObject):
         self._record(level, "web", f"{message}" + (f" ({context})" if context else ""), None)
         return {"status": "ok"}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_jobs(self):
         with self._lock:
             return _jsonable({"status": "ok", "jobs": list(self._jobs)})
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def clear_finished_jobs(self):
         with self._lock:
@@ -1914,7 +1915,7 @@ class Backend(QObject):
         self.jobsChanged.emit(_jsonable(self._jobs))
         return {"status": "ok"}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_intake(self):
         """Downloads & intake: files the watcher saw and scan results waiting for a
@@ -1930,7 +1931,7 @@ class Backend(QObject):
                 }
             )
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def export_library_report(self, dest_dir: str):
         """Bulk > Export report: this computer's records as one JSON file."""
@@ -1941,7 +1942,7 @@ class Backend(QObject):
         path.write_text(json.dumps(self._games, indent=2), encoding="utf-8")
         return {"status": "ok", "path": str(path), "games": len(self._games)}
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def export_diagnostics(self, dest_dir: str):
@@ -1968,7 +1969,7 @@ class Backend(QObject):
             copied.write_bytes(Path(LOG_FILENAME).read_bytes())
         return {"status": "ok", "report": str(report), "log": str(copied) if copied else None}
 
-    @Slot()
+    @method()
     def quit_app(self):
         from PySide6.QtWidgets import QApplication
 
@@ -1987,7 +1988,7 @@ class Backend(QObject):
             title="Pythia's droidtop module is not built",
         )
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_agent_status(self):
@@ -2012,7 +2013,7 @@ class Backend(QObject):
             }
         )
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_off_the_main_thread
     def turn_agent_back_on(self):
@@ -2031,7 +2032,7 @@ class Backend(QObject):
         self._record("info", "pythia", f"droidtop-agent turned back on ({kept})")
         return {"status": "ok", **done}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def serve_from_pythia_again(self):
         """Sync with droidtop on, which is the person's consent (docs/SPEC.md
@@ -2047,7 +2048,7 @@ class Backend(QObject):
         self.modesChanged.emit()
         return {"status": "ok"}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_handhelds(self):
         from pythia import droidtop
@@ -2058,7 +2059,7 @@ class Backend(QObject):
 
         return _jsonable({"status": "ok", "devices": store.devices()})
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_handheld_games(self):
@@ -2072,7 +2073,7 @@ class Backend(QObject):
 
         return _jsonable({"status": "ok", "handhelds": store.games_by_device(store.library(), store.devices())})
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def pair_with_code(self, code: str):
         """Pairs with a handheld showing `code`, on a job of its own (it waits
@@ -2098,7 +2099,7 @@ class Backend(QObject):
         self.pairingFinished.emit(result)
         self.handheldsChanged.emit()
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_pairing_operation
     def show_pairing_code(self):
@@ -2107,7 +2108,7 @@ class Backend(QObject):
         it is going."""
         return self._pairing_dispatch("show_pairing_code")
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def pairing_status(self):
         from pythia import droidtop
@@ -2121,14 +2122,14 @@ class Backend(QObject):
             self.handheldsChanged.emit()
         return _jsonable({"status": "ok", **status})
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_pairing_operation
     def cancel_pairing(self):
         return self._pairing_dispatch("cancel_pairing")
 
     # ---- one code on both screens (docs/SPEC.md 7.1, 7.2) ------------------------
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_pairing_operation
     def start_pair_offer(self):
@@ -2136,7 +2137,7 @@ class Backend(QObject):
         the pairing sheet is open; pair_compare_status follows it."""
         return self._pairing_dispatch("start_pair_offer")
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def pair_compare_status(self):
         from pythia import droidtop
@@ -2150,7 +2151,7 @@ class Backend(QObject):
             self.handheldsChanged.emit()
         return _jsonable({"status": "ok", **status})
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_off_the_main_thread
     def find_computers(self):
@@ -2164,7 +2165,7 @@ class Backend(QObject):
 
         return _jsonable({"status": "ok", "computers": pair.find()})
 
-    @Slot("QVariant", result="QVariant")
+    @method("any", returns="answer")
     @_guarded
     @_off_the_main_thread
     def pick_computer(self, computer):
@@ -2180,7 +2181,7 @@ class Backend(QObject):
         except AgentError as exc:
             return {"status": "error", "message": str(exc)}
 
-    @Slot(bool, result="QVariant")
+    @method("boolean", returns="answer")
     @_guarded
     @_off_the_main_thread
     def confirm_pairing(self, same: bool):
@@ -2199,7 +2200,7 @@ class Backend(QObject):
         self.handheldsChanged.emit()
         return {"status": "ok", "paired": name}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_pairing_operation
     def stop_pair_offer(self):
@@ -2247,7 +2248,7 @@ class Backend(QObject):
 
         threading.Thread(target=release, name="pairing-disconnect", daemon=True).start()
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def pairing_network_explained(self):
         """Whether Pythia has said why pairing needs the network (SPEC 7.5)."""
@@ -2255,7 +2256,7 @@ class Backend(QObject):
 
         return {"status": "ok", "explained": settings.read_bool_setting("pairing_network_explained", False)}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def mark_pairing_network_explained(self):
         from pythia import settings
@@ -2263,7 +2264,7 @@ class Backend(QObject):
         settings.write_setting("pairing_network_explained", True)
         return {"status": "ok"}
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def device_syncs(self, device_id: str):
         """What syncs with a paired device (UX review AG6), from the sync model."""
@@ -2280,7 +2281,7 @@ class Backend(QObject):
             {"status": "ok", "name": device.get("name"), "rows": syncs.what_syncs(device, store.settings())}
         )
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def forget_handheld(self, device_id: str):
         from pythia import droidtop
@@ -2293,7 +2294,7 @@ class Backend(QObject):
         self.handheldsChanged.emit()
         return {"status": "ok"}
 
-    @Slot(str, bool, result="QVariant")
+    @method("string", "boolean", returns="answer")
     @_guarded
     def set_handheld_launch(self, device_id: str, allowed: bool):
         """Whether a handheld may start games here (to stream them with Steam Link)."""
@@ -2307,7 +2308,7 @@ class Backend(QObject):
         self.handheldsChanged.emit()
         return {"status": "ok"}
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def device_offered(self, device_id: str):
@@ -2321,7 +2322,7 @@ class Backend(QObject):
 
         return _jsonable({"status": "ok", **remote.offered(device_id)})
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     def accept_offered_game(self, device_id: str, key: str, title: str):
         """Copies a game a paired device offers into this computer's first
@@ -2370,7 +2371,7 @@ class Backend(QObject):
             done.set()
             progress.unlink(missing_ok=True)
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def play_on_device(self, device_id: str, key: str, title: str):
@@ -2384,7 +2385,7 @@ class Backend(QObject):
         started, said = remote.play_said(remote.play_on(device_id, key, title))
         return {"status": "ok" if started else "error", "message": said}
 
-    @Slot(str, str, bool, result="QVariant")
+    @method("string", "string", "boolean", returns="answer")
     @_guarded
     def set_device_offer(self, device_id: str, what: str, on: bool):
         """What this computer offers a paired device: ``library`` or ``saves``
@@ -2405,7 +2406,7 @@ class Backend(QObject):
     # Each page still calls its slot through the normal path; the slot answers
     # "unavailable" with the reason and logs the attempt. When the feature lands,
     # only the slot body changes.
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_save_backups(self):
         """The copies of saves the droidtop agent keeps on this computer when a
@@ -2446,7 +2447,7 @@ class Backend(QObject):
                 )
         return rows
 
-    @Slot(str, str, str, result="QVariant")
+    @method("string", "string", "string", returns="answer")
     @_guarded
     def restore_save_copy(self, key: str, path: str, title: str):
         """Puts a kept copy of saves back where the game keeps them; the agent
@@ -2464,7 +2465,7 @@ class Backend(QObject):
 
         return self._answer_later("restore_save_copy", work)
 
-    @Slot(str, bool, result="QVariant")
+    @method("string", "boolean", returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_game_saves(self, game_id: str, fetch: bool):
@@ -2487,7 +2488,7 @@ class Backend(QObject):
         key, title = library.game_key(entry), entry.get("canonical_name") or ""
         return {"status": "ok", "key": key, **saves.lookup(key, title, fetch=fetch)}
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def back_up_saves_now(self):
         """Keeps a copy of the saves of every game this computer has in the
@@ -2519,7 +2520,7 @@ class Backend(QObject):
 
         return self._answer_later("back_up_saves_now", work)
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @_off_the_main_thread
     def get_launcher_entries(self):
@@ -2536,7 +2537,7 @@ class Backend(QObject):
         name = store.identity().get("name") or ""
         return {"status": "ok", "system": name, "entries": store_installs.entries()}
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def record_launcher_entry(self, folder: str, key: str):
@@ -2547,13 +2548,13 @@ class Backend(QObject):
         self.refresh_games()
         return _jsonable(result)
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_tools(self):
         return self._unavailable("get_tools", "Downloadable tools are not managed on this platform yet.")
 
     # ---- library folders (scanned on their own; owner, 2026-11-21: "games aren't being auto-added") ----------
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_library_folders(self):
         """The library folders, one list with the droidtop agent's (pythia.droidtop.store.library_folders): each with
@@ -2573,7 +2574,7 @@ class Backend(QObject):
         ]
         return _jsonable({"status": "ok", "folders": rows, "scan_minutes": store.scan_minutes()})
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     def add_library_folder(self, path_str: str, kind: str):
         """Adds a games or ROMs folder to the library folders. A games folder is scanned at once: what it holds is
@@ -2597,7 +2598,7 @@ class Backend(QObject):
             self.start_scan(path_str)
         return {"status": "ok"}
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def remove_library_folder(self, path_str: str):
         """Stops tracking a library folder. Nothing in it is touched, and the games already added stay."""
@@ -2650,14 +2651,14 @@ class Backend(QObject):
         finally:
             self._library_scan_running.release()
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_plugin_repositories(self):
         return self._unavailable(
             "get_plugin_repositories", "Plugin repositories are planned; plugins are installed by hand today."
         )
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_scan_settings(self):
         return self._unavailable(
@@ -2665,7 +2666,7 @@ class Backend(QObject):
             "Scan behaviour cannot be changed yet; a scan links exact matches and asks about the rest.",
         )
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     def set_engine_kind(self, game_id: str, kind: str):
         return self._unavailable(
@@ -2673,30 +2674,30 @@ class Backend(QObject):
             "Correcting an engine by hand is not built yet; rescan after enabling the right engine plugin.",
         )
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     def apply_update(self, game_id: str, version: str):
         return self._unavailable("apply_update", "Pythia records updates but does not download or apply them yet.")
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def reset_identity(self):
         return self._unavailable("reset_identity", "Resetting this computer's identity is not built yet.")
 
-    @Slot(bool, result="QVariant")
+    @method("boolean", returns="answer")
     @_guarded
     def set_resident_watcher(self, enabled: bool):
         return self._unavailable(
             "set_resident_watcher", "A resident watcher is not built yet; use Watch a folder on the Downloads page."
         )
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def set_sync_folder(self, path: str):
         return self._unavailable("set_sync_folder", "The library folder is set by PYTHIA_DATADIR_OVERRIDE for now.")
 
     # ---- modes (pythia.modes): agent mode forces manager mode ----------------
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_modes(self):
         """Manager mode (``on``, ``locked`` while Pythia is the agent, the
@@ -2711,7 +2712,7 @@ class Backend(QObject):
             "service": modes.service_mode(),
         }
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     def set_service_mode(self, action: str):
@@ -2730,7 +2731,7 @@ class Backend(QObject):
         self.modesChanged.emit()
         return {"status": "ok", "message": done, "service": modes.service_mode()}
 
-    @Slot(bool, result="QVariant")
+    @method("boolean", returns="answer")
     @_guarded
     def set_manager_mode(self, on: bool):
         """Turns manager mode on or off; refused, with the reason, while Pythia
@@ -2746,7 +2747,7 @@ class Backend(QObject):
         self.modesChanged.emit()
         return {"status": "ok", "manager": manager}
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     def set_option(self, key: str, value: str):
         """Switches on the Settings pages whose feature has no backend yet. Each key
@@ -2763,27 +2764,27 @@ class Backend(QObject):
             return {"status": "error", "message": f"Unknown option '{key}'."}
         return self._unavailable(f"set_option:{key}", messages[key])
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     def move_app_data(self, path: str):
         return self._unavailable(
             "move_app_data", "Moving the application data is not built yet; set PYTHIA_DATA_DIR before starting Pythia."
         )
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_transfer_settings(self):
         return self._unavailable(
             "get_transfer_settings", "Game transfer between computers is planned; no transfer protocol is chosen yet."
         )
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     def get_storage_roles(self):
         return self._unavailable("get_storage_roles", "Storage roles arrive with save backups and game transfer.")
 
     # ---- the library as a gaming front end reads it (pythia.gaming_api; mytop-project/tracker#920) -----------------
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.GetGamesResult)
     def get_games(self, since_version: str = ""):
@@ -2800,7 +2801,7 @@ class Backend(QObject):
             return ui_contract.ok("get_games", version=version, unchanged=True, games=[])
         return _jsonable(ui_contract.ok("get_games", version=version, unchanged=False, games=cards))
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.GetGameSystemsResult)
     def get_game_systems(self):
@@ -2821,7 +2822,7 @@ class Backend(QObject):
         with self._lock:
             return next((g for g in self._games if g.get("game_id") == game_id), None)
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.GetGameDetailResult)
     def get_game_detail(self, game_id: str):
@@ -2836,7 +2837,7 @@ class Backend(QObject):
             return ui_contract.error(f"No game {game_id} in the library", slot="get_game_detail", code="no-such-game")
         return _jsonable(ui_contract.ok("get_game_detail", **gaming_api.detail(game, get_system_uuid())))
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     @_off_the_main_thread
     @ipc_results.returns(ipc_results.GetGameArtResult)
@@ -2851,7 +2852,7 @@ class Backend(QObject):
             return ui_contract.error(f"No game {game_id} in the library", slot="get_game_art", code="no-such-game")
         return gaming_api.art(game.get("entries") or [], role)
 
-    @Slot(str, str, int, int, result="QVariant")
+    @method("string", "string", "integer", "integer", returns="answer")
     @_guarded
     @_off_the_main_thread
     @ipc_results.returns(ipc_results.GetGameArtDataResult)
@@ -2867,7 +2868,7 @@ class Backend(QObject):
             return ui_contract.error(f"No game {game_id} in the library", slot="get_game_art_data", code="no-such-game")
         return gaming_api.art_bytes(game.get("entries") or [], role, offset, length)
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @_off_the_main_thread
     @ipc_results.returns(ipc_results.GetGameArtListResult)
@@ -2883,7 +2884,7 @@ class Backend(QObject):
             return ui_contract.error(f"No game {game_id} in the library", slot="get_game_art_list", code="no-such-game")
         return _jsonable(ui_contract.ok("get_game_art_list", **gaming_api.art_list(game.get("entries") or [])))
 
-    @Slot("QVariant", result="QVariant")
+    @method("any", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.QueryGamesResult)
     def query_games(self, query):
@@ -2918,7 +2919,7 @@ class Backend(QObject):
         self._collections_version = version
         self.collectionsChanged.emit({"kind": kind, "id": collection_id, "version": version})
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.GetCollectionsResult)
     def get_collections(self):
@@ -2943,14 +2944,14 @@ class Backend(QObject):
         extra = {"changed": result[1]} if isinstance(result, tuple) else {}
         return ui_contract.ok(slot, collection=collection if isinstance(collection, dict) else None, **extra, **fields)
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.CollectionResult)
     def create_collection(self, name: str):
         """Makes an empty collection called ``name`` (no other has that name, ignoring case); answers it."""
         return self._collection_call("create_collection", lambda: game_collections.create(name), "created")
 
-    @Slot(str, str, result="QVariant")
+    @method("string", "string", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.CollectionResult)
     def rename_collection(self, collection_id: str, name: str):
@@ -2959,7 +2960,7 @@ class Backend(QObject):
             "rename_collection", lambda: game_collections.rename(collection_id, name), "renamed", collection_id
         )
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.DeleteCollectionResult)
     def delete_collection(self, collection_id: str):
@@ -2971,7 +2972,7 @@ class Backend(QObject):
 
         return self._collection_call("delete_collection", change, "deleted", collection_id, deleted=True)
 
-    @Slot(str, "QVariant", result="QVariant")
+    @method("string", "any", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.CollectionMembersResult)
     def add_to_collection(self, collection_id: str, game_ids):
@@ -2986,7 +2987,7 @@ class Backend(QObject):
             unknown=unknown,
         )
 
-    @Slot(str, "QVariant", result="QVariant")
+    @method("string", "any", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.CollectionMembersResult)
     def remove_from_collection(self, collection_id: str, game_ids):
@@ -3009,7 +3010,7 @@ class Backend(QObject):
     def _on_running_game(self, kind: str, info: dict):
         (self.gameStarted if kind == "started" else self.gameStopped).emit(_jsonable(info))
 
-    @Slot(result="QVariant")
+    @method(returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.GetRunningGamesResult)
     def get_running_games(self):
@@ -3026,7 +3027,7 @@ class Backend(QObject):
             scope="Games Pythia started, games Steam says it is running, and games found running by their folder",
         )
 
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.QuitGameResult)
     def quit_game(self, game_id: str):
@@ -3041,7 +3042,7 @@ class Backend(QObject):
         return ui_contract.ok("quit_game", game_id=game_id, asked=True)
 
     # ---- jobs ------------------------------------------------------------------------------------------------------
-    @Slot(str, result="QVariant")
+    @method("string", returns="answer")
     @_guarded
     @ipc_results.returns(ipc_results.CancelJobResult)
     def cancel_job(self, job_id: str):

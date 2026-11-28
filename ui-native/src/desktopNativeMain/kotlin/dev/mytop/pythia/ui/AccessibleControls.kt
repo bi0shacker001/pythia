@@ -7,12 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.droidtop.shell.gamepad.ShellLoading
 import dev.droidtop.shell.gamepad.ShellSwitch
@@ -31,10 +28,7 @@ internal fun ToggleRow(label: String, on: Boolean, enabled: Boolean = true, chan
 
 @Composable
 internal fun LoadingStatus(label: String = "Working…") {
-    Row(Modifier.semantics {
-        progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
-        stateDescription = label
-    }, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         ShellLoading()
         Text(label, Modifier.semantics { liveRegion = LiveRegionMode.Polite })
     }

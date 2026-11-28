@@ -23,7 +23,7 @@ default or deleting the current front ends.
 | Plugins | `IntegrationsPages.kt` | Capability pages, repositories, installed tooling, input/mode integrations |
 | Devices and pairing | `DevicesPage.kt` | Source review of expiry/reconnect and comparison races; remote library, launch and sync |
 | Saves and backups | `DevicesPage.kt` | Per-game save locations, backup outcomes and complete history review |
-| Settings and modes | Not yet wired | Manager/agent/service modes, startup, library/data location, UI and log options |
+| Settings and modes | `SettingsPage.kt` | Agent takeover/sync controls, startup, library/data location and remaining UI options |
 | Error console | Diagnostics place | Semantic event/log presentation, bounded text, copy/export diagnostics |
 | Tray and single instance | Existing Python owner | Native window show/hide/close lifecycle, flags still reaching the running process |
 | Updater and packaging | Existing Python packages | Bundle native executable, preserve update lanes and auto-start; macOS window support |
@@ -33,6 +33,13 @@ The native window now gives Library, Activity and Devices primary tabs. Folders,
 Accounts, Plugins, Save backups and Diagnostics live in More, with the current
 secondary page named below the tabs. This separates frequent tasks from setup
 instead of presenting eight equally prominent filter chips as navigation.
+
+Settings provides manager mode, Windows service mode and Normal/Debug log detail.
+It keeps backend lock/unavailable reasons visible, refreshes state after writes,
+and prevents duplicate writes. Service actions retain the existing desktop consent
+and confirmation flow; no helper action runs before confirmation. Missing consent
+or incomplete backend state leaves controls disabled. This is source wiring;
+elevated helper prompts and native keyboard/pad operation remain unverified.
 
 Game notes have a separate editor for this computer's record. Cancel discards the
 draft; a failed save retains it with the backend's reason. The dialog closes and

@@ -2,6 +2,8 @@ package dev.mytop.pythia.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -99,7 +101,7 @@ internal fun SettingsPage(connection: PythiaConnection) {
                 "enable" -> consent
                 "disable" -> "Windows asks for administrator approval. The helper stays installed but does nothing until you turn it on again."
                 else -> "Windows asks for administrator approval. Service mode stays off."
-            }) },
+            }, Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) },
             confirmButton = { TextButton(enabled = !busy && (action != "enable" || consent.isNotBlank()), onClick = {
                 confirmation = null
                 change { connection.call { setServiceMode(action, timeoutMs = 150_000) } }

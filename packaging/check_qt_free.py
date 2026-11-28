@@ -7,6 +7,7 @@ import sys
 import tempfile
 import threading
 import time
+from multiprocessing.connection import Client
 from pathlib import Path
 
 
@@ -82,7 +83,15 @@ def main() -> None:
                     time.sleep(0.5)
                 else:
                     raise AssertionError("installed native launcher did not serve authenticated IPC")
-                assert instance.request("quit") is not None, "installed host did not accept quit"
+                key = instance.key_path()
+                assert key.is_file(), "installed launcher did not create its command-channel key"
+                assert application.poll() is None, "installed native launcher exited before quit"
+                # Keep connection and authentication exceptions visible in CI. The ordinary
+                # CLI treats both as "no running instance" and attempts to start one.
+                with Client(instance.address(), authkey=bytes.fromhex(key.read_text("ascii").strip())) as channel:
+                    channel.send({"op": "quit", "args": {}})
+                    assert channel.poll(15), "installed command channel did not reply to quit"
+                    assert channel.recv() == {"done": 0}, "installed host rejected quit"
                 assert application.wait(timeout=15) == 0, "installed native launcher failed"
             finally:
                 if application.poll() is None:

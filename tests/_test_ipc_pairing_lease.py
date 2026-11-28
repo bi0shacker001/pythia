@@ -15,7 +15,7 @@ class IpcPairingLeaseTest(TestCase):
         owners, stopped = [], []
         released = threading.Event()
 
-        def call(name, owner, alive):
+        def call(name, args, owner, alive):
             owners.append(owner)
             return offers.begin(owner, "compare", lambda: {"status": "ok"}, lambda: stopped.append(owner), alive)
 

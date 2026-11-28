@@ -1463,7 +1463,8 @@
     {
       "name": "pair_compare_status",
       "params": [],
-      "returns": "answer"
+      "returns": "answer",
+      "async": true
     },
     {
       "name": "pair_with_code",
@@ -1483,7 +1484,8 @@
     {
       "name": "pairing_status",
       "params": [],
-      "returns": "answer"
+      "returns": "answer",
+      "async": true
     },
     {
       "name": "pick_computer",

@@ -58,6 +58,18 @@ def pick(computer: dict) -> dict:
     return submodule("pair").pick(computer["id"], computer["name"], computer.get("program", ""), computer["address"])
 
 
+def prepare_pick(computer: dict):
+    """Freeze a cancellable pick operation; its finish() performs the remote exchange."""
+    return submodule("pair").prepare_pick(
+        computer["id"], computer["name"], computer.get("program", ""), computer["address"]
+    )
+
+
+def prepare_confirm(expected_code: str):
+    """Freeze only the comparison whose code the owning UI actually observed."""
+    return submodule("pair").prepare_confirm(expected_code)
+
+
 def compare_status() -> dict:
     """``state``: ``idle``, ``offering`` (``seconds`` waited), ``comparing``
     (``code``, ``name``), ``finishing``, ``paired`` (``paired``: the name) or

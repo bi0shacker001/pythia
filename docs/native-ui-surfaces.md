@@ -64,6 +64,16 @@ old cleanup from stopping a newer Qt or other-client offer. Python tests cover
 real-transport disconnect and ownership races; this is not a device-test result.
 Reservations are captured before scheduling workers, so a timed-out old Stop
 cannot cancel a newer same-connection listener and a stopped queued start cannot
-open a late listener. Comparison pick/confirm ownership and in-flight native
-confirmation cancellation still require review of the shared native binding;
-the listener lease does not establish that those separate operations are scoped.
+open a late listener. A disconnected pending replacement releases its reservation,
+so it cannot indefinitely block the still-active owner; an accepted replacement
+permanently retires older queued starts.
+
+Comparison picks and confirmations use native prepared operations. Preparation
+checks the owning generation under the shared lock; the remote exchange runs
+outside it so Stop and disconnect can cancel its native handle. Confirmation
+requires the exact code observed by that owner and the native binding checks it
+again before taking the comparison. A completed local trust commit remains a
+successful result if it wins the cancellation race. While a pick is reserved but
+has not begun, status reports finishing; its subsequent native network phase can
+report idle until the comparison arrives. These source contracts still require
+the coherent shared-family pins and full native CI before landing.

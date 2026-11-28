@@ -384,6 +384,14 @@ the droidtop coordinator for this lane. Later sections follow them.
       Stop onto a replacement connection. Listener mutations run off Qt's thread.
       Listener generations are reserved before worker scheduling; Stop cancels
       pending startup and cannot withdraw a newer generation on the same channel.
+      Comparison picks and confirmations also belong to that connection and
+      generation. The backend freezes a cancellable native operation while
+      holding its ownership lock, then releases the lock before remote I/O.
+      Confirmation checks the exact comparison code that the owner observed.
+      Stop or disconnect can cancel an operation awaiting the other device;
+      a local trust commit which wins that race still reports success.
+      Abandoned queued replacements release their reservations without poisoning
+      an active owner; accepted replacements permanently retire older starts.
       The invitation code stays visible while status is polled.
       Offer startup, polling and withdrawal are serialized across mode/page changes.
       Cleanup is bound to the connection which started the offer, so reconnecting

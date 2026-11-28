@@ -2109,17 +2109,9 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @_pairing_operation
     def pairing_status(self):
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("pairing_status")
-        from pythia.droidtop import pair
-
-        status = pair.status()
-        if status.get("state") == "paired":
-            self.handheldsChanged.emit()
-        return _jsonable({"status": "ok", **status})
+        return self._pairing_dispatch("pairing_status")
 
     @Slot(result="QVariant")
     @_guarded
@@ -2138,66 +2130,32 @@ class Backend(QObject):
 
     @Slot(result="QVariant")
     @_guarded
+    @_pairing_operation
     def pair_compare_status(self):
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("pair_compare_status")
-        from pythia.droidtop import pair
-
-        status = pair.compare_status()
-        if status.get("state") == "paired":
-            self.handheldsChanged.emit()
-        return _jsonable({"status": "ok", **status})
+        return self._pairing_dispatch("pair_compare_status")
 
     @Slot(result="QVariant")
     @_guarded
-    @_off_the_main_thread
+    @_pairing_operation
     def find_computers(self):
         """Other computers on this network offering to pair (another Pythia
         with its Devices page open)."""
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("find_computers")
-        from pythia.droidtop import pair
-
-        return _jsonable({"status": "ok", "computers": pair.find()})
+        return self._pairing_dispatch("find_computers")
 
     @Slot("QVariant", result="QVariant")
     @_guarded
-    @_off_the_main_thread
+    @_pairing_operation
     def pick_computer(self, computer):
         """Starts comparing with a computer find_computers listed: the code."""
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("pick_computer")
-        from pythia.droidtop import AgentError, pair
-
-        try:
-            return _jsonable({"status": "ok", **pair.pick(dict(computer))})
-        except AgentError as exc:
-            return {"status": "error", "message": str(exc)}
+        return self._pairing_dispatch("pick_computer", args=[dict(computer)])
 
     @Slot(bool, result="QVariant")
     @_guarded
-    @_off_the_main_thread
+    @_pairing_operation
     def confirm_pairing(self, same: bool):
         """The person's answer to "same code on both screens?"; waits for the
         other device's."""
-        from pythia import droidtop
-
-        if not droidtop.available():
-            return self._agent_unavailable("confirm_pairing")
-        from pythia.droidtop import AgentError, pair
-
-        try:
-            name = pair.confirm(bool(same))
-        except AgentError as exc:
-            return {"status": "error", "message": str(exc)}
-        self.handheldsChanged.emit()
-        return {"status": "ok", "paired": name}
+        return self._pairing_dispatch("confirm_pairing", args=[bool(same)])
 
     @Slot(result="QVariant")
     @_guarded
@@ -2205,22 +2163,49 @@ class Backend(QObject):
     def stop_pair_offer(self):
         return self._pairing_dispatch("stop_pair_offer")
 
-    def _pairing_dispatch(self, name: str, owner: object | None = None, alive: Callable[[], bool] = lambda: True):
-        kind = "compare" if name in ("start_pair_offer", "stop_pair_offer") else "code"
-        generation = (
-            self._pairing_offers.reserve(owner, kind)
-            if name in ("start_pair_offer", "show_pairing_code")
-            else self._pairing_offers.request_stop(owner, kind)
-        )
-        return self._answer_later(name, lambda: self._pairing_call(name, owner, alive, generation))
+    def _pairing_dispatch(
+        self,
+        name: str,
+        owner: object | None = None,
+        alive: Callable[[], bool] = lambda: True,
+        args: list[Any] | None = None,
+    ):
+        from pythia.pairing_offers import PairingChanged
 
-    def _pairing_call(self, name: str, owner: object | None, alive: Callable[[], bool], generation: int | None):
+        if not alive():
+            return {"status": "error", "message": "The pairing window has disconnected."}
+        kind = "code" if name in ("show_pairing_code", "cancel_pairing", "pairing_status") else "compare"
+        if name in ("start_pair_offer", "show_pairing_code"):
+            generation = self._pairing_offers.reserve(owner, kind)
+        elif name in ("stop_pair_offer", "cancel_pairing"):
+            generation = self._pairing_offers.request_stop(owner, kind)
+        elif name == "pick_computer":
+            generation = self._pairing_offers.reserve_pick(owner)
+        elif name == "find_computers":
+            self._pairing_offers.begin_discovery(owner)
+            generation = self._pairing_offers.latest(owner, kind)
+        else:
+            generation = self._pairing_offers.latest(owner, kind)
+
+        def work():
+            try:
+                return self._pairing_call(name, owner, alive, generation, args or [])
+            except PairingChanged as exc:
+                return {"status": "error", "message": str(exc)}
+
+        return self._answer_later(name, work)
+
+    def _pairing_call(
+        self, name: str, owner: object | None, alive: Callable[[], bool], generation: int | None, args: list[Any]
+    ):
         from pythia import droidtop
 
         if not droidtop.available():
             return self._agent_unavailable(name)
         from pythia.droidtop import pair
 
+        if name == "find_computers":
+            return _jsonable({"status": "ok", "computers": pair.find()})
         if name == "start_pair_offer":
             return self._pairing_offers.begin(
                 owner, "compare", lambda: _jsonable({"status": "ok", **pair.offer()}), pair.stop, alive, generation
@@ -2229,13 +2214,51 @@ class Backend(QObject):
             return self._pairing_offers.begin(
                 owner, "code", lambda: _jsonable({"status": "ok", **pair.show()}), pair.cancel, alive, generation
             )
+        if name in ("pair_compare_status", "pairing_status"):
+            compare = name == "pair_compare_status"
+            status = self._pairing_offers.observe(
+                owner, "compare" if compare else "code", pair.compare_status if compare else pair.status, alive
+            )
+            if status.get("state") == "paired":
+                self.handheldsChanged.emit()
+            return _jsonable({"status": "ok", **status})
+        if name == "pick_computer":
+            if generation is None:
+                return {"status": "error", "message": "Start pairing again before choosing another computer."}
+            prepared = self._pairing_offers.begin(
+                owner,
+                "compare",
+                lambda: {"operation": pair.prepare_pick(dict(args[0]))},
+                pair.stop,
+                alive,
+                generation,
+            )
+            if "operation" not in prepared:
+                return prepared
+            result = prepared["operation"].finish()
+            if not self._pairing_offers.remember_comparison(owner, generation, result.get("code"), alive):
+                return {"status": "error", "message": "The pairing request changed before its code arrived."}
+            return _jsonable({"status": "ok", **result})
+        if name == "confirm_pairing":
+            operation = self._pairing_offers.prepare(
+                owner,
+                "compare",
+                generation,
+                lambda code: pair.prepare_confirm(code or ""),
+                alive,
+                needs_code=True,
+            )
+            # The native handle is frozen above; its cancellation handle permits Stop during this wait.
+            paired = operation.finish(bool(args[0]))
+            self.handheldsChanged.emit()
+            return {"status": "ok", "paired": paired}
         if name not in ("stop_pair_offer", "cancel_pairing"):
             raise ValueError("Unknown pairing operation")
         self._pairing_offers.stop(owner, "compare" if name == "stop_pair_offer" else "code", generation)
         return {"status": "ok"}
 
-    def _pairing_from_ipc(self, name: str, owner: object, alive: Callable[[], bool]):
-        return self._pairing_dispatch(name, owner, alive)
+    def _pairing_from_ipc(self, name: str, args: list[Any], owner: object, alive: Callable[[], bool]):
+        return self._pairing_dispatch(name, owner, alive, args)
 
     def _release_ipc_pairing(self, owner: object) -> None:
         # Native startup/withdrawal stays off both Qt's UI thread and the IPC writer/read loops.

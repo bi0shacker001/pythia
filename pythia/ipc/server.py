@@ -33,7 +33,19 @@ from pythia.util.log import logger
 BUILTINS = ("hello", "ping", "schema", "subscribe")
 HELLO_TIMEOUT_S = 10.0
 OUTBOX_LIMIT = 2000
-PAIRING_METHODS = frozenset(("start_pair_offer", "show_pairing_code", "stop_pair_offer", "cancel_pairing"))
+PAIRING_METHODS = frozenset(
+    (
+        "start_pair_offer",
+        "show_pairing_code",
+        "stop_pair_offer",
+        "cancel_pairing",
+        "pick_computer",
+        "confirm_pairing",
+        "pair_compare_status",
+        "pairing_status",
+        "find_computers",
+    )
+)
 _EARLY_LIMIT = 256
 _TYPE_CHECKS: dict[str, Callable[[Any], bool]] = {
     "string": lambda v: isinstance(v, str),
@@ -154,7 +166,7 @@ class Server:
         key: bytes,
         call_on_main: Callable[[Callable[[], Any]], Any] | None = None,
         where: str | None = None,
-        pairing_call: Callable[[str, object, Callable[[], bool]], Any] | None = None,
+        pairing_call: Callable[[str, list[Any], object, Callable[[], bool]], Any] | None = None,
         pairing_release: Callable[[object], None] | None = None,
     ):
         self._schema = schema
@@ -342,7 +354,7 @@ class Server:
 
         def invoke():
             if name in PAIRING_METHODS and self._pairing_call is not None and connection is not None:
-                return self._pairing_call(name, connection, lambda: not connection.closed)
+                return self._pairing_call(name, args, connection, lambda: not connection.closed)
             return self._handlers[name](*args)
 
         return ui_contract.guarded(name, lambda: to_answer(name, invoke()), log=failed)

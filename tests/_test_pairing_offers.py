@@ -1,10 +1,137 @@
 import threading
 from unittest import TestCase
 
-from pythia.pairing_offers import PairingOffers
+from pythia.pairing_offers import PairingChanged, PairingOffers
 
 
 class PairingOffersTest(TestCase):
+    def test_abandoned_new_owner_does_not_poison_the_existing_listener(self):
+        offers = PairingOffers()
+        active, abandoned = object(), object()
+        stopped = []
+        offers.begin(active, "compare", lambda: {}, lambda: stopped.append("active"))
+        pending = offers.reserve(abandoned, "compare")
+        offers.release(abandoned)
+        self.assertEqual(
+            offers.begin(
+                abandoned,
+                "compare",
+                lambda: self.fail("closed client started"),
+                lambda: None,
+                lambda: False,
+                generation=pending,
+            )["status"],
+            "error",
+        )
+        self.assertIsNone(offers.latest(abandoned, "compare"))
+        self.assertEqual(
+            offers.observe(active, "compare", lambda: {"state": "offering"}, lambda: True)["state"], "offering"
+        )
+        self.assertEqual(stopped, [])
+
+    def test_release_before_late_reservation_still_removes_the_closed_owner(self):
+        offers = PairingOffers()
+        active, closed = object(), object()
+        offers.begin(active, "compare", lambda: {}, lambda: None)
+        offers.release(closed)
+        late = offers.reserve(closed, "compare")
+        offers.begin(
+            closed, "compare", lambda: self.fail("late client started"), lambda: None, lambda: False, generation=late
+        )
+        self.assertIsNone(offers.latest(closed, "compare"))
+        self.assertEqual(
+            offers.observe(active, "compare", lambda: {"state": "offering"}, lambda: True)["state"], "offering"
+        )
+
+    def test_accepted_takeover_never_revives_an_older_queued_start(self):
+        offers = PairingOffers()
+        old, newer = object(), object()
+        first = offers.reserve(old, "compare")
+        offers.begin(newer, "compare", lambda: {}, lambda: None)
+        offers.stop(newer, "compare", offers.request_stop(newer, "compare"))
+        result = offers.begin(old, "compare", lambda: self.fail("old request revived"), lambda: None, generation=first)
+        self.assertEqual(result["status"], "error")
+
+    def test_confirmation_uses_only_the_owners_observed_code(self):
+        offers = PairingOffers()
+        owner, other = object(), object()
+        offers.begin(owner, "compare", lambda: {}, lambda: None)
+        generation = offers.latest(owner, "compare")
+        with self.assertRaises(PairingChanged):
+            offers.prepare(owner, "compare", generation, lambda _: None, lambda: True, needs_code=True)
+        seen = offers.observe(owner, "compare", lambda: {"state": "comparing", "code": "123456"}, lambda: True)
+        self.assertEqual(seen["code"], "123456")
+        self.assertEqual(
+            offers.observe(other, "compare", lambda: self.fail("read another owner's code"), lambda: True)["state"],
+            "failed",
+        )
+        expected = []
+        operation = object()
+        self.assertIs(
+            offers.prepare(
+                owner,
+                "compare",
+                generation,
+                lambda code: expected.append(code) or operation,
+                lambda: True,
+                needs_code=True,
+            ),
+            operation,
+        )
+        self.assertEqual(expected, ["123456"])
+        offers.reserve_pick(owner)
+        with self.assertRaises(PairingChanged):
+            offers.prepare(
+                owner,
+                "compare",
+                generation,
+                lambda _: self.fail("prepared stale confirmation"),
+                lambda: True,
+                needs_code=True,
+            )
+
+    def test_poll_during_a_new_pick_does_not_read_or_cancel_the_old_comparison(self):
+        offers = PairingOffers()
+        owner = object()
+        stopped = []
+        offers.begin(owner, "compare", lambda: {}, lambda: stopped.append(True))
+        generation = offers.reserve_pick(owner)
+        self.assertIsNotNone(generation)
+        state = offers.observe(owner, "compare", lambda: self.fail("read superseded comparison"), lambda: True)
+        self.assertEqual(state["state"], "finishing")
+        self.assertEqual(stopped, [])
+
+    def test_stopped_pick_needs_a_fresh_discovery_or_offer(self):
+        offers = PairingOffers()
+        owner = object()
+        generation = offers.reserve_pick(owner)
+        offers.request_stop(owner, "compare")
+        self.assertIsNone(offers.reserve_pick(owner))
+        offers.begin_discovery(owner)
+        next_generation = offers.reserve_pick(owner)
+        self.assertGreater(next_generation, generation)
+        started = []
+
+        def old_start():
+            started.append(True)
+            return {}
+
+        self.assertEqual(
+            offers.begin(owner, "compare", old_start, lambda: None, generation=generation)["status"], "error"
+        )
+        self.assertEqual(started, [])
+
+    def test_discovery_does_not_replace_another_windows_offer(self):
+        offers = PairingOffers()
+        old, current = object(), object()
+        offers.reserve_pick(old)
+        offers.request_stop(old, "compare")
+        offers.begin(current, "compare", lambda: {}, lambda: None)
+        offers.begin_discovery(old)
+        self.assertEqual(
+            offers.observe(current, "compare", lambda: {"state": "offering"}, lambda: True)["state"], "offering"
+        )
+
     def test_delayed_stop_cannot_withdraw_a_new_offer_on_the_same_connection(self):
         offers = PairingOffers()
         owner = object()

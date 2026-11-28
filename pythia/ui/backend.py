@@ -192,13 +192,15 @@ class Backend:
         self,
         error_console: bool = False,
         *,
-        desktop_events: bool = True,
         on_quit: Callable[[], None] | None = None,
         choose_path: Callable[[str, bool], str] | None = None,
     ):
         super().__init__()
         self._on_quit = on_quit
         self._choose_path = choose_path
+        self._read_clipboard: Callable[[], str] | None = None
+        self._write_clipboard: Callable[[str], None] | None = None
+        self._ring: Callable[[], None] | None = None
         self._decision_event = threading.Event()
         self._decision_result = None
         self._awaiting_live_decision = False
@@ -238,34 +240,27 @@ class Backend:
         self._library_scan_running = threading.Lock()
         threading.Thread(target=self._scan_library_folders_loop, daemon=True, name="pythia-library-scan").start()
         self._follow_agent_events()
-        if desktop_events:
-            self._follow_kdeconnect()
         # The handhelds' state changed (a pairing, a session): droidtop-agent's
         # folder gets it too while the agent is off (pythia.droidtop.takeover).
         self.handheldsChanged.connect(self._sync_with_agent)
 
     # ---- KDE Connect (docs/SPEC.md 6.1, mytop-project/tracker#645) -----------------------------------------------
-    def _follow_kdeconnect(self):
-        """KDE Connect's events reach the GUI thread through kdeconnectEvent (a signal emitted from the follower's
-        thread is queued), where the clipboard is written and what happened goes to the event log. This computer's
-        clipboard goes to paired devices when it changes; the library does not send back a clip that just came."""
-        from PySide6.QtGui import QGuiApplication
-
+    def attach_desktop_events(self, read, write, changed, ring, dispatch):
+        """Bind clipboard operations and dispatch incoming device events on the desktop's owner thread."""
         from pythia.droidtop import kdeconnect
 
-        kdeconnect.on_event(self.kdeconnectEvent.emit)
+        self._read_clipboard = read
+        self._write_clipboard = write
+        self._ring = ring
         self.kdeconnectEvent.connect(self._on_kdeconnect)
-        clipboard = QGuiApplication.clipboard()
-        if clipboard is not None:
-            clipboard.dataChanged.connect(self._send_clipboard)
+        kdeconnect.on_event(lambda event: dispatch(lambda: self.kdeconnectEvent.emit(event)))
+        changed(self._send_clipboard)
 
     def _send_clipboard(self):
-        from PySide6.QtGui import QGuiApplication
-
         from pythia.droidtop import kdeconnect
         from pythia.droidtop.native import AgentError
 
-        text = QGuiApplication.clipboard().text()
+        text = self._read_clipboard() if self._read_clipboard else ""
         if not text or not kdeconnect.is_on():
             return
 
@@ -278,8 +273,6 @@ class Backend:
         threading.Thread(target=send, name="kdeconnect-clipboard", daemon=True).start()
 
     def _on_kdeconnect(self, event: dict):
-        from PySide6.QtGui import QGuiApplication
-
         kind = event.get("event")
         plugin = event.get("plugin") or {}
         what = plugin.get("plugin")
@@ -290,7 +283,8 @@ class Backend:
         elif kind == "paired":
             self._record("info", "kdeconnect", "Paired a KDE Connect device")
         elif what == "clipboard":
-            QGuiApplication.clipboard().setText(plugin.get("text", ""))
+            if self._write_clipboard is not None:
+                self._write_clipboard(plugin.get("text", ""))
         elif what == "file_received":
             self._record("info", "kdeconnect", f"Received {plugin.get('name')} in {plugin.get('path')}")
         elif what == "file_failed":
@@ -305,7 +299,8 @@ class Backend:
             )
         elif what == "ring":
             self._record("warn", "kdeconnect", "A paired device is looking for this computer")
-            QGuiApplication.beep()
+            if self._ring is not None:
+                self._ring()
         elif what == "ping":
             self._record("info", "kdeconnect", plugin.get("message") or "Ping from a paired device")
 
@@ -1076,9 +1071,9 @@ class Backend:
     @_guarded
     def read_clipboard(self):
         """The clipboard's text, for "Paste link"."""
-        from PySide6.QtGui import QGuiApplication
-
-        return {"status": "ok", "text": QGuiApplication.clipboard().text()}
+        if self._read_clipboard is None:
+            return self._unavailable("read_clipboard", "Clipboard access belongs to the desktop frontend.")
+        return {"status": "ok", "text": self._read_clipboard()}
 
     # 2026-08-04, Lutris-base port: the old direct-launch variant flag (set_variant_
     # direct) isn't ported -- Lutris's own "linux" runner already covers "just run

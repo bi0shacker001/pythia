@@ -20,7 +20,7 @@ def main() -> int:
     from pythia.ipc import host, transport  # noqa: PLC0415
     from pythia.ui.backend import Backend  # noqa: PLC0415
 
-    backend = Backend(desktop_events=False)
+    backend = Backend()
     server = host.start(backend)
     if server is None:
         print("The backend channel did not start.", file=sys.stderr)

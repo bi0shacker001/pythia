@@ -127,6 +127,14 @@ def launch(hint: str | None = None, error_console: bool = False, tray_only: bool
         return path
 
     backend = Backend(error_console=error_console, on_quit=app.quit, choose_path=choose_path)
+    from pythia.ui.tray import MainThread
+
+    clipboard = app.clipboard()
+    if clipboard is not None:
+        desktop_dispatch = MainThread()
+        backend.attach_desktop_events(
+            clipboard.text, clipboard.setText, clipboard.dataChanged.connect, app.beep, desktop_dispatch.run.emit
+        )
     # The same slots, for a second front end in another process (docs/SPEC.md, decision 15).
     from pythia.ipc import qt as ipc
 

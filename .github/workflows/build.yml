@@ -16,8 +16,14 @@ permissions:
   contents: read
 
 jobs:
+  native-preview:
+    if: github.ref == 'refs/heads/ci/native-preview'
+    uses: ./.github/workflows/ui-native.yml
+
   windows:
     name: Windows installer
+    needs: native-preview
+    if: always() && (needs.native-preview.result == 'success' || needs.native-preview.result == 'skipped')
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,8 +78,25 @@ jobs:
           & $cli --list-games
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Installer
+        if: github.ref != 'refs/heads/ci/native-preview'
         shell: pwsh
         run: |
+          $version = python packaging\version.py --display
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=$version" "/DSourceDir=$PWD\dist\standalone\Pythia" "/DOutputDir=$PWD\dist" packaging\windows\pythia.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/download-artifact@v4
+        if: github.ref == 'refs/heads/ci/native-preview'
+        with:
+          name: pythia-native-preview-windows
+          path: dist/standalone/Pythia/native-ui
+      - name: Shared UI preview installer
+        if: github.ref == 'refs/heads/ci/native-preview'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist\standalone\Pythia\native-ui\pythia-ui.exe)) { throw "Missing native UI executable" }
           $version = python packaging\version.py --display
           $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
           if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }

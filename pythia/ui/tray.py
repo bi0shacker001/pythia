@@ -49,7 +49,7 @@ def hide_windows(app: QApplication) -> None:
             window.hide()
 
 
-def install(app: QApplication, icon_path: str) -> QSystemTrayIcon | None:
+def install(app: QApplication, icon_path: str, show_window=None) -> QSystemTrayIcon | None:
     """Puts the icon in the tray and keeps Pythia running when its window closes. None when the desktop has no
     tray, and then closing the window ends Pythia as before."""
     if not QSystemTrayIcon.isSystemTrayAvailable():
@@ -63,7 +63,8 @@ def install(app: QApplication, icon_path: str) -> QSystemTrayIcon | None:
     tray.setToolTip("Pythia")
     menu = QMenu()
     open_action = QAction("Open Pythia", menu)
-    open_action.triggered.connect(lambda: show_windows(app))
+    open_window = show_window or (lambda: show_windows(app))
+    open_action.triggered.connect(lambda: open_window())
     agent_line = QAction("", menu)
     agent_line.setEnabled(False)
     sign_in = QAction("Start at sign-in", menu)
@@ -102,7 +103,7 @@ def install(app: QApplication, icon_path: str) -> QSystemTrayIcon | None:
     tray.setContextMenu(menu)
     tray.activated.connect(
         lambda reason: (
-            show_windows(app)
+            open_window()
             if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick)
             else None
         )

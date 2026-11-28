@@ -22,6 +22,7 @@ on:
       - ".github/workflows/ui-native.yml"
       - ".gitmodules"
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -409,3 +410,9 @@ jobs:
             ${{ env.PYTHIA_DIST }}
             integration-out
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/ci/native-preview'
+        with:
+          name: pythia-native-preview-windows
+          path: ${{ env.PYTHIA_DIST }}/*
+          if-no-files-found: error

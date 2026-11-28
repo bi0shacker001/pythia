@@ -80,7 +80,7 @@ def _become_the_running_pythia(app, tray_only: bool, show_window=None) -> bool:
 
 def launch(hint: str | None = None, error_console: bool = False, tray_only: bool = False):
     try:
-        from PySide6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication, QFileDialog
     except ImportError:
         print(
             "Pythia's UI needs PySide6, which isn't installed.\n"
@@ -120,7 +120,13 @@ def launch(hint: str | None = None, error_console: bool = False, tray_only: bool
 
     from pythia.ui.backend import Backend
 
-    backend = Backend(error_console=error_console, on_quit=app.quit)
+    def choose_path(title: str, directory: bool) -> str:
+        if directory:
+            return QFileDialog.getExistingDirectory(None, title)
+        path, _ = QFileDialog.getOpenFileName(None, title)
+        return path
+
+    backend = Backend(error_console=error_console, on_quit=app.quit, choose_path=choose_path)
     # The same slots, for a second front end in another process (docs/SPEC.md, decision 15).
     from pythia.ipc import qt as ipc
 

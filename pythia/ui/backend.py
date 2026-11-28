@@ -194,9 +194,11 @@ class Backend:
         *,
         desktop_events: bool = True,
         on_quit: Callable[[], None] | None = None,
+        choose_path: Callable[[str, bool], str] | None = None,
     ):
         super().__init__()
         self._on_quit = on_quit
+        self._choose_path = choose_path
         self._decision_event = threading.Event()
         self._decision_result = None
         self._awaiting_live_decision = False
@@ -1717,16 +1719,11 @@ class Backend:
     # opening a folder, renaming or forgetting a record, rebuilding the index.
     @method("string", returns="string")
     def pick_folder(self, title: str) -> str:
-        from PySide6.QtWidgets import QFileDialog
-
-        return QFileDialog.getExistingDirectory(None, title or "Choose a folder") or ""
+        return self._choose_path(title or "Choose a folder", True) if self._choose_path else ""
 
     @method("string", returns="string")
     def pick_file(self, title: str) -> str:
-        from PySide6.QtWidgets import QFileDialog
-
-        path, _filter = QFileDialog.getOpenFileName(None, title or "Choose a file")
-        return path or ""
+        return self._choose_path(title or "Choose a file", False) if self._choose_path else ""
 
     @method(returns="answer")
     @_guarded

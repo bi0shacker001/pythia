@@ -120,7 +120,7 @@ def launch(hint: str | None = None, error_console: bool = False, tray_only: bool
 
     from pythia.ui.backend import Backend
 
-    backend = Backend(error_console=error_console)
+    backend = Backend(error_console=error_console, on_quit=app.quit)
     # The same slots, for a second front end in another process (docs/SPEC.md, decision 15).
     from pythia.ipc import qt as ipc
 

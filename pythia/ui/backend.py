@@ -188,8 +188,15 @@ class Backend:
     # (pythia.game_collections).
     collectionsChanged = Event("any")
 
-    def __init__(self, error_console: bool = False, *, desktop_events: bool = True):
+    def __init__(
+        self,
+        error_console: bool = False,
+        *,
+        desktop_events: bool = True,
+        on_quit: Callable[[], None] | None = None,
+    ):
         super().__init__()
+        self._on_quit = on_quit
         self._decision_event = threading.Event()
         self._decision_result = None
         self._awaiting_live_decision = False
@@ -1953,9 +1960,9 @@ class Backend:
 
     @method()
     def quit_app(self):
-        from PySide6.QtWidgets import QApplication
-
-        QApplication.instance().quit()
+        if self._on_quit is None:
+            return self._unavailable("quit_app", "This backend has no application window to close.")
+        self._on_quit()
 
     # ---- handhelds: this computer as the droidtop agent (pythia.droidtop) --------
     # Pythia's own droidtop module (pythia._native, on droidtop-agent's crates).

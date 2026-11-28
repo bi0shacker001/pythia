@@ -357,6 +357,12 @@ the droidtop coordinator for this lane. Later sections follow them.
       Library, Activity and Devices are primary navigation tabs; setup and
       diagnostics destinations are collected in More, with the active secondary
       destination named below the tabs. Navigation is not a row of filter chips.
+      Settings reads manager/service modes and log detail from the backend.
+      Manager mode retains its backend lock reason; writes refresh actual state
+      instead of flipping switches optimistically. Service mode shows the existing
+      backend consent before enable and confirms disable/removal; Cancel makes
+      no mutation. Missing consent or incomplete state prevents the action.
+      Controls disable during writes and retain rejected/unavailable answers.
       The game page edits notes through `save_notes` for this computer's record;
       failed saves preserve the draft, and Cancel makes no backend call.
       Returning from a game page retains the library scroll position and requests

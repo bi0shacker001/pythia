@@ -99,6 +99,7 @@ fun LibraryScreen(connection: PythiaConnection) {
                 "Plugins" -> PluginsPage(connection)
                 "Devices" -> DevicesPage(connection)
                 "Save backups" -> SaveBackupsPage(connection)
+                "Settings" -> SettingsPage(connection)
                 else -> {
                     AnswerMessage(s.systemInfo)
                     val events by connection.events.collectAsState()
@@ -112,7 +113,7 @@ fun LibraryScreen(connection: PythiaConnection) {
 @Composable
 private fun LibraryNavigation(page: String, navigate: (String) -> Unit) {
     val primary = listOf("Library", "Activity", "Devices")
-    val secondary = listOf("Folders", "Accounts", "Plugins", "Save backups", "Diagnostics")
+    val secondary = listOf("Folders", "Accounts", "Plugins", "Save backups", "Settings", "Diagnostics")
     var expanded by remember { mutableStateOf(false) }
     val selected = primary.indexOf(page).takeIf { it >= 0 } ?: primary.size
     Column {

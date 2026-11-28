@@ -12,8 +12,7 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Signal
 
-from pythia import instance
-from pythia.ipc import schema as schema_module
+from pythia.ipc import host
 from pythia.ipc.server import Server
 from pythia.util.log import logger
 
@@ -49,31 +48,18 @@ class MainThreadCaller(QObject):
         return box["value"]
 
 
-def attach(app: Any, backend: QObject, where: str | None = None) -> Server | None:
+def attach(app: Any, backend: Any, where: str | None = None) -> Server | None:
     """Serves `backend` on the backend channel until `app` quits. None when it cannot (another Pythia has the
     channel, or the folder is not private): the running Pythia carries on without it."""
     try:
-        schema = schema_module.describe(type(backend))
-        handlers = {m["name"]: getattr(backend, m["name"]) for m in schema["methods"]}
         caller = MainThreadCaller()
-        server = Server(
-            schema,
-            handlers,
-            instance.channel_key(),
-            call_on_main=caller.call,
-            where=where,
-            pairing_call=getattr(backend, "_pairing_from_ipc", None),
-            pairing_release=getattr(backend, "_release_ipc_pairing", None),
-        )
-        if not server.start():
+        server = host.start(backend, where, caller.call)
+        if server is None:
             logger.warning("The backend channel is already served; this Pythia does not serve it.")
             return None
     except Exception as ex:  # noqa: BLE001 -- the channel is an extra: Pythia runs without it
         logger.exception("The backend channel could not start: %s", ex)
         return None
-    for event in schema["events"]:
-        name = event["name"]
-        getattr(backend, name).connect(lambda *args, name=name: server.publish(name, list(args)))
     app.aboutToQuit.connect(server.stop)
     # Kept for the app's life, as pythia.ui.mode keeps its icon and its instance channel.
     app._pythia_ipc = (server, caller)  # noqa: SLF001

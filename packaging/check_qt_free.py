@@ -15,8 +15,11 @@ def main() -> None:
     executable = root / "native-ui" / ("pythia-ui.exe" if sys.platform == "win32" else "pythia-ui")
     assert executable.is_file(), executable
     assert importlib.util.find_spec("PySide6") is None, "Qt is importable in the frozen host"
-    forbidden = [path for path in root.rglob("*") if path.is_file() and
-                 ("pyside" in path.name.lower() or path.name.lower().startswith(("qt6", "libqt6")))]
+    forbidden = [
+        path
+        for path in root.rglob("*")
+        if path.is_file() and ("pyside" in path.name.lower() or path.name.lower().startswith(("qt6", "libqt6")))
+    ]
     assert not forbidden, forbidden
     with tempfile.TemporaryDirectory(prefix="pythia-native-bundle-") as data:
         os.environ["PYTHIA_DATA_DIR"] = data
@@ -37,9 +40,15 @@ def main() -> None:
         worker = threading.Thread(target=emit, daemon=True)
         worker.start()
         try:
-            completed = subprocess.run([str(executable), "--smoke"], cwd=executable.parent,
-                                       env=_frontend_environment(), capture_output=True,
-                                       text=True, timeout=150, check=False)
+            completed = subprocess.run(
+                [str(executable), "--smoke"],
+                cwd=executable.parent,
+                env=_frontend_environment(),
+                capture_output=True,
+                text=True,
+                timeout=150,
+                check=False,
+            )
             print(completed.stdout, flush=True)
             print(completed.stderr, file=sys.stderr, flush=True)
             assert completed.returncode == 0, completed.returncode
@@ -58,9 +67,15 @@ def main() -> None:
                 deadline = time.monotonic() + 120
                 while time.monotonic() < deadline:
                     assert application.poll() is None, "installed native launcher exited during startup"
-                    probe = subprocess.run([str(executable), "--probe"], cwd=executable.parent,
-                                           env=_frontend_environment(), capture_output=True,
-                                           text=True, timeout=15, check=False)
+                    probe = subprocess.run(
+                        [str(executable), "--probe"],
+                        cwd=executable.parent,
+                        env=_frontend_environment(),
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                        check=False,
+                    )
                     if probe.returncode == 0:
                         assert '"server":"pythia"' in probe.stdout, probe.stdout
                         break

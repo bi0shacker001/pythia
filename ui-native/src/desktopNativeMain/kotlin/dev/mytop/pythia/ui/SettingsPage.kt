@@ -29,6 +29,7 @@ internal fun SettingsPage(connection: PythiaConnection) {
     fun change(action: suspend () -> Answer) {
         if (busy) return
         busy = true
+        result = null
         scope.launch {
             try { result = action(); reload() } finally { busy = false }
         }

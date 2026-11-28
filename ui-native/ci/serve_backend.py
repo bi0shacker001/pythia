@@ -8,38 +8,39 @@ killed.
 
 import os
 import sys
+import threading
 
 
 def main() -> int:
     if not os.environ.get("PYTHIA_DATA_DIR"):
         print("PYTHIA_DATA_DIR must name a throwaway folder.", file=sys.stderr)
         return 2
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("PYTHIA_DATADIR_OVERRIDE", os.path.join(os.environ["PYTHIA_DATA_DIR"], "datadir"))
 
-    from PySide6.QtGui import QGuiApplication  # noqa: PLC0415
-
-    app = QGuiApplication(sys.argv[:1])
-
-    from pythia.ipc import qt as ipc  # noqa: PLC0415
-    from pythia.ipc import transport  # noqa: PLC0415
+    from pythia.ipc import host, transport  # noqa: PLC0415
     from pythia.ui.backend import Backend  # noqa: PLC0415
 
-    backend = Backend()
-    server = ipc.attach(app, backend)
+    backend = Backend(desktop_events=False)
+    server = host.start(backend)
     if server is None:
         print("The backend channel did not start.", file=sys.stderr)
         return 1
-    emit = os.environ.get("PYTHIA_SERVE_EMIT")
-    if emit:
-        # A signal of the Backend now and then, as a real Pythia has when a library changes: the window's event list.
-        from PySide6.QtCore import QTimer  # noqa: PLC0415
-
-        timer = QTimer(app)
-        timer.timeout.connect(getattr(backend, emit).emit)
-        timer.start(int(os.environ.get("PYTHIA_SERVE_EMIT_MS", "1000")))
     print("ready", transport.address(), flush=True)
-    return app.exec()
+    stop = threading.Event()
+    emit = os.environ.get("PYTHIA_SERVE_EMIT")
+    try:
+        if emit:
+            signal = getattr(backend, emit)
+            interval = int(os.environ.get("PYTHIA_SERVE_EMIT_MS", "1000")) / 1000
+            while not stop.wait(interval):
+                signal.emit()
+        else:
+            stop.wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.stop()
+    return 0
 
 
 if __name__ == "__main__":

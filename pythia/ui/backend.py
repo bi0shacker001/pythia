@@ -188,7 +188,7 @@ class Backend:
     # (pythia.game_collections).
     collectionsChanged = Event("any")
 
-    def __init__(self, error_console: bool = False):
+    def __init__(self, error_console: bool = False, *, desktop_events: bool = True):
         super().__init__()
         self._decision_event = threading.Event()
         self._decision_result = None
@@ -229,7 +229,8 @@ class Backend:
         self._library_scan_running = threading.Lock()
         threading.Thread(target=self._scan_library_folders_loop, daemon=True, name="pythia-library-scan").start()
         self._follow_agent_events()
-        self._follow_kdeconnect()
+        if desktop_events:
+            self._follow_kdeconnect()
         # The handhelds' state changed (a pairing, a session): droidtop-agent's
         # folder gets it too while the agent is off (pythia.droidtop.takeover).
         self.handheldsChanged.connect(self._sync_with_agent)

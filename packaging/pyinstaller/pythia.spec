@@ -7,6 +7,7 @@
 # Windows: Pythia.exe (no console; the Start menu's) and pythia-cli.exe (the command line), one folder.
 # macOS: Pythia.app. Linux: a pythia folder with the pythia program in it.
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -16,6 +17,8 @@ ROOT = Path(SPECPATH).resolve().parent.parent  # noqa: F821 (PyInstaller defines
 ICON = str(ROOT / "share" / "icons" / "hicolor" / "256x256" / "apps" / "net.pythia.Pythia.png")
 WINDOWS = sys.platform == "win32"
 MAC = sys.platform == "darwin"
+QT_FREE = os.environ.get("PYTHIA_QT_FREE") == "1"
+LEGACY_UI = ("pythia.ui.desktop", "pythia.ui.bigpicture", "pythia.ui.webview", "pythia.ui.tray", "pythia.ui.mode", "pythia.ipc.qt")
 
 # The compiled droidtop agent, from the installed wheel. Run from the repository root, the source tree's own
 # pythia package (which has no compiled module) shadowed the wheel's and the build came out without it, so it
@@ -29,7 +32,12 @@ if NATIVE is None or NATIVE.origin is None or ROOT in Path(NATIVE.origin).resolv
 
 # Pythia imports much of itself lazily (plugins, the UI's places, the droidtop modules), so every module
 # is collected.
-hidden = collect_submodules("pythia", filter=lambda name: ".tests" not in name) + ["pythia._native"]
+hidden = collect_submodules("pythia", filter=lambda name: ".tests" not in name and
+    (not QT_FREE or not any(name == old or name.startswith(old + ".") for old in LEGACY_UI))) + ["pythia._native"]
+package_data = collect_data_files("pythia")
+if QT_FREE:
+    package_data = [item for item in package_data if not any(
+        "/" + old.replace(".", "/") + "/" in Path(item[0]).as_posix() for old in LEGACY_UI)]
 
 a = Analysis(  # noqa: F821
     [str(ROOT / "packaging" / "pyinstaller" / "entry.py")],
@@ -37,10 +45,10 @@ a = Analysis(  # noqa: F821
     binaries=[(NATIVE.origin, "pythia")],
     # The package's own files (Qt designs, json, the Windows secure-screen helper) and share/pythia, which
     # pythia.util.datapath finds inside the bundle.
-    datas=collect_data_files("pythia") + [(str(ROOT / "share" / "pythia"), "share/pythia")],
+    datas=package_data + [(str(ROOT / "share" / "pythia"), "share/pythia")],
     hiddenimports=hidden,
     # GTK leftovers the Qt UI does not use (packaging/freeze_requirements.py).
-    excludes=["gi", "dbus", "tkinter"],
+    excludes=["gi", "dbus", "tkinter"] + (["PySide6", "PyQt6", "PyQt5", *LEGACY_UI] if QT_FREE else []),
     noarchive=False,
 )
 pyz = PYZ(a.pure)  # noqa: F821

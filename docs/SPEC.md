@@ -411,7 +411,20 @@ the droidtop coordinator for this lane. Later sections follow them.
       polite live regions; loading exposes indeterminate progress. These are
       source-level accessibility contracts, not a claim that the native
       Compose fork's accessibility bridge has passed device validation.
-    - **Not yet:** a macOS window, the remaining screens, packaging and
+    - **Qt-free packaging candidate (owner, 2026-11-27: remove all Qt;
+      coordinator: "explicit CI smoke first, no claims production parity").**
+      Build's manual `qt_free` input composes the frozen Python backend with
+      the same commit's complete Windows native distribution or Linux
+      executable and SDL3. Linux links on Ubuntu 22.04 to retain the glibc
+      2.35 floor; SDL3 loads from a relative bundle path. The frozen candidate
+      excludes PySide/Qt and retired Qt UI modules/assets. Its CI checks the
+      standalone and installed bundle's real native window, authenticated IPC
+      and explicit `--ui native` entry/quit path, without importing Qt. Existing
+      installer names, CLI/self-command handling and update assets are kept.
+      This opt-in candidate does not change the packaged default, supply tray
+      or clipboard parity, or claim a macOS native window. Qt-free macOS
+      packaging waits for a real renderer for both supported architectures.
+    - **Not yet:** a macOS window, the remaining screens, default packaging and
       making this window the packaged default. The existing front ends
       stay available until their tasks have working native replacements.
 

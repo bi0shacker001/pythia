@@ -55,3 +55,20 @@ What each installs:
   package is called `pythia`, as the Launchpad-built one is; installing one replaces the other.
 
 Uninstalling never removes the person's library or settings.
+
+## Qt-free Windows/Linux candidate
+
+The Build workflow's manual `qt_free=true` input builds the same commit's native
+frontend and composes it into the frozen host under `native-ui/`. It excludes Qt
+dependencies, legacy UI modules and assets from that frozen candidate. The Linux
+frontend is built on Ubuntu 22.04 and carries SDL3 with a relative library path;
+Windows carries the complete native distribution, including its runtime DLLs.
+The existing installer formats and update asset names are retained. The macOS
+jobs are skipped in this mode because there is no native macOS window yet.
+
+CI checks the frozen and installed programs with `packaging/check_qt_free.py`:
+no importable PySide/Qt binaries, a real native smoke window against the frozen
+backend, then the installed `--ui native` launcher, authenticated IPC and quit.
+These checks run in disposable data directories. They do not establish tray,
+clipboard, visual/accessibility or full task parity. The normal release lane and
+packaged default remain separate until the cutover is reviewed.

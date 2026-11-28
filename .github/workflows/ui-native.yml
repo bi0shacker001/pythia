@@ -23,6 +23,10 @@ on:
       - ".gitmodules"
   workflow_dispatch:
   workflow_call:
+    inputs:
+      qt_free:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,7 +51,7 @@ env:
 jobs:
   linux-x64:
     name: linuxX64 (build, test)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.qt_free && 'ubuntu-22.04' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,7 +82,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /opt/sdl3
-          key: sdl3-${{ env.SDL_TAG }}-x64-v1
+          key: sdl3-${{ env.SDL_TAG }}-x64-${{ inputs.qt_free && 'ubuntu22' || 'ubuntu24' }}-v2
       - name: Build SDL3 (Ubuntu 24.04 has no libsdl3)
         if: steps.sdl-cache.outputs.cache-hit != 'true'
         run: |
@@ -116,6 +120,22 @@ jobs:
           name: pythia-ui-linuxX64
           path: ui-native/out/pythia-ui
           retention-days: 7
+      - name: Assemble relocatable Linux native UI
+        if: inputs.qt_free
+        run: |
+          sudo apt-get install -y patchelf
+          mkdir -p out/native-ui/lib
+          cp ui-native/out/pythia-ui out/native-ui/
+          cp -a /usr/local/lib/libSDL3.so* out/native-ui/lib/
+          patchelf --set-rpath '$ORIGIN/lib' out/native-ui/pythia-ui
+          ldd out/native-ui/pythia-ui | tee out/native-ui/linked-libraries.txt
+          ! grep -q 'not found' out/native-ui/linked-libraries.txt
+      - uses: actions/upload-artifact@v4
+        if: inputs.qt_free
+        with:
+          name: pythia-native-distribution-linux
+          path: out/native-ui/
+          if-no-files-found: error
 
   integration:
     name: Integration (linuxX64 against the real Backend)
@@ -414,5 +434,11 @@ jobs:
         if: github.ref == 'refs/heads/ci/native-preview'
         with:
           name: pythia-native-preview-windows
+          path: ${{ env.PYTHIA_DIST }}/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: inputs.qt_free
+        with:
+          name: pythia-native-distribution-windows
           path: ${{ env.PYTHIA_DIST }}/*
           if-no-files-found: error

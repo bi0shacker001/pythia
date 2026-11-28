@@ -11,20 +11,29 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      qt_free:
+        description: Validate the explicit Qt-free Windows/Linux bundle (not a default UI cutover)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   native-preview:
-    if: github.ref == 'refs/heads/ci/native-preview'
+    if: github.ref == 'refs/heads/ci/native-preview' || inputs.qt_free
     uses: ./.github/workflows/ui-native.yml
+    with:
+      qt_free: ${{ inputs.qt_free || false }}
 
   windows:
     name: Windows installer
     needs: native-preview
     if: always() && (needs.native-preview.result == 'success' || needs.native-preview.result == 'skipped')
     runs-on: windows-latest
+    env:
+      PYTHIA_QT_FREE: ${{ inputs.qt_free && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
       - name: The pinned droidtop-platforms data
@@ -48,7 +57,8 @@ jobs:
           cargo install --locked --git https://github.com/mytop-project/windowcast --rev $rev windowcast-secure-helper --root "$env:RUNNER_TEMP\helper"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item "$env:RUNNER_TEMP\helper\bin\windowcast-secure-helper.exe" pythia\windowcast-secure-helper.exe
-          python packaging\freeze_requirements.py > "$env:RUNNER_TEMP\requirements.txt"
+          if ($env:PYTHIA_QT_FREE -eq '1') { python packaging\freeze_requirements.py --qt-free > "$env:RUNNER_TEMP\requirements.txt" }
+          else { python packaging\freeze_requirements.py > "$env:RUNNER_TEMP\requirements.txt" }
           python -m venv "$env:RUNNER_TEMP\freeze"
           $py = "$env:RUNNER_TEMP\freeze\Scripts\python.exe"
           & $py -m pip install --upgrade pip
@@ -76,6 +86,17 @@ jobs:
           $env:APPDATA = "$env:RUNNER_TEMP\appdata"
           $env:LOCALAPPDATA = "$env:RUNNER_TEMP\localappdata"
           & $cli --list-games
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/download-artifact@v4
+        if: inputs.qt_free
+        with:
+          name: pythia-native-distribution-windows
+          path: dist/standalone/Pythia/native-ui
+      - name: Qt-free standalone window and authenticated IPC smoke
+        if: inputs.qt_free
+        shell: pwsh
+        run: |
+          & dist\standalone\Pythia\pythia-cli.exe --pythia-script packaging\check_qt_free.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Installer
         if: github.ref != 'refs/heads/ci/native-preview'
@@ -113,6 +134,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $shortcut = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Pythia.lnk"
           if (-not (Test-Path $shortcut)) { throw "no Start menu entry at $shortcut" }
+          if ('${{ inputs.qt_free }}' -eq 'true') {
+            & "$installed\pythia-cli.exe" --pythia-script packaging\check_qt_free.py
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           Start-Process "$installed\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait
           Start-Sleep -Seconds 5
           if (Test-Path $shortcut) { throw "the uninstaller left the Start menu entry" }
@@ -123,8 +148,12 @@ jobs:
 
   linux:
     name: Linux deb and rpm
+    needs: native-preview
+    if: always() && (needs.native-preview.result == 'success' || needs.native-preview.result == 'skipped')
     # The oldest supported Ubuntu, so the packages run on every distribution with its glibc or newer.
     runs-on: ubuntu-22.04
+    env:
+      PYTHIA_QT_FREE: ${{ inputs.qt_free && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
       - name: The pinned droidtop-platforms data
@@ -140,14 +169,16 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y libudev-dev pkg-config cmake
+          sudo apt-get install -y libudev-dev pkg-config cmake xvfb libgl1-mesa-dri libegl1 libfontconfig1 libxkbcommon0 libwayland-client0 libx11-6
           curl -fsSL -o "$RUNNER_TEMP/nfpm.tar.gz" https://github.com/goreleaser/nfpm/releases/download/v2.49.0/nfpm_2.49.0_Linux_x86_64.tar.gz
           echo "2afaa5ffb5e3493402e31e7c67a5a1fb42133e3f66fc315ca0051934125561c7  $RUNNER_TEMP/nfpm.tar.gz" | sha256sum -c -
           mkdir -p "$RUNNER_TEMP/nfpm"
           tar -xzf "$RUNNER_TEMP/nfpm.tar.gz" -C "$RUNNER_TEMP/nfpm" nfpm
       - name: Standalone build
         run: |
-          python packaging/freeze_requirements.py > "$RUNNER_TEMP/requirements.txt"
+          qt_free_flag=""
+          if [ "$PYTHIA_QT_FREE" = 1 ]; then qt_free_flag=--qt-free; fi
+          python packaging/freeze_requirements.py $qt_free_flag > "$RUNNER_TEMP/requirements.txt"
           python -m venv "$RUNNER_TEMP/freeze"
           "$RUNNER_TEMP/freeze/bin/pip" install --upgrade pip
           "$RUNNER_TEMP/freeze/bin/pip" install -r "$RUNNER_TEMP/requirements.txt" "pyinstaller==6.22.3"
@@ -159,6 +190,16 @@ jobs:
           dist/standalone/pythia/pythia --version
           dist/standalone/pythia/pythia --pythia-script packaging/check_standalone.py
           HOME="$RUNNER_TEMP/home" dist/standalone/pythia/pythia --list-games
+      - uses: actions/download-artifact@v4
+        if: inputs.qt_free
+        with:
+          name: pythia-native-distribution-linux
+          path: dist/standalone/pythia/native-ui
+      - name: Qt-free standalone window and authenticated IPC smoke
+        if: inputs.qt_free
+        run: |
+          chmod +x dist/standalone/pythia/native-ui/pythia-ui
+          LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11 xvfb-run -a dist/standalone/pythia/pythia --pythia-script packaging/check_qt_free.py
       - name: deb and rpm
         run: |
           VERSION=$(python packaging/version.py --package)
@@ -172,6 +213,9 @@ jobs:
           pythia --version
           test -f /usr/share/applications/net.pythia.Pythia.desktop
           HOME="$RUNNER_TEMP/home2" pythia --list-games
+          if [ "$PYTHIA_QT_FREE" = 1 ]; then
+            LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11 xvfb-run -a pythia --pythia-script packaging/check_qt_free.py
+          fi
       - name: Install the rpm on Fedora and run it
         run: |
           docker run --rm -v "$PWD/dist:/dist:ro" fedora:41 sh -c "dnf install -y /dist/pythia-*.rpm && pythia --version && HOME=/tmp pythia --list-games"
@@ -184,6 +228,7 @@ jobs:
 
   macos:
     name: macOS disk image (${{ matrix.arch }})
+    if: ${{ !inputs.qt_free }}
     strategy:
       matrix:
         include:

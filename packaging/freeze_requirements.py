@@ -17,12 +17,13 @@ LEFT_OUT = {"pygobject", "dbus-python"}
 
 
 def main() -> int:
+    left_out = LEFT_OUT | ({"pyside6"} if "--qt-free" in sys.argv[1:] else set())
     project = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text("utf-8"))
     for requirement in project["project"]["dependencies"]:
         name = requirement.split(";")[0].strip().split("[")[0]
         for sep in "<>=!~ ":
             name = name.split(sep)[0]
-        if name.lower() not in LEFT_OUT:
+        if name.lower() not in left_out:
             sys.stdout.write(requirement + "\n")
     return 0
 
